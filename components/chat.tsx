@@ -1,0 +1,210 @@
+"use client";
+
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { routeOf } from "@/lib/agents/demo";
+import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
+import type { HealthProfile } from "@/lib/memory/profile";
+
+/* --- tiny, safe markdown-lite renderer --- */
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} className="font-semibold text-white">{p.slice(2, -2)}</strong>;
+        if (p.startsWith("_") && p.endsWith("_")) return <em key={i} className="text-[var(--text-dim)]">{p.slice(1, -1)}</em>;
+        return <span key={i}>{p}</span>;
+      })}
+    </>
+  );
+}
+
+function Markdown({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-1.5 text-sm leading-relaxed">
+      {lines.map((line, i) => {
+        const t = line.trim();
+        if (!t) return <div key={i} className="h-1" />;
+        if (t.startsWith("🚩") || /red flag/i.test(t))
+          return <p key={i} className="rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-1.5 text-[#ffd7dd]"><Inline text={t} /></p>;
+        if (t.startsWith("- "))
+          return (
+            <div key={i} className="flex gap-2 pl-1">
+              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[var(--emerald)]" />
+              <span className="text-[var(--text-muted)]"><Inline text={t.slice(2)} /></span>
+            </div>
+          );
+        if (/^\d+\.\s/.test(t))
+          return <p key={i} className="pl-1 text-[var(--text-muted)]"><Inline text={t} /></p>;
+        return <p key={i} className="text-[var(--text)]"><Inline text={t} /></p>;
+      })}
+    </div>
+  );
+}
+
+const SUGGESTIONS = [
+  "I have a fever.",
+  "Am I eating enough protein?",
+  "Explain my blood report.",
+  "How's my sleep trend?",
+  "Best workout for building muscle?",
+];
+
+export default function Chat({ profile }: { profile: HealthProfile }) {
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ messages }) => ({
+          body: { messages, profile: profileRef.current },
+        }),
+      }),
+    [],
+  );
+
+  const { messages, sendMessage, status, error } = useChat({ transport });
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, status]);
+
+  const busy = status === "submitted" || status === "streaming";
+
+  const send = (text: string) => {
+    if (!text.trim() || busy) return;
+    sendMessage({ text });
+    setInput("");
+  };
+
+  // agent badge for an assistant message = route of the user message before it
+  const badgeFor = (idx: number) => {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        const t = messages[i].parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" ");
+        return routeOf(t);
+      }
+    }
+    return "supervisor";
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* header */}
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">✦</span>
+          <div>
+            <p className="text-sm font-semibold">NutritiScan Supervisor</p>
+            <p className="text-[11px] text-[var(--text-dim)]">routing across 5 specialists · remembers your history</p>
+          </div>
+        </div>
+        <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">
+          <span className={`h-1.5 w-1.5 rounded-full ${busy ? "bg-[var(--amber)]" : "bg-[var(--emerald)]"}`} />
+          {busy ? "thinking" : "ready"}
+        </span>
+      </div>
+
+      {/* messages */}
+      <div ref={scrollRef} className="scroll-thin flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        {messages.length === 0 && (
+          <div className="grid h-full place-items-center text-center">
+            <div>
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-2xl">✦</div>
+              <p className="mt-4 text-lg font-semibold">Hi {profile.name}. How are you feeling?</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Ask about symptoms, food, training, sleep, or your labs.</p>
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, idx) => {
+          const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("");
+          if (m.role === "user") {
+            return (
+              <div key={m.id} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[color-mix(in_oklab,var(--emerald)_18%,transparent)] px-4 py-2.5 text-sm text-white">
+                  {text}
+                </div>
+              </div>
+            );
+          }
+          const route = badgeFor(idx);
+          const color = agentColor(route);
+          return (
+            <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm" style={{ background: `${color}22` }}>
+                {route === "supervisor" ? "✦" : agentGlyph(route)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="mb-1 text-[11px] font-medium" style={{ color }}>
+                  {route === "supervisor" ? "Supervisor" : agentName(route)}
+                </p>
+                <div className="rounded-2xl rounded-tl-sm bg-[var(--surface-2)] px-4 py-3">
+                  {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+
+        {status === "submitted" && (
+          <div className="flex gap-3">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-sm">✦</span>
+            <div className="flex items-center gap-1 rounded-2xl bg-[var(--surface-2)] px-4 py-3">
+              {[0, 1, 2].map((d) => (
+                <motion.span key={d} className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]" animate={{ opacity: [0.2, 1, 0.2] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
+            Something went wrong. Please try again.
+          </p>
+        )}
+      </div>
+
+      {/* suggestions */}
+      <AnimatePresence>
+        {messages.length === 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-wrap gap-2 px-5 pb-3">
+            {SUGGESTIONS.map((s) => (
+              <button key={s} onClick={() => send(s)} className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white">
+                {s}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* input */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); send(input); }}
+        className="border-t border-[var(--border)] p-4"
+      >
+        <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={busy}
+            placeholder="Describe how you feel, or ask anything…"
+            className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
+          />
+          <button type="submit" disabled={busy || !input.trim()} className="btn-primary grid h-8 w-8 place-items-center rounded-xl text-base disabled:opacity-40">
+            ↑
+          </button>
+        </div>
+        <p className="mt-2 text-center text-[10px] text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
+      </form>
+    </div>
+  );
+}
