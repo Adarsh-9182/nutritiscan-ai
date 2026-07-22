@@ -46,6 +46,28 @@ function Markdown({ text }: { text: string }) {
   );
 }
 
+// Extract the "which specialists were consulted" trace from a message.
+// Demo mode → data-trace part; real mode → tool-ask* parts.
+const TOOL_MAP: Record<string, string> = {
+  asknutritionagent: "nutrition",
+  askfitnessagent: "fitness",
+  askdoctoragent: "doctor",
+  asklabagent: "lab",
+  askcoachagent: "coach",
+};
+function tracesFor(m: { parts: unknown[] }): { agents: string[]; done: boolean } | null {
+  const parts = m.parts as { type: string; data?: { agents?: string[]; done?: boolean }; state?: string }[];
+  const d = parts.find((p) => p.type === "data-trace");
+  if (d?.data?.agents?.length) return { agents: d.data.agents, done: !!d.data.done };
+  const toolParts = parts.filter((p) => typeof p.type === "string" && p.type.startsWith("tool-ask"));
+  if (toolParts.length) {
+    const agents = [...new Set(toolParts.map((p) => TOOL_MAP[p.type.slice(5).toLowerCase()]).filter(Boolean))];
+    const done = toolParts.every((p) => p.state === "output-available" || p.state === "output-error");
+    if (agents.length) return { agents, done };
+  }
+  return null;
+}
+
 const SUGGESTIONS = [
   "I have a fever.",
   "Am I eating enough protein?",
@@ -138,6 +160,7 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
           }
           const route = badgeFor(idx);
           const color = agentColor(route);
+          const trace = tracesFor(m);
           return (
             <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
               <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm" style={{ background: `${color}22` }}>
@@ -147,6 +170,17 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
                 <p className="mb-1 text-[11px] font-medium" style={{ color }}>
                   {route === "supervisor" ? "Supervisor" : agentName(route)}
                 </p>
+                {trace && (
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-[var(--text-dim)]">{trace.done ? "Consulted" : "Consulting"}</span>
+                    {trace.agents.map((a) => (
+                      <span key={a} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]" style={{ borderColor: `${agentColor(a)}55`, color: agentColor(a) }}>
+                        {!trace.done && <motion.span className="h-1 w-1 rounded-full" style={{ background: agentColor(a) }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity }} />}
+                        {agentGlyph(a)} {agentName(a)}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="rounded-2xl rounded-tl-sm bg-[var(--surface-2)] px-4 py-3">
                   {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                 </div>

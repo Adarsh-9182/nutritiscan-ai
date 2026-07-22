@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import Chat from "@/components/chat";
 import { AGENTS } from "@/lib/agents-meta";
-import { bmi, demoProfile, healthScore, heightImperial, type HealthProfile } from "@/lib/memory/profile";
+import { bmi, demoProfile, healthScore, heightImperial, insight, type HealthProfile } from "@/lib/memory/profile";
+import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
+
+const STORAGE_KEY = "ns-profile-v1";
 
 /* ---- progress ring ---- */
 function Ring({ value, max = 100, size = 132, stroke = 10, color = "var(--emerald)", label, sub }: { value: number; max?: number; size?: number; stroke?: number; color?: string; label: string; sub?: string }) {
@@ -69,7 +72,43 @@ function Stepper({ label, value, unit, onDec, onInc, color }: { label: string; v
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<HealthProfile>(demoProfile);
+  const [hydrated, setHydrated] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportMsg, setReportMsg] = useState<string | null>(null);
   const patch = (p: Partial<HealthProfile>) => setProfile((prev) => ({ ...prev, ...p }));
+
+  // Hydrate from localStorage (real, keyless persistence — the AI's memory survives refreshes).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setProfile(JSON.parse(raw));
+    } catch {}
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    } catch {}
+  }, [profile, hydrated]);
+
+  const addReport = () => {
+    const found = parseLabReport(reportText);
+    if (!found.length) {
+      setReportMsg('No known markers found. Try lines like "B12 180" or "Vitamin D 34".');
+      return;
+    }
+    patch({ biomarkers: mergeBiomarkers(profile.biomarkers, found) });
+    setReportMsg(`Added ${found.length} marker${found.length > 1 ? "s" : ""} to your memory ✓`);
+    setReportText("");
+    setShowReport(false);
+  };
+
+  const resetMemory = () => {
+    setProfile(demoProfile);
+    setReportMsg("Memory reset to demo profile.");
+  };
 
   const score = healthScore(profile);
   const b = bmi(profile);
@@ -116,9 +155,12 @@ export default function Dashboard() {
           <div className="rounded-[var(--radius)] glass p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">Health Memory</p>
-              <span className="text-[11px] text-[var(--text-dim)]">{profile.name}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowReport((s) => !s); setReportMsg(null); }} className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:text-white">+ Report</button>
+                <button onClick={resetMemory} title="Reset to demo memory" className="grid h-6 w-6 place-items-center rounded-full border border-[var(--border-strong)] text-[11px] text-[var(--text-dim)] transition hover:text-white">↺</button>
+              </div>
             </div>
-            <p className="mt-1 text-[11px] text-[var(--text-dim)]">Edits update every agent instantly.</p>
+            <p className="mt-2 rounded-lg bg-[color-mix(in_oklab,var(--emerald)_12%,transparent)] px-2.5 py-1.5 text-[11px] leading-snug text-[var(--text-muted)]">💡 {insight(profile)}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Stepper label="Weight" value={String(profile.weightKg)} unit="kg" color="var(--cyan)" onDec={() => patch({ weightKg: Math.max(35, profile.weightKg - 1) })} onInc={() => patch({ weightKg: profile.weightKg + 1 })} />
               <Stepper label="Sleep" value={String(profile.sleepHours)} unit="h" color="var(--violet)" onDec={() => patch({ sleepHours: Math.max(3, +(profile.sleepHours - 0.5).toFixed(1)) })} onInc={() => patch({ sleepHours: +(profile.sleepHours + 0.5).toFixed(1) })} />
@@ -141,6 +183,28 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+
+            <AnimatePresence>
+              {showReport && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="mt-3 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] p-3">
+                    <p className="text-[11px] text-[var(--text-dim)]">Paste a lab report — I&apos;ll extract the markers.</p>
+                    <textarea
+                      value={reportText}
+                      onChange={(e) => setReportText(e.target.value)}
+                      rows={4}
+                      placeholder={"e.g.\nVitamin B12: 180 pg/mL\nVitamin D: 34\nTSH 5.2  Hemoglobin 14.6"}
+                      className="scroll-thin mt-2 w-full resize-none rounded-lg bg-[var(--surface)] px-2.5 py-2 text-xs text-white outline-none placeholder:text-[var(--text-dim)]"
+                    />
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button onClick={() => setShowReport(false)} className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-white">Cancel</button>
+                      <button onClick={addReport} disabled={!reportText.trim()} className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-40">Extract markers</button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {reportMsg && <p className="mt-2 text-[11px] text-[var(--emerald)]">{reportMsg}</p>}
           </div>
         </div>
 

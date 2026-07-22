@@ -5,7 +5,7 @@ import {
   type UIMessage,
 } from "ai";
 import { buildSupervisor } from "@/lib/agents";
-import { demoAnswer } from "@/lib/agents/demo";
+import { demoAnswer, routeOf } from "@/lib/agents/demo";
 import { demoProfile, type HealthProfile } from "@/lib/memory/profile";
 
 export const maxDuration = 60;
@@ -35,19 +35,31 @@ export async function POST(req: Request) {
     }
   }
 
-  // Demo brain — streams a safe, structured answer word-by-word.
-  const answer = demoAnswer(lastUserText(messages), profile);
+  // Demo brain — streams a safe, structured answer word-by-word,
+  // with a live "consulting specialist" trace so the multi-agent
+  // routing is visible in the UI.
+  const userText = lastUserText(messages);
+  const route = routeOf(userText);
+  const answer = demoAnswer(userText, profile);
   const words = answer.split(/(\s+)/); // keep whitespace tokens
 
   const stream = createUIMessageStream({
     async execute({ writer }) {
+      const consulting = route === "supervisor" ? [] : [route];
+      if (consulting.length) {
+        writer.write({ type: "data-trace", id: "trace", data: { agents: consulting, done: false } });
+        await new Promise((r) => setTimeout(r, 550));
+      }
       const id = "msg-" + Date.now();
       writer.write({ type: "text-start", id });
       for (const w of words) {
         writer.write({ type: "text-delta", id, delta: w });
-        await new Promise((r) => setTimeout(r, w.trim() ? 18 : 6));
+        await new Promise((r) => setTimeout(r, w.trim() ? 16 : 6));
       }
       writer.write({ type: "text-end", id });
+      if (consulting.length) {
+        writer.write({ type: "data-trace", id: "trace", data: { agents: consulting, done: true } });
+      }
     },
   });
 

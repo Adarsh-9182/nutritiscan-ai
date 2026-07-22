@@ -26,7 +26,7 @@ const SPECS: MarkerSpec[] = [
   {
     name: "Vitamin D",
     unit: "ng/mL",
-    patterns: [/vitamin\s*d\s*(?:3|25.?oh)?[^0-9]{0,12}(\d{1,3})/i, /25[\s-]?oh[^0-9]{0,12}(\d{1,3})/i],
+    patterns: [/25[\s-]?oh[^0-9]{0,20}(\d{1,3})/i, /vitamin\s*d3?\b[^0-9]{0,12}(\d{1,3})/i],
     classify: (v) => (v < 20 ? "low" : v < 40 ? "borderline" : v > 100 ? "high" : "normal"),
     note: (v) => (v < 40 ? "Aim for 40–60" : undefined),
   },
