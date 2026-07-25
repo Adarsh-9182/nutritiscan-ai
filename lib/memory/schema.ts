@@ -110,6 +110,13 @@ export const HealthProfileSchema = z.object({
   medicines: stringList,
   conditions: stringList,
   trends: z.array(TrendSchema).catch([]).transform((t) => t.slice(0, LIMITS.trends)).optional(),
+  /**
+   * Client-side onboarding flag. Carried through rather than dropped so the
+   * sanitized profile stays a faithful subset of HealthProfile — if this
+   * output is ever echoed back to the browser, a stripped flag would make
+   * onboarding re-trigger on every visit.
+   */
+  onboarded: z.boolean().catch(false).optional(),
 });
 
 /**

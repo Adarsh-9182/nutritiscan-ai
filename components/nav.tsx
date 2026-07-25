@@ -11,6 +11,7 @@ import { motion } from "motion/react";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/scan", label: "Scan" },
+  { href: "/timeline", label: "Timeline" },
 ];
 
 export default function Nav({ status }: { status?: { tone: "good" | "warn"; label: string } }) {

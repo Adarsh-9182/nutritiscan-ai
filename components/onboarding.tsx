@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useHydrated, useProfile } from "@/lib/memory/store";
+import { journalEntry } from "@/lib/memory/journal";
 
 /**
  * First run, in one screen. Everything is prefilled with a sensible default,
@@ -42,6 +43,12 @@ export default function Onboarding() {
       heightCm,
       goal,
       onboarded: true,
+      // A real person's story starts today — not with the demo's borrowed past.
+      journal: [
+        journalEntry({ kind: "milestone", title: "Started tracking with NutritiScan", tone: "neutral" }),
+        journalEntry({ kind: "goal", title: `Goal set: ${goal.toLowerCase()}`, tone: "neutral" }),
+        journalEntry({ kind: "body", title: `Weight ${weight} kg`, tone: "neutral", metric: { name: "Weight", value: weight, unit: "kg" } }),
+      ],
     });
     setDismissed(true);
   };

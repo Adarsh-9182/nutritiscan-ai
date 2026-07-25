@@ -11,6 +11,8 @@ export type Biomarker = {
   note?: string;
 };
 
+import { demoJournal, type JournalEntry } from "./journal";
+
 export type Trend = { label: string; delta: string; direction: "up" | "down" | "flat"; good: boolean };
 
 export type HealthProfile = {
@@ -31,6 +33,8 @@ export type HealthProfile = {
   trends?: Trend[];
   /** set once the user has been through first-run so we never ask twice */
   onboarded?: boolean;
+  /** dated, append-only history — the spine of the patient timeline */
+  journal?: JournalEntry[];
 };
 
 // Default demo memory — Adarsh (from the product brief).
@@ -53,6 +57,7 @@ export const demoProfile: HealthProfile = {
   allergies: [],
   medicines: [],
   conditions: [],
+  journal: demoJournal,
   trends: [
     { label: "Sleep duration", delta: "+48 min / month", direction: "up", good: true },
     { label: "Workout consistency", delta: "+2 days / week", direction: "up", good: true },

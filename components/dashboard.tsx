@@ -10,6 +10,7 @@ import Onboarding from "@/components/onboarding";
 import { AGENTS } from "@/lib/agents-meta";
 import { bmi, demoProfile, healthScore, heightImperial, insight } from "@/lib/memory/profile";
 import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
+import { journalEntry } from "@/lib/memory/journal";
 import { dayTotals, mealsOn, mealTime } from "@/lib/memory/meals";
 import { useMeals, useProfile } from "@/lib/memory/store";
 import { proteinTarget } from "@/lib/nutrition/analyze";
@@ -93,7 +94,21 @@ export default function Dashboard() {
       setReportMsg('No known markers found. Try lines like "B12 180" or "Vitamin D 34".');
       return;
     }
-    patch({ biomarkers: mergeBiomarkers(profile.biomarkers, found) });
+    // Each marker becomes a dated event as well as a current value, so the
+    // timeline can show how it moved rather than only where it landed.
+    const entries = found.map((b) =>
+      journalEntry({
+        kind: "lab",
+        title: `${b.name} recorded at ${b.value}`,
+        detail: b.note,
+        tone: b.status === "normal" ? "good" : b.status === "borderline" ? "warn" : "bad",
+        metric: { name: b.name, value: parseFloat(b.value), unit: b.value.replace(/^[\d.]+\s*/, "") },
+      }),
+    );
+    patch({
+      biomarkers: mergeBiomarkers(profile.biomarkers, found),
+      journal: [...(profile.journal ?? []), ...entries],
+    });
     setReportMsg(`Added ${found.length} marker${found.length > 1 ? "s" : ""} to your memory ✓`);
     setReportText("");
     setShowReport(false);
