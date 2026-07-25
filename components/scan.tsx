@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Ring from "@/components/ring";
+import Nav from "@/components/nav";
+import Onboarding from "@/components/onboarding";
 import type { ScanResult } from "@/lib/nutrition/analyze";
 import { useMeals, useProfile, readProfile } from "@/lib/memory/store";
 import { dayTotals, mealsOn, mealTime, toLoggedMeal } from "@/lib/memory/meals";
@@ -86,7 +88,7 @@ function FlagRow({ tone, text }: { tone: "good" | "warn" | "bad"; text: string }
 export default function Scan() {
   const [profile] = useProfile();
   const [meals, , addMeal] = useMeals();
-  const [mode, setMode] = useState<Mode>("photo");
+  const [userMode, setUserMode] = useState<Mode | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [stages, setStages] = useState<Stage[]>([]);
@@ -98,6 +100,10 @@ export default function Scan() {
   const [vision, setVision] = useState<boolean | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  // A ref, not `busy` state, so `run` keeps a stable identity — otherwise
+  // every consumer that depends on it is rebuilt twice per scan.
+  const runningRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -108,6 +114,10 @@ export default function Scan() {
     return () => ac.abort();
   }, []);
 
+  // Leaving mid-scan must not leave a stream running and setState firing
+  // into an unmounted tree.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   const reset = () => {
     setResult(null);
     setError(null);
@@ -117,15 +127,28 @@ export default function Scan() {
 
   const run = useCallback(
     async (payload: { mode: Mode; text?: string; image?: { base64: string; mediaType: string; filename?: string } }) => {
-      if (busy) return;
+      if (runningRef.current) return;
+      runningRef.current = true;
       reset();
       setBusy(true);
+
+      const ac = new AbortController();
+      abortRef.current = ac;
+
       try {
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...payload, profile: readProfile() }),
+          signal: ac.signal,
         });
+
+        // A 429 or 413 returns JSON, not a stream — surface what it says
+        // instead of failing with a generic message.
+        if (!res.ok) {
+          const detail = await res.json().catch(() => null);
+          throw new Error(detail?.error ?? "The scanner is unavailable right now. Try again in a moment.");
+        }
         if (!res.body) throw new Error("No response from the scanner.");
 
         const reader = res.body.getReader();
@@ -140,7 +163,13 @@ export default function Scan() {
           buffer = lines.pop() ?? "";
           for (const line of lines) {
             if (!line.trim()) continue;
-            const ev = JSON.parse(line) as { type: string; id?: string; label?: string; status?: Stage["status"]; result?: ScanResult; message?: string };
+            // One malformed frame must not discard a result that already arrived.
+            let ev: { type: string; id?: string; label?: string; status?: Stage["status"]; result?: ScanResult; message?: string };
+            try {
+              ev = JSON.parse(line);
+            } catch {
+              continue;
+            }
             if (ev.type === "stage" && ev.id && ev.label && ev.status) {
               const stage = { id: ev.id, label: ev.label, status: ev.status };
               setStages((prev) => (prev.some((s) => s.id === stage.id) ? prev.map((s) => (s.id === stage.id ? stage : s)) : [...prev, stage]));
@@ -148,17 +177,24 @@ export default function Scan() {
               setResult(ev.result);
             } else if (ev.type === "error") {
               setError(ev.message ?? "Something went wrong.");
+              setStages([]);
             }
           }
         }
       } catch (e) {
+        if ((e as Error)?.name === "AbortError") return; // deliberate cancel
         setError(e instanceof Error ? e.message : "Something went wrong analysing that meal.");
+        setStages([]);
       } finally {
+        runningRef.current = false;
+        abortRef.current = null;
         setBusy(false);
       }
     },
-    [busy],
+    [],
   );
+
+  const cancel = () => abortRef.current?.abort();
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -169,7 +205,7 @@ export default function Scan() {
       try {
         const { base64, mediaType, preview: p } = await prepareImage(file);
         setPreview(p);
-        setMode("photo");
+        setUserMode("photo");
         await run({ mode: "photo", image: { base64, mediaType, filename: file.name } });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not read that image.");
@@ -184,34 +220,23 @@ export default function Scan() {
     setLogged(true);
   };
 
+  // Photo mode is the hero, but only when it can actually see. Until we know
+  // vision is available, open on Describe — which is always real.
+  const mode: Mode = userMode ?? (vision ? "photo" : "describe");
+
   const today = dayTotals(meals);
   const todayMeals = mealsOn(meals).slice().reverse();
   const proteinGoal = Math.round(profile.weightKg * 1.8);
 
   return (
     <div className="bg-aurora min-h-[100svh] px-4 py-4 sm:px-6">
-      {/* top bar */}
-      <div className="mx-auto mb-5 flex max-w-6xl items-center justify-between rounded-full glass px-4 py-2.5 sm:px-5">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">N</span>
-          <span className="text-sm font-semibold">
-            NutritiScan <span className="text-[var(--text-dim)]">Scan</span>
-          </span>
-        </Link>
-        <div className="flex items-center gap-2">
-          {vision !== null && (
-            <span className="hidden items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: vision ? "var(--emerald)" : "var(--amber)" }} />
-              {vision ? "vision online" : "demo mode"}
-            </span>
-          )}
-          <Link href="/dashboard" className="btn-ghost rounded-full px-3.5 py-1.5 text-xs">
-            Dashboard →
-          </Link>
-        </div>
-      </div>
+      <a href="#scan-analysis" className="sr-only skip-link">
+        Skip to the analysis
+      </a>
+      <Onboarding />
+      <Nav status={vision === null ? undefined : vision ? { tone: "good", label: "vision online" } : { tone: "warn", label: "describe mode is live" }} />
 
-      <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
+      <main className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — capture */}
         <div className="space-y-4 lg:col-span-5">
           <div className="rounded-[var(--radius)] glass p-5">
@@ -226,8 +251,10 @@ export default function Scan() {
                 {(["photo", "describe"] as Mode[]).map((m) => (
                   <button
                     key={m}
+                    type="button"
+                    aria-pressed={mode === m}
                     onClick={() => {
-                      setMode(m);
+                      setUserMode(m);
                       reset();
                     }}
                     className={`rounded-full px-3 py-1 capitalize transition ${mode === m ? "bg-[var(--surface-2)] text-white" : "text-[var(--text-dim)] hover:text-white"}`}
@@ -241,7 +268,14 @@ export default function Scan() {
             <AnimatePresence mode="wait">
               {mode === "photo" ? (
                 <motion.div key="photo" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-4">
-                  <div
+                  {/*
+                    A real button element, not a div with onClick: this is the
+                    primary action of the page and was previously unreachable by
+                    keyboard and invisible to assistive tech. Drag-and-drop is
+                    layered on top of it rather than replacing it.
+                  */}
+                  <button
+                    type="button"
                     onDragOver={(e) => {
                       e.preventDefault();
                       setDragging(true);
@@ -254,7 +288,9 @@ export default function Scan() {
                       if (f) void handleFile(f);
                     }}
                     onClick={() => fileRef.current?.click()}
-                    className={`relative grid cursor-pointer place-items-center overflow-hidden rounded-2xl border border-dashed transition ${
+                    disabled={busy}
+                    aria-label={preview ? "Replace the meal photo" : "Choose a photo of your plate to scan"}
+                    className={`relative grid w-full cursor-pointer place-items-center overflow-hidden rounded-2xl border border-dashed transition disabled:cursor-not-allowed ${
                       dragging ? "border-[var(--emerald)] bg-[color-mix(in_oklab,var(--emerald)_10%,transparent)]" : "border-[var(--border-strong)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
                     }`}
                     style={{ minHeight: 220 }}
@@ -266,12 +302,12 @@ export default function Scan() {
                       </>
                     ) : (
                       <div className="px-6 py-8 text-center">
-                        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-xl">📸</div>
+                        <div aria-hidden="true" className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-xl">📸</div>
                         <p className="mt-3 text-sm font-medium">Drop a photo of your plate</p>
                         <p className="mt-1 text-[11px] text-[var(--text-dim)]">or click to choose a file</p>
                       </div>
                     )}
-                  </div>
+                  </button>
 
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => cameraRef.current?.click()} className="btn-ghost flex-1 rounded-xl px-3 py-2 text-xs">
@@ -305,7 +341,15 @@ export default function Scan() {
                   />
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {EXAMPLES.map((ex) => (
-                      <button key={ex} onClick={() => setText(ex)} className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white">
+                      <button
+                        key={ex}
+                        disabled={busy}
+                        onClick={() => {
+                          setText(ex);
+                          void run({ mode: "describe", text: ex });
+                        }}
+                        className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white disabled:opacity-40 focus-ring"
+                      >
                         {ex}
                       </button>
                     ))}
@@ -359,14 +403,31 @@ export default function Scan() {
           </div>
         </div>
 
-        {/* RIGHT — analysis */}
+        {/*
+          RIGHT — analysis.
+          aria-live so the pipeline stages, the verdict and any error are
+          announced as they stream in. Without it a screen-reader user gets
+          silence through the entire scan and never learns it finished.
+        */}
         <div className="lg:col-span-7">
-          <div className="min-h-[70vh] rounded-[var(--radius)] glass-strong p-5">
+          <div
+            id="scan-analysis"
+            className="min-h-[70vh] rounded-[var(--radius)] glass-strong p-5"
+            aria-live="polite"
+            aria-busy={busy}
+          >
             {/* pipeline */}
             <AnimatePresence>
               {stages.length > 0 && !result && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
-                  <p className="text-sm font-semibold">Analysing</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">Analysing</p>
+                    {busy && (
+                      <button onClick={cancel} className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[11px] text-[var(--text-dim)] transition hover:text-white focus-ring">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                   {stages.map((s) => (
                     <motion.div key={s.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 rounded-xl bg-[var(--surface-2)] px-3 py-2.5">
                       {s.status === "done" ? (
@@ -395,7 +456,23 @@ export default function Scan() {
             )}
 
             {error && (
-              <div className="mt-2 rounded-xl border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-4 py-3 text-sm text-[#ffd7dd]">{error}</div>
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-2 rounded-xl border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-4 py-3">
+                <p className="text-sm text-[#ffd7dd]">{error}</p>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setUserMode("describe");
+                      reset();
+                    }}
+                    className="btn-ghost rounded-lg px-3 py-1.5 text-xs"
+                  >
+                    Describe it instead
+                  </button>
+                  <button onClick={reset} className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] transition hover:text-white focus-ring">
+                    Dismiss
+                  </button>
+                </div>
+              </motion.div>
             )}
 
             {/* result */}
@@ -528,7 +605,7 @@ export default function Scan() {
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

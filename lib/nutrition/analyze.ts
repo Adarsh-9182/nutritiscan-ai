@@ -9,7 +9,7 @@
 // plate; this file decides what it means for the person eating it.
 // ============================================================
 
-import { matchFood, PORTIONS, type Allergen, type Food } from "./foods";
+import { foodById, matchFood, PORTIONS, type Allergen, type Food } from "./foods";
 import { type HealthProfile } from "../memory/profile";
 
 export type ScanItem = {
@@ -20,6 +20,17 @@ export type ScanItem = {
   carbs: number;
   fat: number;
   fiber: number;
+  /**
+   * The database food this item resolved to, recorded once at parse time.
+   *
+   * Everything downstream keys off this instead of re-running `matchFood` on
+   * the display name. That used to cause a real data-integrity bug: an item
+   * flagged `matched: false` — meaning "the model named a food we do not
+   * know, these macros are its guess" — would still fuzzy-match in the totals
+   * pass and contribute confident sugar, sodium and micronutrient figures
+   * from a food nobody had actually identified.
+   */
+  foodId?: string;
   /** false when the model named a food our database doesn't know */
   matched: boolean;
   confidence?: number;
@@ -57,8 +68,21 @@ export type ScanResult = {
   note?: string;
 };
 
-/** A food the model named, with an optional portion. */
-export type NamedItem = { name: string; grams?: number; confidence?: number; kcal?: number; protein?: number; carbs?: number; fat?: number };
+/**
+ * A food the vision model named, with an optional portion.
+ *
+ * Deliberately no macro fields: the model is asked to identify and weigh,
+ * never to invent nutrition. Numbers come from the database, or — for foods
+ * we can't resolve — from the clearly-labelled generic below.
+ */
+export type NamedItem = { name: string; grams?: number; confidence?: number };
+
+/**
+ * Stand-in per-100g figures for a food the database doesn't know. Roughly a
+ * mixed cooked dish. Shown as "est." in the UI and excluded from every
+ * micronutrient claim, because we genuinely don't know what this is.
+ */
+const UNKNOWN_FOOD_PER_100G = { kcal: 150, protein: 5, carbs: 18, fat: 5 } as const;
 
 const ZERO: Totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0, b12: 0, vitD: 0, iron: 0, calcium: 0 };
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -133,6 +157,7 @@ function toItem(food: Food, grams: number, confidence?: number): ScanItem {
     carbs: r1(food.carbs * k),
     fat: r1(food.fat * k),
     fiber: r1(food.fiber * k),
+    foodId: food.id,
     matched: true,
     confidence,
   };
@@ -150,16 +175,17 @@ export function resolveNamed(named: NamedItem[]): { items: ScanItem[]; foods: Fo
       foods.push(food);
       items.push({ ...toItem(food, grams, n.confidence), name: food.name });
     } else {
-      // Unknown food — keep the model's own estimate rather than dropping it,
-      // and mark it so the UI can show it as unverified.
+      // Unknown food — keep it on the plate rather than dropping it silently,
+      // but scale a generic estimate and mark it unverified. No foodId, so it
+      // contributes nothing to the micronutrient totals.
       const k = grams / 100;
       items.push({
         name: n.name,
         grams: Math.round(grams),
-        kcal: Math.round(n.kcal ?? 150 * k),
-        protein: r1(n.protein ?? 5 * k),
-        carbs: r1(n.carbs ?? 18 * k),
-        fat: r1(n.fat ?? 5 * k),
+        kcal: Math.round(UNKNOWN_FOOD_PER_100G.kcal * k),
+        protein: r1(UNKNOWN_FOOD_PER_100G.protein * k),
+        carbs: r1(UNKNOWN_FOOD_PER_100G.carbs * k),
+        fat: r1(UNKNOWN_FOOD_PER_100G.fat * k),
         fiber: 0,
         matched: false,
         confidence: n.confidence,
@@ -173,7 +199,7 @@ export function resolveNamed(named: NamedItem[]): { items: ScanItem[]; foods: Fo
 // 2. Totals — including the micronutrients this product tracks
 // ------------------------------------------------------------
 
-function totalsOf(items: ScanItem[], foods: Food[]): Totals {
+function totalsOf(items: ScanItem[]): Totals {
   const t = { ...ZERO };
   for (const it of items) {
     t.kcal += it.kcal;
@@ -181,10 +207,11 @@ function totalsOf(items: ScanItem[], foods: Food[]): Totals {
     t.carbs += it.carbs;
     t.fat += it.fat;
     t.fiber += it.fiber;
-  }
-  // sugar/sodium/micros only exist for database-matched foods
-  for (const it of items) {
-    const food = foods.find((f) => f.name === it.name) ?? matchFood(it.name);
+
+    // Sugar, sodium and micronutrients exist only for foods we actually
+    // resolved. An unmatched item has no foodId and is skipped here — we
+    // will not put a confident B12 figure against something we couldn't name.
+    const food = it.foodId ? foodById(it.foodId) : null;
     if (!food) continue;
     const k = it.grams / 100;
     t.sugar += food.sugar * k;
@@ -390,8 +417,12 @@ export function analyzeMeal(
   p: HealthProfile,
   opts: { source: ScanResult["source"]; title?: string; note?: string },
 ): ScanResult {
-  const foods = items.map((i) => matchFood(i.name)).filter((f): f is Food => !!f);
-  const totals = totalsOf(items, foods);
+  // Resolve straight from the ids recorded at parse time. Re-running
+  // `matchFood` over display names here repeated work already done and could
+  // disagree with the parse, giving flags and totals different views of the
+  // same plate.
+  const foods = items.map((i) => (i.foodId ? foodById(i.foodId) : null)).filter((f): f is Food => !!f);
+  const totals = totalsOf(items);
   const perMeal = Math.round(proteinTarget(p) / 3);
   const fitScore = scoreMeal(totals, foods, p, perMeal);
   const grade = gradeOf(fitScore, totals, perMeal);

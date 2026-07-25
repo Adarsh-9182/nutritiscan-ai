@@ -3,7 +3,9 @@ import { z } from "zod";
 import { MODEL, SAFETY } from "@/lib/agents/safety";
 import { analyzeMeal, parseMeal, resolveNamed, type ScanResult } from "@/lib/nutrition/analyze";
 import { matchFood } from "@/lib/nutrition/foods";
-import { demoProfile, type HealthProfile } from "@/lib/memory/profile";
+import { type HealthProfile } from "@/lib/memory/profile";
+import { safeProfile } from "@/lib/memory/schema";
+import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 
 export const maxDuration = 60;
 
@@ -13,18 +15,21 @@ export const maxDuration = 60;
 // instead of a spinner that means nothing.
 // ------------------------------------------------------------
 
+/** A downscaled 1152px JPEG lands well under this; anything larger is not our client. */
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+/** Vision calls cost real money, so they get a tighter budget than chat. */
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
+const MODEL_BUDGET_MS = 45_000;
+
+const MAX_TEXT_LENGTH = 600;
+const ALLOWED_MEDIA = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+
 type Stage = { id: string; label: string };
 type Event =
   | { type: "stage"; id: string; label: string; status: "active" | "done" }
   | { type: "result"; result: ScanResult }
   | { type: "error"; message: string };
-
-type Body = {
-  mode: "photo" | "describe";
-  text?: string;
-  image?: { base64: string; mediaType: string; filename?: string };
-  profile?: HealthProfile;
-};
 
 const VisionSchema = z.object({
   title: z.string().describe("A short natural name for the meal, e.g. 'Dal, rice and salad'."),
@@ -54,9 +59,33 @@ Estimate only what you can see. Do not invent items that are not in the photo.
 
 ${SAFETY}`;
 
+/**
+ * The request body, validated rather than asserted. The image is the
+ * expensive, attacker-controlled part: a crafted POST can otherwise carry
+ * an arbitrary blob straight into a paid vision model.
+ */
+const BodySchema = z.object({
+  mode: z.enum(["photo", "describe"]).catch("describe"),
+  text: z.string().max(MAX_TEXT_LENGTH).optional(),
+  image: z
+    .object({
+      base64: z.string().min(1).max(MAX_BODY_BYTES),
+      mediaType: z.string().refine((m) => ALLOWED_MEDIA.has(m.toLowerCase()), "Unsupported image type."),
+      filename: z.string().max(200).optional(),
+    })
+    .optional(),
+  profile: z.unknown().optional(),
+});
+
 function encoder(controller: ReadableStreamDefaultController) {
   const enc = new TextEncoder();
-  return (e: Event) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
+  return (e: Event) => {
+    try {
+      controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
+    } catch {
+      // Client hung up mid-scan; nothing left to write to.
+    }
+  };
 }
 
 const PHOTO_STAGES: Stage[] = [
@@ -76,20 +105,30 @@ const TEXT_STAGES: Stage[] = [
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Strip path segments so a filename can't be read as anything but a label. */
+const safeFilename = (name: string) => name.replace(/[\\/]/g, " ").slice(0, 120);
+
 export async function POST(req: Request) {
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json({ error: "Send a JSON body with a mode of 'photo' or 'describe'." }, { status: 400 });
+  const rate = checkRate(`scan:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!rate.ok) {
+    return tooManyRequests(rate.retryAfter, "That's a lot of scans at once — give it a few seconds and try again.");
   }
 
-  const profile = body.profile ?? demoProfile;
-  const mode = body.mode === "photo" ? "photo" : "describe";
-  // The gateway accepts either an explicit key or a Vercel OIDC token, so try
-  // the real model whenever either is present — and degrade, never fail, if it
-  // turns out to be unusable (no billing, expired token, provider outage).
-  const hasCredential = !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
+  const read = await readJsonCapped(req, MAX_BODY_BYTES);
+  if (!read.ok) return Response.json({ error: read.error }, { status: read.status });
+
+  const parsed = BodySchema.safeParse(read.value);
+  if (!parsed.success) {
+    return Response.json({ error: "That scan request wasn't something I could read." }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const profile: HealthProfile = safeProfile(body.profile);
+  const mode = body.mode;
+  const hasCredential = hasModelCredential();
+
+  const budget = AbortSignal.timeout(MODEL_BUDGET_MS);
+  const signal = AbortSignal.any([req.signal, budget]);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -123,13 +162,14 @@ export async function POST(req: Request) {
             try {
               const { output } = await generateText({
                 model: MODEL,
+                abortSignal: signal,
                 output: Output.object({ schema: VisionSchema }),
                 messages: [
                   {
                     role: "user",
                     content: [
                       { type: "text", text: VISION_PROMPT },
-                      { type: "file", mediaType: body.image.mediaType || "image/jpeg", data: { type: "data", data: body.image.base64 } },
+                      { type: "file", mediaType: body.image.mediaType, data: { type: "data", data: body.image.base64 } },
                     ],
                   },
                 ],
@@ -158,7 +198,8 @@ export async function POST(req: Request) {
             // No usable vision model. Rather than fabricate a reading of a photo
             // nobody looked at, use the one real signal available — the filename —
             // and label everything else plainly as a sample.
-            const guess = body.image?.filename ? matchFood(body.image.filename.replace(/[-_.]/g, " ")) : null;
+            const filename = body.image?.filename ? safeFilename(body.image.filename) : null;
+            const guess = filename ? matchFood(filename.replace(/[-_.]/g, " ")) : null;
             const why = degraded
               ? `Real photo recognition is configured but currently unavailable — ${degraded}`
               : "No vision model is configured";
@@ -169,7 +210,7 @@ export async function POST(req: Request) {
               result = analyzeMeal(parseMeal(guess.name), profile, {
                 source: "text",
                 title: guess.name,
-                note: `${why}. I read the filename ("${body.image?.filename}") instead of the image itself — the nutrition below is real, the identification is a guess.`,
+                note: `${why}. I read the filename ("${filename}") instead of the image itself — the nutrition below is real, the identification is a guess.`,
               });
             } else {
               result = analyzeMeal(parseMeal("2 rotis, a bowl of dal, curd and salad"), profile, {
@@ -190,7 +231,7 @@ export async function POST(req: Request) {
           if (!items.length) {
             send({
               type: "error",
-              message: `I couldn't find a food I know in "${text}". Try naming items plainly — "2 rotis, dal, curd" or "150g chicken and rice".`,
+              message: `I couldn't find a food I know in "${text.slice(0, 80)}". Try naming items plainly — "2 rotis, dal, curd" or "150g chicken and rice".`,
             });
             return;
           }
@@ -203,10 +244,16 @@ export async function POST(req: Request) {
         finishStages();
         send({ type: "result", result });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Something went wrong analysing that meal.";
-        send({ type: "error", message });
+        // Never surface a raw provider error to the client — it can carry
+        // internal hostnames and request ids.
+        console.error("[scan] pipeline failure", err);
+        send({ type: "error", message: "Something went wrong analysing that meal. Try again in a moment." });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already closed by a client disconnect.
+        }
       }
     },
   });
@@ -221,5 +268,5 @@ export async function POST(req: Request) {
 
 /** Lets the client show whether real vision is configured. */
 export async function GET() {
-  return Response.json({ vision: !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN) });
+  return Response.json({ vision: hasModelCredential() }, { headers: { "cache-control": "no-store" } });
 }

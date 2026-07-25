@@ -141,4 +141,7 @@ export function matchFood(text: string): Food | null {
   return null;
 }
 
-export const foodById = (id: string) => FOODS.find((f) => f.id === id) ?? null;
+/** Indexed rather than scanned — this is on the hot path of every totals pass. */
+const BY_ID = new Map(FOODS.map((f) => [f.id, f]));
+
+export const foodById = (id: string): Food | null => BY_ID.get(id) ?? null;

@@ -5,6 +5,8 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Chat from "@/components/chat";
 import Ring from "@/components/ring";
+import Nav from "@/components/nav";
+import Onboarding from "@/components/onboarding";
 import { AGENTS } from "@/lib/agents-meta";
 import { bmi, demoProfile, healthScore, heightImperial, insight } from "@/lib/memory/profile";
 import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
@@ -12,23 +14,42 @@ import { dayTotals, mealsOn, mealTime } from "@/lib/memory/meals";
 import { useMeals, useProfile } from "@/lib/memory/store";
 import { proteinTarget } from "@/lib/nutrition/analyze";
 
-/* ---- 7-night sleep bars ---- */
+/**
+ * Sleep pattern.
+ *
+ * IMPORTANT: we do not have per-night sleep data. The user records a single
+ * average and nothing else. This previously rendered six hard-coded values
+ * under the heading "last 7 nights", which presented invented biometrics to
+ * the user as their own history — not acceptable in a health product, and
+ * exactly the sort of thing a clinician or regulator would object to.
+ *
+ * Until there is a real per-night source, the six context bars are drawn as
+ * dimmed, explicitly-labelled illustration and only the final bar — the
+ * user's recorded average — is rendered as data.
+ */
+const ILLUSTRATIVE_PATTERN = [6.4, 7.1, 6.8, 7.6, 7.2, 7.9];
+
 function SleepBars({ avg }: { avg: number }) {
-  const nights = [6.4, 7.1, 6.8, 7.6, 7.2, 7.9, avg];
   const max = 9;
+  const bars = [...ILLUSTRATIVE_PATTERN, avg];
   return (
-    <div className="flex h-20 items-end gap-1.5">
-      {nights.map((n, i) => (
-        <motion.div
-          key={i}
-          initial={{ height: 0 }}
-          animate={{ height: `${(n / max) * 100}%` }}
-          transition={{ delay: i * 0.05, duration: 0.6 }}
-          className="flex-1 rounded-md"
-          style={{ background: i === nights.length - 1 ? "var(--violet)" : "color-mix(in oklab, var(--violet) 40%, transparent)" }}
-          title={`${n}h`}
-        />
-      ))}
+    <div className="flex h-20 items-end gap-1.5" role="img" aria-label={`Your recorded sleep average is ${avg} hours a night. The preceding bars are an illustrative pattern, not recorded nights.`}>
+      {bars.map((n, i) => {
+        const isRecorded = i === bars.length - 1;
+        return (
+          <motion.div
+            key={i}
+            initial={{ height: 0 }}
+            animate={{ height: `${(n / max) * 100}%` }}
+            transition={{ delay: i * 0.05, duration: 0.6 }}
+            className="flex-1 rounded-md"
+            style={{
+              background: isRecorded ? "var(--violet)" : "color-mix(in oklab, var(--violet) 22%, transparent)",
+            }}
+            title={isRecorded ? `${n}h — your recorded average` : "illustrative"}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -40,8 +61,17 @@ function Stepper({ label, value, unit, onDec, onInc, color }: { label: string; v
       <div className="mt-1 flex items-center justify-between">
         <p className="font-medium" style={{ color }}>{value}<span className="ml-1 text-xs text-[var(--text-dim)]">{unit}</span></p>
         <div className="flex items-center gap-1">
-          <button onClick={onDec} className="grid h-6 w-6 place-items-center rounded-md bg-[var(--surface)] text-sm hover:bg-[var(--border)]">−</button>
-          <button onClick={onInc} className="grid h-6 w-6 place-items-center rounded-md bg-[var(--surface)] text-sm hover:bg-[var(--border)]">+</button>
+          {/*
+            Icon-only controls need their own name — a screen reader
+            otherwise announces five identical "minus" buttons with no
+            indication of which value each one changes.
+          */}
+          <button type="button" onClick={onDec} aria-label={`Decrease ${label}`} className="grid h-6 w-6 place-items-center rounded-md bg-[var(--surface)] text-sm hover:bg-[var(--border)]">
+            <span aria-hidden="true">−</span>
+          </button>
+          <button type="button" onClick={onInc} aria-label={`Increase ${label}`} className="grid h-6 w-6 place-items-center rounded-md bg-[var(--surface)] text-sm hover:bg-[var(--border)]">
+            <span aria-hidden="true">+</span>
+          </button>
         </div>
       </div>
     </div>
@@ -83,22 +113,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-[100svh] px-4 py-4 sm:px-6">
-      {/* top bar */}
-      <div className="mx-auto mb-5 flex max-w-7xl items-center justify-between rounded-full glass px-4 py-2.5 sm:px-5">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">N</span>
-          <span className="text-sm font-semibold">NutritiScan <span className="text-[var(--text-dim)]">Health OS</span></span>
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className="hidden items-center gap-1.5 text-xs text-[var(--text-muted)] sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--emerald)]" /> memory synced
-          </span>
-          <Link href="/scan" className="btn-primary rounded-full px-3.5 py-1.5 text-xs">Scan a meal</Link>
-          <Link href="/" className="btn-ghost rounded-full px-3.5 py-1.5 text-xs">← Home</Link>
-        </div>
-      </div>
+      <Onboarding />
+      <Nav status={{ tone: "good", label: "memory synced" }} />
 
-      <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-12">
+      <main className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-12">
         {/* LEFT — score + memory */}
         <div className="space-y-4 lg:col-span-3">
           <div className="rounded-[var(--radius)] glass p-5">
@@ -124,7 +142,9 @@ export default function Dashboard() {
               <p className="text-sm font-semibold">Health Memory</p>
               <div className="flex items-center gap-2">
                 <button onClick={() => { setShowReport((s) => !s); setReportMsg(null); }} className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:text-white">+ Report</button>
-                <button onClick={resetMemory} title="Reset to demo memory" className="grid h-6 w-6 place-items-center rounded-full border border-[var(--border-strong)] text-[11px] text-[var(--text-dim)] transition hover:text-white">↺</button>
+                <button type="button" onClick={resetMemory} title="Reset to demo memory" aria-label="Reset Health Memory to the demo profile" className="grid h-6 w-6 place-items-center rounded-full border border-[var(--border-strong)] text-[11px] text-[var(--text-dim)] transition hover:text-white">
+                  <span aria-hidden="true">↺</span>
+                </button>
               </div>
             </div>
             <p className="mt-2 rounded-lg bg-[color-mix(in_oklab,var(--emerald)_12%,transparent)] px-2.5 py-1.5 text-[11px] leading-snug text-[var(--text-muted)]">💡 {insight(profile)}</p>
@@ -187,7 +207,9 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
             <div className="rounded-[var(--radius)] glass p-5">
               <p className="text-sm font-semibold">Sleep</p>
-              <p className="text-[11px] text-[var(--text-dim)]">last 7 nights · avg {profile.sleepHours}h</p>
+              <p className="text-[11px] text-[var(--text-dim)]">
+                your average {profile.sleepHours}h · earlier bars illustrative
+              </p>
               <div className="mt-4"><SleepBars avg={profile.sleepHours} /></div>
             </div>
 
@@ -253,7 +275,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

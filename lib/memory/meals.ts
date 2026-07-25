@@ -39,24 +39,6 @@ export function toLoggedMeal(r: ScanResult): LoggedMeal {
   };
 }
 
-export function loadMeals(): LoggedMeal[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(MEALS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as LoggedMeal[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveMeals(meals: LoggedMeal[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MEALS_KEY, JSON.stringify(meals.slice(-100)));
-  } catch {}
-}
-
 const sameDay = (iso: string, day: Date) => {
   const d = new Date(iso);
   return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();

@@ -56,15 +56,17 @@ const TOOL_MAP: Record<string, string> = {
   asklabagent: "lab",
   askcoachagent: "coach",
 };
-function tracesFor(m: { parts: unknown[] }): { agents: string[]; done: boolean } | null {
+type Trace = { agents: string[]; done: boolean; source: "demo" | "real" };
+
+function tracesFor(m: { parts: unknown[] }): Trace | null {
   const parts = m.parts as { type: string; data?: { agents?: string[]; done?: boolean }; state?: string }[];
   const d = parts.find((p) => p.type === "data-trace");
-  if (d?.data?.agents?.length) return { agents: d.data.agents, done: !!d.data.done };
+  if (d?.data?.agents?.length) return { agents: d.data.agents, done: !!d.data.done, source: "demo" };
   const toolParts = parts.filter((p) => typeof p.type === "string" && p.type.startsWith("tool-ask"));
   if (toolParts.length) {
     const agents = [...new Set(toolParts.map((p) => TOOL_MAP[p.type.slice(5).toLowerCase()]).filter(Boolean))];
     const done = toolParts.every((p) => p.state === "output-available" || p.state === "output-error");
-    if (agents.length) return { agents, done };
+    if (agents.length) return { agents, done, source: "real" };
   }
   return null;
 }
@@ -91,7 +93,7 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
     [],
   );
 
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  const { messages, sendMessage, status, error, stop, regenerate } = useChat({ transport });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -107,8 +109,22 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
     setInput("");
   };
 
-  // agent badge for an assistant message = route of the user message before it
-  const badgeFor = (idx: number) => {
+  /**
+   * Which specialist to credit an assistant message to.
+   *
+   * This used to run the *demo* router over the preceding user message
+   * regardless of which brain actually answered. In real multi-agent mode
+   * that meant the badge could read "Doctor Agent" on an answer the
+   * supervisor had routed to Nutrition — a wrong clinical attribution shown
+   * with full confidence.
+   *
+   * Now the demo trace is the only thing that licenses a specialist badge.
+   * A real answer is credited to the Supervisor, which is what actually
+   * composed it, and the consulted specialists appear in the trace chips
+   * where they are known for certain.
+   */
+  const badgeFor = (idx: number, trace: Trace | null) => {
+    if (trace?.source === "real") return "supervisor";
     for (let i = idx - 1; i >= 0; i--) {
       if (messages[i].role === "user") {
         const t = messages[i].parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" ");
@@ -136,7 +152,20 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
       </div>
 
       {/* messages */}
-      <div ref={scrollRef} className="scroll-thin flex-1 space-y-4 overflow-y-auto px-5 py-5">
+      {/*
+        The transcript is a live region: answers stream in token by token and
+        a screen-reader user would otherwise get no signal that a reply
+        arrived at all. "polite" so it waits for a pause rather than
+        interrupting on every delta.
+      */}
+      <div
+        ref={scrollRef}
+        className="scroll-thin flex-1 space-y-4 overflow-y-auto px-5 py-5"
+        role="log"
+        aria-live="polite"
+        aria-busy={busy}
+        aria-label="Conversation with your health companion"
+      >
         {messages.length === 0 && (
           <div className="grid h-full place-items-center text-center">
             <div>
@@ -158,9 +187,9 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
               </div>
             );
           }
-          const route = badgeFor(idx);
-          const color = agentColor(route);
           const trace = tracesFor(m);
+          const route = badgeFor(idx, trace);
+          const color = agentColor(route);
           return (
             <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
               <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm" style={{ background: `${color}22` }}>
@@ -201,9 +230,13 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
         )}
 
         {error && (
-          <p className="rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
-            Something went wrong. Please try again.
-          </p>
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
+            <span>That answer didn&apos;t come through.</span>
+            {/* An error with no way out is a dead end — offer the retry. */}
+            <button type="button" onClick={() => regenerate()} className="rounded-md border border-[color-mix(in_oklab,var(--rose)_45%,transparent)] px-2.5 py-1 font-medium transition hover:bg-[color-mix(in_oklab,var(--rose)_18%,transparent)]">
+              Try again
+            </button>
+          </div>
         )}
       </div>
 
@@ -226,16 +259,30 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
         className="border-t border-[var(--border)] p-4"
       >
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+          {/* A placeholder is not a label — it disappears on focus. */}
+          <label htmlFor="chat-input" className="sr-only">
+            Describe how you feel, or ask a health question
+          </label>
           <input
+            id="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={busy}
             placeholder="Describe how you feel, or ask anything…"
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
           />
-          <button type="submit" disabled={busy || !input.trim()} className="btn-primary grid h-8 w-8 place-items-center rounded-xl text-base disabled:opacity-40">
-            ↑
-          </button>
+          {busy ? (
+            // The supervisor can fan out across five specialists for the best
+            // part of a minute. Leaving the user with no way to interrupt that
+            // was the single worst moment in the flow.
+            <button type="button" onClick={() => stop()} aria-label="Stop generating" className="btn-ghost grid h-8 w-8 place-items-center rounded-xl">
+              <span aria-hidden="true">■</span>
+            </button>
+          ) : (
+            <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 place-items-center rounded-xl text-base disabled:opacity-40">
+              <span aria-hidden="true">↑</span>
+            </button>
+          )}
         </div>
         <p className="mt-2 text-center text-[10px] text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
       </form>

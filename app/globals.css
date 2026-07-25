@@ -14,8 +14,13 @@
   --border-strong: rgba(255, 255, 255, 0.14);
 
   --text: #eaf0f6;
-  --text-muted: #94a3b3;
-  --text-dim: #5d6b7b;
+  --text-muted: #94a3b3; /* 7.83:1 on --bg */
+  /*
+   * Was #5d6b7b — 3.70:1 on --bg, which fails WCAG AA (4.5:1) and was used
+   * for real content (portion sizes, timestamps, lab units), not decoration.
+   * #75859a is 5.36:1 and keeps a visible step below --text-muted.
+   */
+  --text-dim: #75859a;
 
   /* health = emerald, ai = violet, vitals = cyan, warn = amber */
   --emerald: #34d399;
@@ -62,6 +67,45 @@ body {
 ::selection {
   background: color-mix(in oklab, var(--emerald) 35%, transparent);
   color: #fff;
+}
+
+/*
+ * Keyboard focus. Several inputs set `outline-none` for the custom
+ * focus-within borders, which left keyboard users with no visible focus
+ * anywhere in the app. This restores it without touching mouse styling.
+ */
+:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Visually hidden, still announced — skip links and icon-button labels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.skip-link:focus {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  width: auto;
+  height: auto;
+  clip: auto;
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--emerald);
+  color: #04120c;
+  font-weight: 600;
 }
 
 /* Ambient page background — aurora + grid */
@@ -160,6 +204,17 @@ body {
   background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
+}
+
+/* Keyboard focus — visible for keyboard users, invisible to mouse users */
+.focus-ring:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 
 /* Scrollbar */
