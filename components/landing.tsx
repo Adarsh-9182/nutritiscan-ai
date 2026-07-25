@@ -155,6 +155,7 @@ export default function Landing() {
             <a href="#agents" className="hover:text-white transition">Agents</a>
             <a href="#reasoning" className="hover:text-white transition">How it thinks</a>
             <Link href="/scan" className="hover:text-white transition">Scan</Link>
+            <Link href="/timeline" className="hover:text-white transition">Timeline</Link>
             <a href="#memory" className="hover:text-white transition">Memory</a>
           </nav>
           <Link href="/dashboard" className="btn-primary rounded-full px-4 py-2 text-sm">Open App</Link>
