@@ -59,6 +59,20 @@ export const demoProfile: HealthProfile = {
   ],
 };
 
+// Where the memory lives between visits. Shared by every surface
+// (dashboard, chat, scanner) so they all reason about the same person.
+export const PROFILE_KEY = "ns-profile-v1";
+
+export function loadProfile(): HealthProfile {
+  if (typeof window === "undefined") return demoProfile;
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? { ...demoProfile, ...(JSON.parse(raw) as HealthProfile) } : demoProfile;
+  } catch {
+    return demoProfile;
+  }
+}
+
 export function bmi(p: HealthProfile): number {
   const m = p.heightCm / 100;
   return +(p.weightKg / (m * m)).toFixed(1);

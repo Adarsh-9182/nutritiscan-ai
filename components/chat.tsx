@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
+import { readProfile } from "@/lib/memory/store";
 import type { HealthProfile } from "@/lib/memory/profile";
 
 /* --- tiny, safe markdown-lite renderer --- */
@@ -77,15 +78,14 @@ const SUGGESTIONS = [
 ];
 
 export default function Chat({ profile }: { profile: HealthProfile }) {
-  const profileRef = useRef(profile);
-  profileRef.current = profile;
-
+  // Read the live memory at send time rather than mirroring it into a ref —
+  // the store is already the single source of truth.
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ messages }) => ({
-          body: { messages, profile: profileRef.current },
+          body: { messages, profile: readProfile() },
         }),
       }),
     [],

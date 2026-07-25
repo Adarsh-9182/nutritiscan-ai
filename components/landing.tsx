@@ -154,6 +154,7 @@ export default function Landing() {
             <a href="#architecture" className="hover:text-white transition">Architecture</a>
             <a href="#agents" className="hover:text-white transition">Agents</a>
             <a href="#reasoning" className="hover:text-white transition">How it thinks</a>
+            <Link href="/scan" className="hover:text-white transition">Scan</Link>
             <a href="#memory" className="hover:text-white transition">Memory</a>
           </nav>
           <Link href="/dashboard" className="btn-primary rounded-full px-4 py-2 text-sm">Open App</Link>
@@ -195,7 +196,7 @@ export default function Landing() {
             <Link href="/dashboard" className="btn-primary rounded-full px-6 py-3 text-sm sm:text-base">
               Meet your AI Health OS →
             </Link>
-            <a href="#reasoning" className="btn-ghost rounded-full px-6 py-3 text-sm sm:text-base">See how it reasons</a>
+            <Link href="/scan" className="btn-ghost rounded-full px-6 py-3 text-sm sm:text-base">Scan a meal</Link>
           </div>
         </Reveal>
 

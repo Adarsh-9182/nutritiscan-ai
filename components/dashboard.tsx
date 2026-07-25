@@ -1,38 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Chat from "@/components/chat";
+import Ring from "@/components/ring";
 import { AGENTS } from "@/lib/agents-meta";
-import { bmi, demoProfile, healthScore, heightImperial, insight, type HealthProfile } from "@/lib/memory/profile";
+import { bmi, demoProfile, healthScore, heightImperial, insight } from "@/lib/memory/profile";
 import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
-
-const STORAGE_KEY = "ns-profile-v1";
-
-/* ---- progress ring ---- */
-function Ring({ value, max = 100, size = 132, stroke = 10, color = "var(--emerald)", label, sub }: { value: number; max?: number; size?: number; stroke?: number; color?: string; label: string; sub?: string }) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, value / max));
-  return (
-    <div className="relative grid place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth={stroke} />
-        <motion.circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - pct) }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          style={{ filter: `drop-shadow(0 0 10px ${color}80)` }}
-        />
-      </svg>
-      <div className="absolute text-center">
-        <p className="text-3xl font-semibold" style={{ color }}>{label}</p>
-        {sub && <p className="text-[11px] text-[var(--text-dim)]">{sub}</p>}
-      </div>
-    </div>
-  );
-}
+import { dayTotals, mealsOn, mealTime } from "@/lib/memory/meals";
+import { useMeals, useProfile } from "@/lib/memory/store";
+import { proteinTarget } from "@/lib/nutrition/analyze";
 
 /* ---- 7-night sleep bars ---- */
 function SleepBars({ avg }: { avg: number }) {
@@ -71,27 +49,13 @@ function Stepper({ label, value, unit, onDec, onInc, color }: { label: string; v
 }
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<HealthProfile>(demoProfile);
-  const [hydrated, setHydrated] = useState(false);
+  // Memory is read from the shared store, so edits here show up on the
+  // scanner and the timeline immediately — and survive a refresh.
+  const [profile, setProfile, patch] = useProfile();
+  const [meals] = useMeals();
   const [showReport, setShowReport] = useState(false);
   const [reportText, setReportText] = useState("");
   const [reportMsg, setReportMsg] = useState<string | null>(null);
-  const patch = (p: Partial<HealthProfile>) => setProfile((prev) => ({ ...prev, ...p }));
-
-  // Hydrate from localStorage (real, keyless persistence — the AI's memory survives refreshes).
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setProfile(JSON.parse(raw));
-    } catch {}
-    setHydrated(true);
-  }, []);
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    } catch {}
-  }, [profile, hydrated]);
 
   const addReport = () => {
     const found = parseLabReport(reportText);
@@ -112,8 +76,10 @@ export default function Dashboard() {
 
   const score = healthScore(profile);
   const b = bmi(profile);
-  const proteinTarget = Math.round(profile.weightKg * 1.8);
-  const proteinToday = 112;
+  // Intake now comes from meals the user actually scanned and logged.
+  const target = proteinTarget(profile);
+  const today = dayTotals(meals);
+  const todayMeals = mealsOn(meals).slice().reverse();
 
   return (
     <div className="min-h-[100svh] px-4 py-4 sm:px-6">
@@ -127,6 +93,7 @@ export default function Dashboard() {
           <span className="hidden items-center gap-1.5 text-xs text-[var(--text-muted)] sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--emerald)]" /> memory synced
           </span>
+          <Link href="/scan" className="btn-primary rounded-full px-3.5 py-1.5 text-xs">Scan a meal</Link>
           <Link href="/" className="btn-ghost rounded-full px-3.5 py-1.5 text-xs">← Home</Link>
         </div>
       </div>
@@ -225,11 +192,31 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-[var(--radius)] glass p-5">
-              <p className="text-sm font-semibold">Nutrition</p>
-              <p className="text-[11px] text-[var(--text-dim)]">protein today</p>
-              <div className="mt-3 grid place-items-center">
-                <Ring value={proteinToday} max={proteinTarget} size={104} stroke={9} color="var(--cyan)" label={`${proteinToday}g`} sub={`/ ${proteinTarget}g`} />
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Nutrition</p>
+                  <p className="text-[11px] text-[var(--text-dim)]">protein today · from scanned meals</p>
+                </div>
+                <Link href="/scan" className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:text-white">+ Scan</Link>
               </div>
+              <div className="mt-3 grid place-items-center">
+                <Ring value={today.protein} max={target} size={104} stroke={9} color="var(--cyan)" label={`${today.protein}g`} sub={`/ ${target}g`} />
+              </div>
+              {todayMeals.length > 0 ? (
+                <div className="mt-3 space-y-1.5">
+                  {todayMeals.slice(0, 4).map((m) => (
+                    <div key={m.id} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs">
+                      <span className="min-w-0 flex-1 truncate text-[var(--text-muted)]">{m.title}</span>
+                      <span className="ml-2 shrink-0 text-[10px] text-[var(--text-dim)]">{mealTime(m.at)} · {m.kcal} kcal</span>
+                    </div>
+                  ))}
+                  <p className="pt-0.5 text-center text-[10px] text-[var(--text-dim)]">{today.kcal} kcal · {today.fiber} g fibre today</p>
+                </div>
+              ) : (
+                <Link href="/scan" className="mt-3 block rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-center text-[11px] text-[var(--text-dim)] transition hover:text-white">
+                  No meals logged today — scan one →
+                </Link>
+              )}
             </div>
           </div>
 
