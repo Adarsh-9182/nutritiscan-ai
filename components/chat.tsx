@@ -2,11 +2,11 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
-import { readProfile } from "@/lib/memory/store";
+import { clearTranscript, readMeals, readProfile, readTranscript, useHydrated, writeTranscript } from "@/lib/memory/store";
 import type { HealthProfile } from "@/lib/memory/profile";
 
 /* --- tiny, safe markdown-lite renderer --- */
@@ -30,8 +30,23 @@ function Markdown({ text }: { text: string }) {
       {lines.map((line, i) => {
         const t = line.trim();
         if (!t) return <div key={i} className="h-1" />;
-        if (t.startsWith("🚩") || /red flag/i.test(t))
+        // Anchored to the flag glyph and to a line that *opens* with "red
+        // flag" or "medical warning" (the Medical Reasoning Format's header
+        // for this section — lib/agents/safety.ts). A bare /red flag/i test
+        // styled "there were no red flags here" as an urgent rose alert — the
+        // exact inversion of its meaning, hence the header-anchored match.
+        if (t.startsWith("🚩") || /^\*{0,2}(red flags?|medical warning)\b/i.test(t))
           return <p key={i} className="rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-1.5 text-[#ffd7dd]"><Inline text={t} /></p>;
+        // A line that is *entirely* bold is a section heading, not a sentence.
+        // Every agent writes them ("**Protein**", "**What stands out**") and
+        // they used to render at body weight and body size, so the answers
+        // arrived as one undifferentiated wall.
+        if (/^\*\*[^*]+\*\*$/.test(t))
+          return (
+            <p key={i} className="pt-2 t-label font-semibold uppercase tracking-wide text-[var(--text-dim)] first:pt-0">
+              {t.slice(2, -2)}
+            </p>
+          );
         if (t.startsWith("- "))
           return (
             <div key={i} className="flex gap-2 pl-1">
@@ -79,7 +94,37 @@ const SUGGESTIONS = [
   "Best workout for building muscle?",
 ];
 
+/**
+ * The transcript can only be restored on the client, and `useChat` reads its
+ * initial messages exactly once. Mounting the conversation behind a hydration
+ * gate is what lets us hand it the stored history at construction time instead
+ * of pushing it in from an effect — no mismatch, no setState-in-effect.
+ */
 export default function Chat({ profile }: { profile: HealthProfile }) {
+  const hydrated = useHydrated();
+  if (!hydrated) return <ChatSkeleton />;
+  return <Conversation profile={profile} />;
+}
+
+function ChatSkeleton() {
+  return (
+    <div className="flex h-full flex-col" aria-busy="true" aria-label="Loading your conversation">
+      <div className="flex items-center gap-2.5 border-b border-[var(--border)] px-5 py-4">
+        <span className="shimmer h-9 w-9 rounded-xl" />
+        <div className="space-y-1.5">
+          <span className="shimmer block h-3 w-40 rounded" />
+          <span className="shimmer block h-2.5 w-56 rounded" />
+        </div>
+      </div>
+      <div className="flex-1 space-y-4 px-5 py-5">
+        <span className="shimmer ml-auto block h-10 w-2/5 rounded-2xl" />
+        <span className="shimmer block h-24 w-4/5 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
+function Conversation({ profile }: { profile: HealthProfile }) {
   // Read the live memory at send time rather than mirroring it into a ref —
   // the store is already the single source of truth.
   const transport = useMemo(
@@ -87,26 +132,62 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
       new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ messages }) => ({
-          body: { messages, profile: readProfile() },
+          body: { messages, profile: readProfile(), meals: readMeals() },
         }),
       }),
     [],
   );
 
-  const { messages, sendMessage, status, error, stop, regenerate } = useChat({ transport });
+  // Restored once, at construction. `useChat` owns the list from here.
+  const restored = useMemo(() => readTranscript(), []);
+  const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, status]);
+  const pinnedRef = useRef(true);
+  const reduceMotion = useReducedMotion();
 
   const busy = status === "submitted" || status === "streaming";
 
+  // Write the transcript back only when a turn settles. Persisting on every
+  // token would serialise the whole conversation to localStorage tens of times
+  // per answer.
+  useEffect(() => {
+    if (busy) return;
+    writeTranscript(messages);
+  }, [messages, busy]);
+
+  /**
+   * Follow the stream, but never steal the viewport.
+   *
+   * This used to smooth-scroll to the bottom on every `messages` change — and
+   * `messages` gets a new identity per token, so a single answer queued
+   * hundreds of overlapping smooth-scroll animations and yanked the view back
+   * every time the user scrolled up to re-read something.
+   */
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !pinnedRef.current) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion || busy ? "auto" : "smooth" });
+  }, [messages, status, busy, reduceMotion]);
+
   const send = (text: string) => {
     if (!text.trim() || busy) return;
+    pinnedRef.current = true;
     sendMessage({ text });
     setInput("");
+  };
+
+  /** Health conversations are the most sensitive thing stored here. */
+  const clearConversation = () => {
+    stop();
+    setMessages([]);
+    clearTranscript();
   };
 
   /**
@@ -142,13 +223,24 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">✦</span>
           <div>
             <p className="text-sm font-semibold">NutritiScan Supervisor</p>
-            <p className="text-[11px] text-[var(--text-dim)]">routing across 5 specialists · remembers your history</p>
+            <p className="t-label text-[var(--text-dim)]">routing across 5 specialists · remembers your history</p>
           </div>
         </div>
-        <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">
-          <span className={`h-1.5 w-1.5 rounded-full ${busy ? "bg-[var(--amber)]" : "bg-[var(--emerald)]"}`} />
-          {busy ? "thinking" : "ready"}
-        </span>
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={clearConversation}
+              className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+            >
+              Clear
+            </button>
+          )}
+          <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 t-label text-[var(--text-muted)]">
+            <span className={`h-1.5 w-1.5 rounded-full ${busy ? "bg-[var(--amber)]" : "bg-[var(--emerald)]"}`} />
+            {busy ? "thinking" : "ready"}
+          </span>
+        </div>
       </div>
 
       {/* messages */}
@@ -160,6 +252,7 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
       */}
       <div
         ref={scrollRef}
+        onScroll={onScroll}
         className="scroll-thin flex-1 space-y-4 overflow-y-auto px-5 py-5"
         role="log"
         aria-live="polite"
@@ -196,14 +289,14 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
                 {route === "supervisor" ? "✦" : agentGlyph(route)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="mb-1 text-[11px] font-medium" style={{ color }}>
+                <p className="mb-1 t-label font-medium" style={{ color }}>
                   {route === "supervisor" ? "Supervisor" : agentName(route)}
                 </p>
                 {trace && (
                   <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] text-[var(--text-dim)]">{trace.done ? "Consulted" : "Consulting"}</span>
+                    <span className="t-label text-[var(--text-dim)]">{trace.done ? "Consulted" : "Consulting"}</span>
                     {trace.agents.map((a) => (
-                      <span key={a} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]" style={{ borderColor: `${agentColor(a)}55`, color: agentColor(a) }}>
+                      <span key={a} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 t-label" style={{ borderColor: `${agentColor(a)}55`, color: agentColor(a) }}>
                         {!trace.done && <motion.span className="h-1 w-1 rounded-full" style={{ background: agentColor(a) }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity }} />}
                         {agentGlyph(a)} {agentName(a)}
                       </span>
@@ -284,7 +377,7 @@ export default function Chat({ profile }: { profile: HealthProfile }) {
             </button>
           )}
         </div>
-        <p className="mt-2 text-center text-[10px] text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
+        <p className="mt-2 text-center t-label text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
       </form>
     </div>
   );

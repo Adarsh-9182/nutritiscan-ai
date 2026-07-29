@@ -1,6 +1,6 @@
 import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
-import { MODEL, SAFETY, TRIAGE_FORMAT } from "./safety";
+import { MODEL, SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
 import { memoryContext, type HealthProfile } from "../memory/profile";
 
 // ------------------------------------------------------------
@@ -8,7 +8,7 @@ import { memoryContext, type HealthProfile } from "../memory/profile";
 // personalized with the user's Health Memory.
 // ------------------------------------------------------------
 
-function specialist(name: string, expertise: string, profile: HealthProfile) {
+function specialist(name: string, expertise: string, profile: HealthProfile, nutrition: string) {
   return new ToolLoopAgent({
     model: MODEL,
     instructions: `You are the ${name} inside NutritiScan AI, a health operating system.
@@ -18,39 +18,47 @@ ${SAFETY}
 
 ${memoryContext(profile)}
 
+${nutrition}
+
 Answer ONLY within your specialty, concisely and practically. Return a focused
 summary the supervisor can hand to the user. Reference the user's memory when relevant
 (e.g. their goal, sleep, or lab values). No preamble.`,
   });
 }
 
-function buildSpecialists(profile: HealthProfile) {
+function buildSpecialists(profile: HealthProfile, nutrition: string) {
   return {
     nutrition: specialist(
       "Nutrition Agent",
       "Expertise: protein targets, calories, macro/micro-nutrients, vitamin & mineral deficiencies, food choices, hydration. You reason about grams per kg, meal timing, and food sources.",
       profile,
+      nutrition,
     ),
     fitness: specialist(
       "Fitness Agent",
       "Expertise: workout programming, BMI/body-composition context, progressive overload, muscle gain vs fat loss, recovery, training frequency.",
       profile,
+      nutrition,
     ),
     doctor: specialist(
       "Doctor Agent (educational)",
       `Expertise: symptom education, general condition information, and how medications work in general terms. You NEVER diagnose or prescribe. When given symptoms, you reason like a careful triage assistant.
-${TRIAGE_FORMAT}`,
+${MEDICAL_REASONING_FORMAT}`,
       profile,
+      nutrition,
     ),
     lab: specialist(
       "Lab Agent",
-      "Expertise: interpreting lab reports in plain language — CBC, thyroid (TSH/T3/T4), vitamin panels (B12, D), lipids, glucose. You explain what a value means, reference ranges, and trends, without diagnosing.",
+      `Expertise: interpreting lab reports in plain language — CBC, thyroid (TSH/T3/T4), vitamin panels (B12, D), lipids, glucose. You explain what a value means, reference ranges, and trends, without diagnosing. A recorded value is a Fact; what it might indicate is Inference — never blur the two.
+${MEDICAL_REASONING_FORMAT}`,
       profile,
+      nutrition,
     ),
     coach: specialist(
       "Health Coach",
       "Expertise: sleep quality, habit formation, goal setting, consistency, reminders, motivation, and turning insights into small daily actions.",
       profile,
+      nutrition,
     ),
   };
 }
@@ -60,8 +68,8 @@ ${TRIAGE_FORMAT}`,
 // coherent, safe, personalized answer.
 // ------------------------------------------------------------
 
-export function buildSupervisor(profile: HealthProfile) {
-  const s = buildSpecialists(profile);
+export function buildSupervisor(profile: HealthProfile, nutrition: string) {
+  const s = buildSpecialists(profile, nutrition);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
     tool({
@@ -92,9 +100,11 @@ How you work:
 
 ${SAFETY}
 
-${TRIAGE_FORMAT}
+${MEDICAL_REASONING_FORMAT}
 
-${memoryContext(profile)}`,
+${memoryContext(profile)}
+
+${nutrition}`,
     tools: {
       askNutritionAgent: delegate(s.nutrition, "Nutrition Agent"),
       askFitnessAgent: delegate(s.fitness, "Fitness Agent"),
