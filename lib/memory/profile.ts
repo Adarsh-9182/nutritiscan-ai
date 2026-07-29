@@ -17,8 +17,14 @@ export type Trend = { label: string; delta: string; direction: "up" | "down" | "
 
 export type HealthProfile = {
   name: string;
-  age: number;
-  sex: "male" | "female" | "other";
+  /**
+   * Optional because we never ask for them at first run. A health product
+   * must be able to say "not recorded" — printing a default age and sex into
+   * the agent prompt is indistinguishable, downstream, from the user having
+   * told us.
+   */
+  age?: number;
+  sex?: "male" | "female" | "other";
   heightCm: number;
   weightKg: number;
   goal: string;
@@ -66,9 +72,44 @@ export const demoProfile: HealthProfile = {
   ],
 };
 
+/**
+ * The memory a *real* person starts with: empty.
+ *
+ * This exists because first-run used to `patch()` the user's answers on top of
+ * `demoProfile`, which left Adarsh's biomarkers and trends in place. A brand
+ * new user was shown "Vitamin B12 180 pg/mL — low" as their own recorded lab,
+ * it was subtracted from their health score, the insight engine cited it as
+ * evidence, and `memoryContext()` fed it to all five agents. The product told
+ * people they had a deficiency it had invented.
+ *
+ * Anything not recorded stays absent. The screens are responsible for saying
+ * "nothing yet" — never for filling the gap.
+ */
+export const blankProfile: HealthProfile = {
+  name: "there",
+  heightCm: 170,
+  weightKg: 70,
+  goal: "Stay healthy",
+  sleepHours: 7,
+  exerciseDaysPerWeek: 3,
+  biomarkers: [],
+  allergies: [],
+  medicines: [],
+  conditions: [],
+  journal: [],
+  trends: [],
+};
+
 // Where the memory lives between visits. Shared by every surface
 // (dashboard, chat, scanner) so they all reason about the same person.
 export const PROFILE_KEY = "ns-profile-v1";
+
+/**
+ * Whether what's on screen is still the shipped demo memory rather than the
+ * user's own. The "skip" path at first run deliberately keeps it, so every
+ * surface showing labs or trends must be able to label them as a sample.
+ */
+export const isDemoMemory = (p: HealthProfile): boolean => !!p.journal?.some((e) => e.id.startsWith("j-seed-"));
 
 export function bmi(p: HealthProfile): number {
   const m = p.heightCm / 100;
@@ -82,21 +123,49 @@ export function heightImperial(cm: number): string {
   return `${ft}'${inch}"`;
 }
 
-// A composite, illustrative "health score" (NOT a medical assessment).
-export function healthScore(p: HealthProfile): number {
-  let score = 72;
-  if (p.sleepHours >= 7) score += 6;
-  if (p.exerciseDaysPerWeek >= 4) score += 8;
+export type ScoreFactor = { label: string; delta: number; detail: string };
+
+/**
+ * A composite, illustrative "health score" — NOT a medical assessment.
+ *
+ * It returns the factors alongside the number. The number on its own is the
+ * least defensible thing on the dashboard: it is the largest type on the page
+ * and it used to arrive with no stated basis, in a product whose entire
+ * differentiator (`lib/health/insights.ts`) is refusing to assert more than
+ * the evidence supports. If we show a score, we show our working.
+ */
+export function healthScore(p: HealthProfile): { score: number; factors: ScoreFactor[] } {
+  const factors: ScoreFactor[] = [];
+  const add = (label: string, delta: number, detail: string) => {
+    if (delta !== 0) factors.push({ label, delta, detail });
+  };
+
+  const BASE = 72;
+  add("Baseline", BASE, "every score starts here");
+
+  add("Sleep", p.sleepHours >= 7 ? 6 : 0, `${p.sleepHours} h a night`);
+  add("Training", p.exerciseDaysPerWeek >= 4 ? 8 : 0, `${p.exerciseDaysPerWeek} days a week`);
+
   const b = bmi(p);
-  if (b >= 18.5 && b <= 24.9) score += 6;
-  const lows = p.biomarkers.filter((x) => x.status === "low" || x.status === "high").length;
-  score -= lows * 4;
-  const borderline = p.biomarkers.filter((x) => x.status === "borderline").length;
-  score -= borderline * 2;
-  return Math.max(35, Math.min(98, score));
+  add("BMI", b >= 18.5 && b <= 24.9 ? 6 : 0, `${b} — within 18.5–24.9`);
+
+  const outOfRange = p.biomarkers.filter((x) => x.status === "low" || x.status === "high");
+  add("Labs out of range", outOfRange.length * -4, outOfRange.map((x) => x.name).join(", "));
+
+  const borderline = p.biomarkers.filter((x) => x.status === "borderline");
+  add("Borderline labs", borderline.length * -2, borderline.map((x) => x.name).join(", "));
+
+  const raw = factors.reduce((a, f) => a + f.delta, 0);
+  return { score: Math.max(35, Math.min(98, raw)), factors };
 }
 
-// A short longitudinal insight for the Health Memory Engine (illustrative).
+/**
+ * A short longitudinal note for the Health Memory card.
+ *
+ * With nothing recorded it says so. It previously fell through to "your
+ * fundamentals look steady" — a reassurance about a body it knew nothing
+ * about, which is the failure mode this product exists to avoid.
+ */
 export function insight(p: HealthProfile): string {
   const sleepUp = p.trends?.find((t) => /sleep/i.test(t.label) && t.direction === "up");
   const workoutUp = p.trends?.find((t) => /workout|consistency/i.test(t.label) && t.direction === "up");
@@ -105,7 +174,9 @@ export function insight(p: HealthProfile): string {
   if (sleepUp) parts.push(`your sleep is trending up (${sleepUp.delta})`);
   if (workoutUp) parts.push(`workout consistency has improved (${workoutUp.delta})`);
   if (low) parts.push(`keep an eye on your ${low.name.toLowerCase()}`);
-  if (!parts.length) return `${p.name}, your fundamentals look steady. Keep the streak going.`;
+  if (!parts.length) {
+    return `I don't know enough about you yet to say anything useful. Scan a meal or paste a lab report and this becomes real.`;
+  }
   const joined = parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts.slice(-1) : parts[0];
   return `${p.name}, ${joined}.`;
 }
