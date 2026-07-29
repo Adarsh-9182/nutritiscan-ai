@@ -181,19 +181,51 @@ export function insight(p: HealthProfile): string {
   return `${p.name}, ${joined}.`;
 }
 
-// Render the memory as context injected into every agent's instructions.
-export function memoryContext(p: HealthProfile): string {
-  const labs = p.biomarkers.map((b) => `  - ${b.name}: ${b.value} (${b.status}${b.note ? `, ${b.note}` : ""})`).join("\n");
-  return `[USER HEALTH MEMORY — remember and personalize everything to this person]
-Name: ${p.name}
-Age/Sex: ${p.age} / ${p.sex}
-Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}
-Primary goal: ${p.goal}
-Sleep: ~${p.sleepHours} h/night   Exercise: ${p.exerciseDaysPerWeek} days/week   Resting HR: ${p.restingHr ?? "n/a"} bpm
-Allergies: ${p.allergies.length ? p.allergies.join(", ") : "none recorded"}
-Medicines: ${p.medicines.length ? p.medicines.join(", ") : "none recorded"}
-Conditions: ${p.conditions.length ? p.conditions.join(", ") : "none recorded"}
-Recent lab biomarkers:
-${labs || "  - none recorded"}
-[END MEMORY]`;
+// ------------------------------------------------------------
+// Memory sections — context engineering, not just rendering.
+//
+// Every specialist used to get the FULL profile every turn: a Fitness
+// question got the complete lab panel, allergy list, and medicines dumped
+// into its instructions alongside the one field it actually needed (BMI).
+// That's context stuffing, not context engineering — it dilutes the
+// specialist's attention with irrelevant detail and costs tokens on every
+// one of the (possibly several) specialist calls a single turn can fan out
+// to. Each specialist now declares which sections it needs (lib/agents/index.ts);
+// this module only has to make that declaration possible and correct.
+//
+// The Supervisor and Doctor Agent still get ALL_MEMORY_SECTIONS — the
+// Supervisor is the one deciding whether a question is single- or
+// cross-domain (and can route to more than one specialist when it is), and
+// Doctor's triage role means narrowing its facts is exactly the kind of
+// "invent by omission" failure the safety rules exist to prevent.
+// ------------------------------------------------------------
+
+export type MemorySection = "identity" | "vitals" | "goal" | "sleep" | "activity" | "allergies" | "medicines" | "conditions" | "biomarkers";
+
+export const ALL_MEMORY_SECTIONS: MemorySection[] = ["identity", "vitals", "goal", "sleep", "activity", "allergies", "medicines", "conditions", "biomarkers"];
+
+const SECTION_RENDERERS: Record<MemorySection, (p: HealthProfile) => string> = {
+  identity: (p) => `Name: ${p.name}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,
+  vitals: (p) => `Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}`,
+  goal: (p) => `Primary goal: ${p.goal}`,
+  sleep: (p) => `Sleep: ~${p.sleepHours} h/night`,
+  activity: (p) => `Exercise: ${p.exerciseDaysPerWeek} days/week   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
+  allergies: (p) => `Allergies: ${p.allergies.length ? p.allergies.join(", ") : "none recorded"}`,
+  medicines: (p) => `Medicines: ${p.medicines.length ? p.medicines.join(", ") : "none recorded"}`,
+  conditions: (p) => `Conditions: ${p.conditions.length ? p.conditions.join(", ") : "none recorded"}`,
+  biomarkers: (p) => {
+    const labs = p.biomarkers.map((b) => `  - ${b.name}: ${b.value} (${b.status}${b.note ? `, ${b.note}` : ""})`).join("\n");
+    return `Recent lab biomarkers:\n${labs || "  - none recorded"}`;
+  },
+};
+
+/**
+ * Render the memory as context injected into an agent's instructions.
+ * Defaults to every section (the original, pre-scoping behavior) so
+ * existing callers — and the Supervisor/Doctor, which want the full
+ * picture — don't have to spell out the section list.
+ */
+export function memoryContext(p: HealthProfile, sections: MemorySection[] = ALL_MEMORY_SECTIONS): string {
+  const body = sections.map((s) => SECTION_RENDERERS[s](p)).join("\n");
+  return `[USER HEALTH MEMORY — remember and personalize everything to this person]\n${body}\n[END MEMORY]`;
 }
