@@ -9,6 +9,7 @@ import { buildSupervisor } from "@/lib/agents";
 import { demoAnswer, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
+import { recallRelevant } from "@/lib/memory/recall";
 import { type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
 import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
@@ -76,12 +77,13 @@ async function streamRealSupervisor(
   messages: UIMessage[],
   profile: HealthProfile,
   nutrition: string,
+  recalled: string | null,
   signal: AbortSignal,
 ): Promise<RealOutcome> {
   let wrote = false;
   try {
     const stream = await createAgentUIStream({
-      agent: buildSupervisor(profile, nutrition),
+      agent: buildSupervisor(profile, nutrition, recalled),
       uiMessages: messages,
       abortSignal: signal,
     });
@@ -194,7 +196,11 @@ export async function POST(req: Request) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
       if (hasModelCredential()) {
-        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, signal);
+        // Best-effort: a failed or slow embedding call must not cost the
+        // user their answer, so recall degrades to null rather than
+        // propagating a rejection into the supervisor call below it.
+        const recalled = await recallRelevant(userText, profile, meals, signal);
+        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, signal);
         if (outcome !== "unavailable") return;
         // "unavailable" means nothing reached the client yet — the demo
         // brain can still answer, and an honest answer beats a dead spinner.

@@ -19,8 +19,10 @@
 // ============================================================
 
 import { useSyncExternalStore } from "react";
+import type { UIMessage } from "ai";
 import { demoProfile, PROFILE_KEY, type HealthProfile } from "./profile";
 import { MEALS_KEY, type LoggedMeal } from "./meals";
+import { capTranscript, CHAT_KEY, safeTranscript } from "./transcript";
 
 type Listener = () => void;
 
@@ -100,6 +102,7 @@ function createStore<T>(key: string, fallback: T) {
 
 const profileStore = createStore<HealthProfile>(PROFILE_KEY, demoProfile);
 const mealsStore = createStore<LoggedMeal[]>(MEALS_KEY, []);
+const transcriptStore = createStore<UIMessage[]>(CHAT_KEY, []);
 
 // Module-scope so identities are stable across renders — passing these to a
 // memoized child must not defeat the memoization.
@@ -129,3 +132,15 @@ export const useHydrated = () => useSyncExternalStore(NOOP_SUBSCRIBE, () => true
 
 /** Non-reactive read, for code paths outside React (e.g. building a request body). */
 export const readProfile = () => profileStore.read();
+export const readMeals = () => mealsStore.read();
+
+/**
+ * The chat transcript.
+ *
+ * Deliberately *not* exposed as a hook: `useChat` owns the live message list
+ * and re-rendering the transcript from two sources would fight it. These are
+ * the seam — read once at mount, write back when a turn settles.
+ */
+export const readTranscript = () => safeTranscript(transcriptStore.read());
+export const writeTranscript = (messages: UIMessage[]) => transcriptStore.write(capTranscript(messages));
+export const clearTranscript = () => transcriptStore.write([]);

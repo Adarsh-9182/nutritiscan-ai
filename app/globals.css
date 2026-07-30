@@ -33,7 +33,7 @@
 
   --radius: 20px;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @theme inline {
@@ -131,6 +131,57 @@ body {
   background-size: 64px 64px;
   mask-image: radial-gradient(circle at 50% 0%, black, transparent 75%);
   pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   Type scale.
+
+   The app had grown six ad-hoc sizes expressed as arbitrary values
+   (text-[10px], text-[11px], text-xs, text-sm, text-lg, text-3xl)
+   with no rule about which meant what — so the same kind of label
+   was 10px on one card and 11px on the next. Worse, 10px was
+   carrying real content: portion weights, meal times, micronutrient
+   figures. Nothing below 11px renders content any more.
+   ------------------------------------------------------------ */
+.t-label {
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+}
+.t-meta {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.t-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.t-title {
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.006em;
+}
+.t-hero {
+  font-size: 19px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.t-display {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * Every number that changes in place — ring readouts, macro totals, live
+ * counters. Proportional digits shift width as they tick and the whole row
+ * jitters; tabular ones hold their column.
+ */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Glass surfaces */

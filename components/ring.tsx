@@ -62,10 +62,12 @@ export default function Ring({
         />
       </svg>
       <div className="absolute text-center" aria-hidden="true">
-        <p className="text-3xl font-semibold" style={{ color }}>
+        {/* tabular figures: the value animates and counts, and proportional
+            digits make the whole readout shift width as it settles. */}
+        <p className="t-display tnum" style={{ color }}>
           {label}
         </p>
-        {sub && <p className="text-[11px] text-[var(--text-dim)]">{sub}</p>}
+        {sub && <p className="t-label tnum text-[var(--text-dim)]">{sub}</p>}
       </div>
     </div>
   );

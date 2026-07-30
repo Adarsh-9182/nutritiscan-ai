@@ -14,11 +14,11 @@ const LINKS = [
   { href: "/timeline", label: "Timeline" },
 ];
 
-export default function Nav({ status }: { status?: { tone: "good" | "warn"; label: string } }) {
+export default function Nav({ status, width = "max-w-7xl" }: { status?: { tone: "good" | "warn"; label: string }; width?: string }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary" className="mx-auto mb-5 flex max-w-7xl items-center justify-between rounded-full glass px-3 py-2 sm:px-4">
+    <nav aria-label="Primary" className={`mx-auto mb-5 flex ${width} items-center justify-between rounded-full glass px-3 py-2 sm:px-4`}>
       <Link href="/" className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 focus-ring" aria-label="NutritiScan home">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">N</span>
         <span className="hidden text-sm font-semibold sm:inline">
@@ -45,7 +45,7 @@ export default function Nav({ status }: { status?: { tone: "good" | "warn"; labe
 
       <div className="flex shrink-0 items-center gap-2">
         {status && (
-          <span className="hidden items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] sm:flex">
+          <span className="hidden items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 t-label text-[var(--text-muted)] sm:flex">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.tone === "good" ? "var(--emerald)" : "var(--amber)" }} />
             {status.label}
           </span>

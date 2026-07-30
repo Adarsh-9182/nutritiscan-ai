@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useHydrated, useProfile } from "@/lib/memory/store";
+import { blankProfile } from "@/lib/memory/profile";
 import { journalEntry } from "@/lib/memory/journal";
 
 /**
@@ -19,7 +20,7 @@ const GOALS = [
 ];
 
 export default function Onboarding() {
-  const [profile, , patch] = useProfile();
+  const [profile, setProfile, patch] = useProfile();
   const hydrated = useHydrated();
   const [dismissed, setDismissed] = useState(false);
   const [name, setName] = useState("");
@@ -37,13 +38,18 @@ export default function Onboarding() {
   }, [open]);
 
   const finish = () => {
-    patch({
-      name: name.trim() || profile.name,
+    // Replace the memory outright rather than patching the demo. `patch()`
+    // merges onto whatever is in the store, which at first run is the demo
+    // profile — so the user inherited Adarsh's biomarkers and trends, and was
+    // told about a B12 deficiency nobody had measured. A real person starts
+    // empty: no labs, no trends, no borrowed past.
+    setProfile({
+      ...blankProfile,
+      name: name.trim() || blankProfile.name,
       weightKg: weight,
       heightCm,
       goal,
       onboarded: true,
-      // A real person's story starts today — not with the demo's borrowed past.
       journal: [
         journalEntry({ kind: "milestone", title: "Started tracking with NutritiScan", tone: "neutral" }),
         journalEntry({ kind: "goal", title: `Goal set: ${goal.toLowerCase()}`, tone: "neutral" }),
@@ -96,7 +102,7 @@ export default function Onboarding() {
               }}
             >
               <div>
-                <label htmlFor="ob-name" className="text-[11px] text-[var(--text-dim)]">
+                <label htmlFor="ob-name" className="t-label text-[var(--text-dim)]">
                   What should I call you?
                 </label>
                 <input
@@ -104,14 +110,14 @@ export default function Onboarding() {
                   ref={inputRef}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={profile.name}
+                  placeholder="Your first name"
                   autoComplete="given-name"
                   className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-[var(--text-dim)] focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
                 />
               </div>
 
               <fieldset>
-                <legend className="text-[11px] text-[var(--text-dim)]">What are you working toward?</legend>
+                <legend className="t-label text-[var(--text-dim)]">What are you working toward?</legend>
                 <div className="mt-1.5 grid grid-cols-3 gap-2">
                   {GOALS.map((g) => (
                     <button
@@ -119,7 +125,7 @@ export default function Onboarding() {
                       type="button"
                       onClick={() => setGoal(g.label)}
                       aria-pressed={goal === g.label}
-                      className={`rounded-xl border px-2 py-2.5 text-[11px] transition focus-ring ${
+                      className={`rounded-xl border px-2 py-2.5 t-label transition focus-ring ${
                         goal === g.label
                           ? "border-[color-mix(in_oklab,var(--emerald)_55%,transparent)] bg-[color-mix(in_oklab,var(--emerald)_14%,transparent)] text-white"
                           : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-white"
@@ -134,7 +140,7 @@ export default function Onboarding() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="ob-weight" className="text-[11px] text-[var(--text-dim)]">
+                  <label htmlFor="ob-weight" className="t-label text-[var(--text-dim)]">
                     Weight (kg)
                   </label>
                   <input
@@ -149,7 +155,7 @@ export default function Onboarding() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="ob-height" className="text-[11px] text-[var(--text-dim)]">
+                  <label htmlFor="ob-height" className="t-label text-[var(--text-dim)]">
                     Height (cm)
                   </label>
                   <input
@@ -170,7 +176,7 @@ export default function Onboarding() {
               </button>
             </form>
 
-            <button onClick={skip} className="mt-3 w-full rounded-lg py-1.5 text-[11px] text-[var(--text-dim)] transition hover:text-white focus-ring">
+            <button onClick={skip} className="mt-3 w-full rounded-lg py-1.5 t-label text-[var(--text-dim)] transition hover:text-white focus-ring">
               Skip — explore with the demo profile
             </button>
           </motion.div>

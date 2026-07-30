@@ -17,6 +17,7 @@
 
 import { z } from "zod";
 import { demoProfile, type HealthProfile } from "./profile";
+import type { LoggedMeal } from "./meals";
 
 /** Field budgets. Generous for real use, far too small to smuggle a prompt. */
 const LIMITS = {
@@ -95,16 +96,29 @@ const stringList = z
 const num = (min: number, max: number, fallback: number) =>
   z.coerce.number().catch(fallback).transform((n) => (Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback));
 
+/**
+ * A field that is allowed to be unknown. Absent, null and unparseable all
+ * collapse to `undefined` rather than to a plausible-looking default — the
+ * agent prompt then prints "not recorded", which is the truth, instead of a
+ * number the user never gave us.
+ */
+const optionalNum = (min: number, max: number) =>
+  z.unknown().transform((v) => {
+    if (v === null || v === undefined || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
+  });
+
 export const HealthProfileSchema = z.object({
   name: text(LIMITS.name, "there"),
-  age: num(1, 120, demoProfile.age),
-  sex: z.enum(["male", "female", "other"]).catch("other"),
+  age: optionalNum(1, 120),
+  sex: z.enum(["male", "female", "other"]).optional().catch(undefined),
   heightCm: num(60, 250, demoProfile.heightCm),
   weightKg: num(20, 400, demoProfile.weightKg),
   goal: text(LIMITS.goal, "Stay healthy"),
   sleepHours: num(0, 24, demoProfile.sleepHours),
   exerciseDaysPerWeek: num(0, 7, demoProfile.exerciseDaysPerWeek),
-  restingHr: num(25, 220, 60).optional(),
+  restingHr: optionalNum(25, 220),
   biomarkers: z.array(BiomarkerSchema).catch([]).transform((b) => b.slice(0, LIMITS.biomarkers)),
   allergies: stringList,
   medicines: stringList,
@@ -118,6 +132,49 @@ export const HealthProfileSchema = z.object({
    */
   onboarded: z.boolean().catch(false).optional(),
 });
+
+/**
+ * Meals reach the prompt too, and their titles are the *least* trusted text in
+ * the system: they come from a vision model's free-form output or from whatever
+ * the user typed. Same treatment as the profile — shape, then content.
+ */
+const MEAL_LIMITS = { title: 80, item: 48, items: 12, meals: 60 } as const;
+
+const LoggedMealSchema = z.object({
+  id: text(48, "meal"),
+  at: z
+    .unknown()
+    .transform((v) => {
+      const d = new Date(typeof v === "string" || typeof v === "number" ? v : NaN);
+      // An unparseable or absurd date would silently land in the wrong place on
+      // the timeline and skew every "last 14 days" average.
+      return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
+    }),
+  title: text(MEAL_LIMITS.title, "Meal"),
+  items: z.unknown().transform((v) => (Array.isArray(v) ? v.map((x) => clean(x, MEAL_LIMITS.item)).filter(Boolean).slice(0, MEAL_LIMITS.items) : [])),
+  kcal: num(0, 20_000, 0),
+  protein: num(0, 1_000, 0),
+  carbs: num(0, 2_000, 0),
+  fat: num(0, 1_000, 0),
+  fiber: num(0, 500, 0),
+  fitScore: num(0, 100, 50),
+  source: z.enum(["vision", "text", "sample"]).catch("text"),
+});
+
+/**
+ * Never throws: a malformed meal log degrades to "no meals" — which the
+ * nutrition context handles by telling the agent intake is unknown — rather
+ * than failing a health question outright.
+ */
+export function safeMeals(input: unknown): LoggedMeal[] {
+  if (!Array.isArray(input)) return [];
+  const out: LoggedMeal[] = [];
+  for (const raw of input.slice(-MEAL_LIMITS.meals)) {
+    const parsed = LoggedMealSchema.safeParse(raw);
+    if (parsed.success) out.push(parsed.data as LoggedMeal);
+  }
+  return out;
+}
 
 /**
  * Turn whatever the client sent into a profile that is safe to put in a

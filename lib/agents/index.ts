@@ -91,7 +91,7 @@ ${MEDICAL_REASONING_FORMAT}`,
 // coherent, safe, personalized answer.
 // ------------------------------------------------------------
 
-export function buildSupervisor(profile: HealthProfile, nutrition: string) {
+export function buildSupervisor(profile: HealthProfile, nutrition: string, recalled?: string | null) {
   const s = buildSpecialists(profile, nutrition);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
@@ -134,7 +134,8 @@ ${MEDICAL_REASONING_FORMAT}
 
 ${memoryContext(profile, ALL_MEMORY_SECTIONS)}
 
-${nutrition}`,
+${nutrition}
+${recalled ? `\n${recalled}\n` : ""}`,
     tools: {
       askNutritionAgent: delegate(s.nutrition, "Nutrition Agent"),
       askFitnessAgent: delegate(s.fitness, "Fitness Agent"),

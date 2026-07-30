@@ -7,9 +7,10 @@ import { AnimatePresence, motion } from "motion/react";
 import Ring from "@/components/ring";
 import Nav from "@/components/nav";
 import Onboarding from "@/components/onboarding";
-import type { ScanResult } from "@/lib/nutrition/analyze";
+import MealList from "@/components/meal-list";
+import { proteinTarget, type ScanResult } from "@/lib/nutrition/analyze";
 import { useMeals, useProfile, readProfile } from "@/lib/memory/store";
-import { dayTotals, mealsOn, mealTime, toLoggedMeal } from "@/lib/memory/meals";
+import { dayTotals, mealsOn, toLoggedMeal } from "@/lib/memory/meals";
 
 type Stage = { id: string; label: string; status: "active" | "done" };
 type Mode = "photo" | "describe";
@@ -75,7 +76,7 @@ function FlagRow({ tone, text }: { tone: "good" | "warn" | "bad"; text: string }
   const glyph = tone === "good" ? "✓" : tone === "warn" ? "!" : "✕";
   return (
     <div className="flex gap-2.5 rounded-xl px-3 py-2" style={{ background: `color-mix(in oklab, ${color} 9%, transparent)` }}>
-      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold" style={{ background: `${color}30`, color }}>
+      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full t-label font-bold" style={{ background: `${color}30`, color }}>
         {glyph}
       </span>
       <p className="text-xs leading-relaxed text-[var(--text-muted)]">{text}</p>
@@ -87,7 +88,7 @@ function FlagRow({ tone, text }: { tone: "good" | "warn" | "bad"; text: string }
 
 export default function Scan() {
   const [profile] = useProfile();
-  const [meals, , addMeal] = useMeals();
+  const [meals, setMeals, addMeal] = useMeals();
   const [userMode, setUserMode] = useState<Mode | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -226,15 +227,21 @@ export default function Scan() {
 
   const today = dayTotals(meals);
   const todayMeals = mealsOn(meals).slice().reverse();
-  const proteinGoal = Math.round(profile.weightKg * 1.8);
+  // Must come from the one function that knows the goal multiplier. Hardcoding
+  // 1.8 here meant a "Lose fat" user saw a target on /scan that disagreed with
+  // the ring on /dashboard.
+  const proteinGoal = proteinTarget(profile);
 
+  // No `bg-aurora` on the page wrapper — <body> already carries it. Re-applying
+  // it stacked a second set of fixed gradient layers, so /scan and /timeline
+  // rendered at double the intensity of /dashboard.
   return (
-    <div className="bg-aurora min-h-[100svh] px-4 py-4 sm:px-6">
+    <div className="min-h-[100svh] px-4 py-4 sm:px-6">
       <a href="#scan-analysis" className="sr-only skip-link">
         Skip to the analysis
       </a>
       <Onboarding />
-      <Nav status={vision === null ? undefined : vision ? { tone: "good", label: "vision online" } : { tone: "warn", label: "describe mode is live" }} />
+      <Nav width="max-w-6xl" status={vision === null ? undefined : vision ? { tone: "good", label: "vision online" } : { tone: "warn", label: "describe mode is live" }} />
 
       <main className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — capture */}
@@ -242,12 +249,12 @@ export default function Scan() {
           <div className="rounded-[var(--radius)] glass p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-lg font-semibold">Scan a meal</h1>
-                <p className="text-[11px] text-[var(--text-dim)]">
+                <h1 className="t-hero">Scan a meal</h1>
+                <p className="t-label text-[var(--text-dim)]">
                   personalised to {profile.name} · {profile.goal.toLowerCase()}
                 </p>
               </div>
-              <div className="flex rounded-full border border-[var(--border-strong)] p-0.5 text-[11px]">
+              <div className="flex rounded-full border border-[var(--border-strong)] p-0.5 t-label">
                 {(["photo", "describe"] as Mode[]).map((m) => (
                   <button
                     key={m}
@@ -304,7 +311,7 @@ export default function Scan() {
                       <div className="px-6 py-8 text-center">
                         <div aria-hidden="true" className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-xl">📸</div>
                         <p className="mt-3 text-sm font-medium">Drop a photo of your plate</p>
-                        <p className="mt-1 text-[11px] text-[var(--text-dim)]">or click to choose a file</p>
+                        <p className="mt-1 t-label text-[var(--text-dim)]">or click to choose a file</p>
                       </div>
                     )}
                   </button>
@@ -319,7 +326,7 @@ export default function Scan() {
                   </div>
 
                   {vision === false && (
-                    <p className="mt-3 rounded-xl border border-[color-mix(in_oklab,var(--amber)_35%,transparent)] bg-[color-mix(in_oklab,var(--amber)_10%,transparent)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                    <p className="mt-3 rounded-xl border border-[color-mix(in_oklab,var(--amber)_35%,transparent)] bg-[color-mix(in_oklab,var(--amber)_10%,transparent)] px-3 py-2 t-label leading-relaxed text-[var(--text-muted)]">
                       No vision model configured, so photos return a clearly-labelled sample. <strong className="text-white">Describe</strong> mode is fully real and works offline — every number there is computed from the food database.
                     </p>
                   )}
@@ -348,7 +355,7 @@ export default function Scan() {
                           setText(ex);
                           void run({ mode: "describe", text: ex });
                         }}
-                        className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white disabled:opacity-40 focus-ring"
+                        className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 t-label text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white disabled:opacity-40 focus-ring"
                       >
                         {ex}
                       </button>
@@ -357,7 +364,7 @@ export default function Scan() {
                   <button onClick={() => void run({ mode: "describe", text })} disabled={busy || !text.trim()} className="btn-primary mt-3 w-full rounded-xl px-4 py-2.5 text-sm disabled:opacity-40">
                     {busy ? "Analysing…" : "Analyse this meal"}
                   </button>
-                  <p className="mt-2 text-center text-[10px] text-[var(--text-dim)]">Understands portions — “2 rotis”, “a katori of dal”, “200g chicken”, “a glass of milk”.</p>
+                  <p className="mt-2 text-center t-label text-[var(--text-dim)]">Understands portions — “2 rotis”, “a katori of dal”, “200g chicken”, “a glass of milk”.</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -366,8 +373,8 @@ export default function Scan() {
           {/* today's log */}
           <div className="rounded-[var(--radius)] glass p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Today</p>
-              <span className="text-[11px] text-[var(--text-dim)]">
+              <h2 className="t-title">Today</h2>
+              <span className="t-label text-[var(--text-dim)]">
                 {today.count} meal{today.count === 1 ? "" : "s"} logged
               </span>
             </div>
@@ -378,28 +385,23 @@ export default function Scan() {
                 { k: "Fibre", v: today.fiber, u: "g", c: "var(--violet)" },
               ].map((s) => (
                 <div key={s.k} className="rounded-xl bg-[var(--surface-2)] py-2.5">
-                  <p className="text-[10px] text-[var(--text-dim)]">{s.k}</p>
+                  <p className="t-label text-[var(--text-dim)]">{s.k}</p>
                   <p className="mt-0.5 font-medium" style={{ color: s.c }}>
                     {s.v}
-                    <span className="ml-1 text-[10px] text-[var(--text-dim)]">{s.u}</span>
+                    <span className="ml-1 t-label text-[var(--text-dim)]">{s.u}</span>
                   </p>
                 </div>
               ))}
             </div>
-            {todayMeals.length > 0 ? (
-              <div className="mt-3 space-y-1.5">
-                {todayMeals.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs">
-                    <span className="min-w-0 flex-1 truncate text-[var(--text-muted)]">{m.title}</span>
-                    <span className="ml-2 shrink-0 text-[10px] text-[var(--text-dim)]">
-                      {mealTime(m.at)} · {m.kcal} kcal · {m.protein} g P
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-[11px] text-[var(--text-dim)]">Nothing logged yet today. Scan a meal and hit “Log this meal” — your dashboard reads from here.</p>
-            )}
+            <div className="mt-3">
+              {todayMeals.length > 0 ? (
+                <MealList meals={todayMeals} onRemove={(id) => setMeals(meals.filter((x) => x.id !== id))} />
+              ) : (
+                <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2.5 t-label text-[var(--text-muted)]">
+                  Nothing logged yet today. Scan a meal and hit “Log this meal” — your dashboard reads from here.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -421,9 +423,9 @@ export default function Scan() {
               {stages.length > 0 && !result && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">Analysing</p>
+                    <h2 className="t-title">Analysing</h2>
                     {busy && (
-                      <button onClick={cancel} className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[11px] text-[var(--text-dim)] transition hover:text-white focus-ring">
+                      <button onClick={cancel} className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring">
                         Cancel
                       </button>
                     )}
@@ -447,7 +449,7 @@ export default function Scan() {
               <div className="grid min-h-[60vh] place-items-center text-center">
                 <div className="max-w-sm">
                   <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-2xl">🍽️</div>
-                  <p className="mt-4 text-lg font-semibold">Point it at a plate.</p>
+                  <p className="mt-4 t-hero">Point it at a plate.</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
                     I&apos;ll break the meal into foods, count what&apos;s in it, and read the result against your goal, your labs, and your allergies — not a generic daily value.
                   </p>
@@ -484,11 +486,11 @@ export default function Scan() {
                     <Ring value={result.fitScore} size={116} stroke={9} color={GRADE_COLOR[result.grade]} label={String(result.fitScore)} sub="fit score" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-lg font-semibold">{result.title}</h2>
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize" style={{ background: `color-mix(in oklab, ${GRADE_COLOR[result.grade]} 18%, transparent)`, color: GRADE_COLOR[result.grade] }}>
+                        <h2 className="t-hero">{result.title}</h2>
+                        <span className="rounded-full px-2 py-0.5 t-label font-medium capitalize" style={{ background: `color-mix(in oklab, ${GRADE_COLOR[result.grade]} 18%, transparent)`, color: GRADE_COLOR[result.grade] }}>
                           {result.grade}
                         </span>
-                        <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text-dim)]">
+                        <span className="rounded-full border border-[var(--border)] px-2 py-0.5 t-label text-[var(--text-dim)]">
                           {result.source === "vision" ? "from photo" : result.source === "sample" ? "sample" : "from description"}
                         </span>
                       </div>
@@ -496,15 +498,15 @@ export default function Scan() {
                     </div>
                   </div>
 
-                  {result.note && <p className="rounded-xl border border-[color-mix(in_oklab,var(--amber)_35%,transparent)] bg-[color-mix(in_oklab,var(--amber)_9%,transparent)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">{result.note}</p>}
+                  {result.note && <p className="rounded-xl border border-[color-mix(in_oklab,var(--amber)_35%,transparent)] bg-[color-mix(in_oklab,var(--amber)_9%,transparent)] px-3 py-2 t-label leading-relaxed text-[var(--text-muted)]">{result.note}</p>}
 
                   {/* macros */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl bg-[var(--surface-2)] p-4">
                       <div className="flex items-baseline justify-between">
-                        <p className="text-sm font-semibold">Macros</p>
+                        <h3 className="t-title">Macros</h3>
                         <p className="text-sm font-semibold text-[var(--cyan)]">
-                          {result.totals.kcal} <span className="text-[11px] font-normal text-[var(--text-dim)]">kcal</span>
+                          {result.totals.kcal} <span className="t-label font-normal text-[var(--text-dim)]">kcal</span>
                         </p>
                       </div>
                       <div className="mt-3 space-y-2.5">
@@ -519,30 +521,30 @@ export default function Scan() {
                           { k: "Sodium", v: `${result.totals.sodium} mg` },
                         ].map((x) => (
                           <div key={x.k} className="rounded-lg bg-[var(--surface)] py-1.5">
-                            <p className="text-[10px] text-[var(--text-dim)]">{x.k}</p>
-                            <p className="text-[11px] font-medium">{x.v}</p>
+                            <p className="t-label text-[var(--text-dim)]">{x.k}</p>
+                            <p className="t-label font-medium">{x.v}</p>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div className="rounded-2xl bg-[var(--surface-2)] p-4">
-                      <p className="text-sm font-semibold">On the plate</p>
+                      <h3 className="t-title">On the plate</h3>
                       <div className="mt-3 space-y-1.5">
                         {result.items.map((it) => (
                           <div key={`${it.name}-${it.grams}`} className="flex items-center justify-between rounded-lg bg-[var(--surface)] px-3 py-2 text-xs">
                             <span className="min-w-0 flex-1 truncate">
                               {it.name}
-                              {!it.matched && <span className="ml-1.5 text-[10px] text-[var(--amber)]">est.</span>}
+                              {!it.matched && <span className="ml-1.5 t-label text-[var(--amber)]">est.</span>}
                             </span>
-                            <span className="ml-2 shrink-0 text-[10px] text-[var(--text-dim)]">
+                            <span className="ml-2 shrink-0 t-label text-[var(--text-dim)]">
                               {it.grams} g · {it.kcal} kcal · {it.protein} g P
                             </span>
                           </div>
                         ))}
                       </div>
                       {result.totals.b12 > 0 && (
-                        <p className="mt-3 rounded-lg bg-[var(--surface)] px-3 py-2 text-[10px] text-[var(--text-dim)]">
+                        <p className="mt-3 rounded-lg bg-[var(--surface)] px-3 py-2 t-label text-[var(--text-dim)]">
                           Micros: B12 {result.totals.b12} µg · Iron {result.totals.iron} mg · Calcium {result.totals.calcium} mg
                         </p>
                       )}
@@ -551,9 +553,9 @@ export default function Scan() {
 
                   {/* personalized flags */}
                   <div className="rounded-2xl bg-[var(--surface-2)] p-4">
-                    <p className="text-sm font-semibold">
-                      What this means for you<span className="ml-2 text-[10px] font-normal text-[var(--text-dim)]">read against your Health Memory</span>
-                    </p>
+                    <h3 className="t-title">
+                      What this means for you<span className="ml-2 t-label font-normal text-[var(--text-dim)]">read against your Health Memory</span>
+                    </h3>
                     <div className="mt-3 space-y-1.5">
                       {result.flags.map((f, i) => (
                         <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}>
@@ -566,13 +568,13 @@ export default function Scan() {
                   {/* swaps */}
                   {result.swaps.length > 0 && (
                     <div className="rounded-2xl bg-[var(--surface-2)] p-4">
-                      <p className="text-sm font-semibold">Smarter swaps</p>
+                      <h3 className="t-title">Smarter swaps</h3>
                       <div className="mt-3 grid gap-2 sm:grid-cols-3">
                         {result.swaps.map((s, i) => (
                           <div key={i} className="rounded-xl bg-[var(--surface)] p-3">
-                            <p className="text-[10px] text-[var(--text-dim)] line-through">{s.from}</p>
+                            <p className="t-label text-[var(--text-dim)] line-through">{s.from}</p>
                             <p className="mt-0.5 text-xs font-medium text-[var(--emerald)]">{s.to}</p>
-                            <p className="mt-1.5 text-[10px] leading-relaxed text-[var(--text-muted)]">{s.why}</p>
+                            <p className="mt-1.5 t-label leading-relaxed text-[var(--text-muted)]">{s.why}</p>
                           </div>
                         ))}
                       </div>
@@ -599,7 +601,7 @@ export default function Scan() {
                     </Link>
                   </div>
 
-                  <p className="text-center text-[10px] text-[var(--text-dim)]">Estimates for education, not clinical measurement · portions and cooking method change these numbers</p>
+                  <p className="text-center t-label text-[var(--text-dim)]">Estimates for education, not clinical measurement · portions and cooking method change these numbers</p>
                 </motion.div>
               )}
             </AnimatePresence>

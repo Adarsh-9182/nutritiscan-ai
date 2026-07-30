@@ -23,6 +23,17 @@ function Inline({ text }: { text: string }) {
   );
 }
 
+/**
+ * Strip this file's markdown-lite syntax for copy-to-clipboard. Someone
+ * copying an answer to hand to a clinician shouldn't paste literal `**`/`_`
+ * markers — line-level structure (headers, bullets, numbering) already
+ * reads fine as plain text, so only the inline emphasis markers need
+ * unwrapping.
+ */
+function toPlainText(text: string): string {
+  return text.replace(/\*\*([^*]+)\*\*|_([^_]+)_/g, (_match, bold: string | undefined, italic: string | undefined) => bold ?? italic ?? "");
+}
+
 function Markdown({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -142,8 +153,10 @@ function Conversation({ profile }: { profile: HealthProfile }) {
   const restored = useMemo(() => readTranscript(), []);
   const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const reduceMotion = useReducedMotion();
 
   const busy = status === "submitted" || status === "streaming";
@@ -181,6 +194,30 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     pinnedRef.current = true;
     sendMessage({ text });
     setInput("");
+  };
+
+  // Grow the textarea with its content, capped by max-h-40 in the className
+  // (the browser clamps the inline height itself once that's hit and the
+  // native scrollbar takes over — no extra bookkeeping needed here).
+  // Reset to "auto" first, or the element only ever grows: shrinking after
+  // deleting text or sending needs the browser to remeasure from scratch.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  const copyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(toPlainText(text));
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500);
+    } catch {
+      // Clipboard access can be denied (permissions) or unavailable
+      // (non-secure context) — a failed copy isn't worth surfacing as an
+      // error in a health chat; the user can still select and copy by hand.
+    }
   };
 
   /** Health conversations are the most sensitive thing stored here. */
@@ -284,7 +321,7 @@ function Conversation({ profile }: { profile: HealthProfile }) {
           const route = badgeFor(idx, trace);
           const color = agentColor(route);
           return (
-            <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+            <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group flex gap-3">
               <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm" style={{ background: `${color}22` }}>
                 {route === "supervisor" ? "✦" : agentGlyph(route)}
               </span>
@@ -306,6 +343,28 @@ function Conversation({ profile }: { profile: HealthProfile }) {
                 <div className="rounded-2xl rounded-tl-sm bg-[var(--surface-2)] px-4 py-3">
                   {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                 </div>
+                {/* Structured medical guidance is exactly the kind of thing a
+                    user wants to hand to a clinician verbatim — copy has to
+                    exist somewhere. Hover-revealed (with focus-visible as the
+                    keyboard/screen-reader equivalent of hover) so it doesn't
+                    compete with the answer itself at rest. */}
+                {text && (
+                  <button
+                    type="button"
+                    onClick={() => copyMessage(m.id, text)}
+                    className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
+                  >
+                    {copiedId === m.id ? (
+                      <>
+                        <span aria-hidden="true">✓</span> Copied
+                      </>
+                    ) : (
+                      <>
+                        <span aria-hidden="true">⧉</span> Copy
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </motion.div>
           );
@@ -351,28 +410,40 @@ function Conversation({ profile }: { profile: HealthProfile }) {
         onSubmit={(e) => { e.preventDefault(); send(input); }}
         className="border-t border-[var(--border)] p-4"
       >
-        <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+        <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
           {/* A placeholder is not a label — it disappears on focus. */}
           <label htmlFor="chat-input" className="sr-only">
             Describe how you feel, or ask a health question
           </label>
-          <input
+          <textarea
             id="chat-input"
+            ref={textareaRef}
+            rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends; Shift+Enter (or any IME composition) inserts a
+              // newline. Symptom descriptions run long enough that a
+              // single-line input hid what the user had already typed —
+              // this is a textarea specifically so that stays visible.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                send(input);
+              }
+            }}
             disabled={busy}
             placeholder="Describe how you feel, or ask anything…"
-            className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
+            className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
           />
           {busy ? (
             // The supervisor can fan out across five specialists for the best
             // part of a minute. Leaving the user with no way to interrupt that
             // was the single worst moment in the flow.
-            <button type="button" onClick={() => stop()} aria-label="Stop generating" className="btn-ghost grid h-8 w-8 place-items-center rounded-xl">
+            <button type="button" onClick={() => stop()} aria-label="Stop generating" className="btn-ghost grid h-8 w-8 shrink-0 place-items-center rounded-xl">
               <span aria-hidden="true">■</span>
             </button>
           ) : (
-            <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 place-items-center rounded-xl text-base disabled:opacity-40">
+            <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 shrink-0 place-items-center rounded-xl text-base disabled:opacity-40">
               <span aria-hidden="true">↑</span>
             </button>
           )}
