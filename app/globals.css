@@ -1,58 +1,275 @@
 @import "tailwindcss";
 
 /* ============================================================
-   NUTRITISCAN AI — Design System
-   Apple Health × Linear × Stripe × AI Physician, 2030
+   NUTRITISCAN — DESIGN SYSTEM v2
+   "The AI Health Operating System"
+
+   Read this first, because it explains most of what follows.
+
+   This product's job is to LOWER THE PULSE. A person opening a
+   blood report is already anxious; a person scanning a meal is
+   already a little guilty. Every token here is chosen so the
+   interface never adds to that load.
+
+   Three rules govern the palette. They are enforced here, at the
+   token, rather than left to each component's judgement:
+
+   1. NO RED. Anywhere. Not for out-of-range labs, not for "high"
+      markers, not for form errors. Red is the colour of
+      emergency and this is not an emergency room. "Worth
+      attention" gets amber; "danger" is a sentence a human
+      writes, not a colour we paint.
+
+   2. ONE ACCENT ON RESULTS. Amber/orange is the only accent that
+      appears on a result surface. Green appears solely to say
+      "this is fine, it needs nothing from you". Blue appears
+      solely on evidence provenance. A screen lighting up in four
+      colours reads as four competing alarms.
+
+   3. SEMANTIC TOKENS ONLY. Components never name a hue. They
+      name a meaning (--attention, --steady, --evidence). Light
+      mode is then a token flip, not a re-layout — which is
+      exactly what section 06 of the vision asks for.
    ============================================================ */
 
+/* ------------------------------------------------------------
+   1. PRIMITIVES — the raw ramps.
+
+   Warm-neutral, not blue-grey. A pure #000/#111 grey reads
+   clinical and cold; shifting the neutrals a few degrees toward
+   amber makes the dark theme feel like a dimmed room rather than
+   a piece of medical equipment.
+   ------------------------------------------------------------ */
 :root {
-  --bg: #05070a;
-  --bg-2: #080b11;
-  --surface: rgba(255, 255, 255, 0.03);
-  --surface-2: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --n-0: #ffffff;
+  --n-25: #fdfaf7;
+  --n-50: #f7f2ec;
+  --n-100: #ece5dc;
+  --n-200: #d9d0c4;
+  --n-300: #b8ada0;
+  --n-400: #8f857a;
+  --n-500: #6b625a;
+  --n-600: #4e463f;
+  --n-700: #35302b;
+  --n-750: #29241f;
+  --n-800: #1f1b17;
+  --n-850: #171410;
+  --n-900: #12100d;
+  --n-950: #0b0908;
 
-  --text: #eaf0f6;
-  --text-muted: #94a3b3; /* 7.83:1 on --bg */
-  /*
-   * Was #5d6b7b — 3.70:1 on --bg, which fails WCAG AA (4.5:1) and was used
-   * for real content (portion sizes, timestamps, lab units), not decoration.
-   * #75859a is 5.36:1 and keeps a visible step below --text-muted.
-   */
-  --text-dim: #75859a;
+  /* Accent — the single voice of the product */
+  --o-300: #ffb27a;
+  --o-400: #ff8f45;
+  --o-500: #f97316;
+  --o-600: #e35d07;
+  --o-700: #c2410c;
+  --o-800: #9a3412;
 
-  /* health = emerald, ai = violet, vitals = cyan, warn = amber */
-  --emerald: #34d399;
-  --emerald-deep: #10b981;
-  --cyan: #22d3ee;
-  --violet: #a78bfa;
-  --blue: #60a5fa;
-  --amber: #fbbf24;
-  --rose: #fb7185;
+  /* Attention — amber. Never red, however far out of range. */
+  --a-300: #fbd38d;
+  --a-400: #f6bb51;
+  --a-500: #eaa131;
+  --a-700: #a86a12;
+  --a-800: #86530c;
 
-  --radius: 20px;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Steady — the "nothing needed from you" green. Muted on
+     purpose: a saturated green competes with the accent and turns
+     a calm reassurance into a second alarm. */
+  --g-400: #5cc79a;
+  --g-500: #3fa981;
+  --g-700: #1f7355;
+  --g-800: #175942;
+
+  /* Evidence — provenance chips only. Never a status. */
+  --b-400: #7aa7f5;
+  --b-500: #5b8def;
+  --b-700: #2f5fc0;
+  --b-800: #24488f;
+
+  /* ----- Motion. Durations and curves are tokens because "how
+     fast the app feels" must be one decision, not fifty. ----- */
+  --dur-1: 120ms;  /* state flips: toggle, checkbox, hover */
+  --dur-2: 200ms;  /* element enter/exit, chips, badges */
+  --dur-3: 320ms;  /* cards, sheets, list staggers */
+  --dur-4: 520ms;  /* page transitions, hero reveals */
+  --dur-5: 900ms;  /* data drawing: charts, range bars, rings */
+
+  /* Decelerate on entry. Nothing in this product uses a bouncy
+     spring: overshoot reads as playful, and playful is wrong when
+     the content is a cholesterol trend. */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --r-xs: 8px;
+  --r-sm: 11px;
+  --r-md: 15px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --r-full: 999px;
+
+  /* 4pt base */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --s-10: 64px;
+
+  --tabbar-h: 62px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  /* The product is phone-shaped by design. On a desktop it centres
+     in a column rather than stretching a conversation to 1600px. */
+  --app-max: 480px;
+  --reading-max: 62ch;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* ------------------------------------------------------------
+   2. SEMANTIC TOKENS — dark (default).
+
+   Hierarchy in dark mode is carried by SURFACE CONTRAST: each
+   layer sits a little lighter than the one behind it. Shadows are
+   nearly invisible on near-black and do almost no work here.
+   ------------------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: var(--n-950);
+  --bg-2: var(--n-900);
+  --surface: #17130f;
+  --surface-2: #1e1915;
+  --surface-3: #262019;
+  --border: rgba(255, 244, 232, 0.09);
+  --border-strong: rgba(255, 244, 232, 0.17);
+
+  --text: #f5efe8;   /* 16.8:1 on --bg */
+  --text-2: #b6aca1; /*  7.9:1 — secondary prose */
+  --text-3: #8b8177; /*  4.9:1 — metadata, still AA */
+
+  --accent: var(--o-500);
+  --accent-hover: var(--o-400);
+  --accent-ink: #23130a;        /* text ON an accent fill */
+  --accent-text: var(--o-400);  /* accent used AS text — 7.2:1 on --bg */
+  --accent-soft: rgba(249, 115, 22, 0.14);
+  --accent-line: rgba(249, 115, 22, 0.32);
+
+  --attention: var(--a-400);
+  --attention-text: var(--a-300);
+  --attention-soft: rgba(246, 187, 81, 0.13);
+  --attention-line: rgba(246, 187, 81, 0.3);
+
+  --steady: var(--g-500);
+  --steady-text: var(--g-400);
+  --steady-soft: rgba(63, 169, 129, 0.13);
+  --steady-line: rgba(63, 169, 129, 0.28);
+
+  --evidence: var(--b-500);
+  --evidence-text: var(--b-400);
+  --evidence-soft: rgba(91, 141, 239, 0.15);
+  --evidence-line: rgba(91, 141, 239, 0.3);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 16px -6px rgba(0, 0, 0, 0.6);
+  --shadow-3: 0 18px 48px -18px rgba(0, 0, 0, 0.8);
+  --shadow-accent: 0 10px 30px -12px rgba(249, 115, 22, 0.55);
+
+  /* Chart ink. Deliberately only three: the line, the comparison
+     baseline, and the emphasis dot. */
+  --chart-line: var(--o-500);
+  --chart-alt: var(--a-400);
+  --chart-grid: rgba(255, 244, 232, 0.1);
+}
+
+/* ------------------------------------------------------------
+   3. SEMANTIC TOKENS — light.
+
+   Per the vision: "Nothing re-laid-out — only the semantic tokens
+   flip." Two real differences:
+
+   - ELEVATION carries hierarchy here. On cream, a lighter surface
+     is invisible, so cards separate with shadow + a hairline.
+   - ACCENT-AS-TEXT DARKENS. #F97316 on cream is ~2.9:1 and fails
+     AA outright. Every "colour as text" token steps down two
+     stops so badges and links clear 4.5:1. This is the single
+     most common accessibility failure in a themed design system,
+     and it is fixed once here rather than per component.
+   ------------------------------------------------------------ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: var(--n-25);
+  --bg-2: var(--n-50);
+  --surface: #ffffff;
+  --surface-2: var(--n-50);
+  --surface-3: var(--n-100);
+  --border: rgba(53, 48, 43, 0.11);
+  --border-strong: rgba(53, 48, 43, 0.2);
+
+  --text: #1c1815;   /* 15.9:1 on --bg */
+  --text-2: #57504a; /*  7.6:1 */
+  --text-3: #7b736b; /*  4.7:1 — AA for metadata */
+
+  --accent: var(--o-600);
+  --accent-hover: var(--o-700);
+  --accent-ink: #ffffff;
+  --accent-text: var(--o-700);   /* 5.6:1 on cream */
+  --accent-soft: rgba(249, 115, 22, 0.11);
+  --accent-line: rgba(226, 93, 7, 0.28);
+
+  --attention: var(--a-500);
+  --attention-text: var(--a-800); /* 5.9:1 on cream */
+  --attention-soft: rgba(234, 161, 49, 0.16);
+  --attention-line: rgba(234, 161, 49, 0.38);
+
+  --steady: var(--g-500);
+  --steady-text: var(--g-800);    /* 6.4:1 on the soft green card */
+  --steady-soft: rgba(63, 169, 129, 0.14);
+  --steady-line: rgba(63, 169, 129, 0.34);
+
+  --evidence: var(--b-500);
+  --evidence-text: var(--b-800);  /* 6.8:1 */
+  --evidence-soft: rgba(91, 141, 239, 0.13);
+  --evidence-line: rgba(91, 141, 239, 0.32);
+
+  --shadow-1: 0 1px 2px rgba(53, 48, 43, 0.06);
+  --shadow-2: 0 4px 14px -6px rgba(53, 48, 43, 0.14);
+  --shadow-3: 0 18px 44px -16px rgba(53, 48, 43, 0.2);
+  --shadow-accent: 0 10px 28px -12px rgba(226, 93, 7, 0.4);
+
+  --chart-line: var(--o-600);
+  --chart-alt: var(--a-500);
+  --chart-grid: rgba(53, 48, 43, 0.12);
+}
+
+/* Tailwind v4 bridge — only what components reference as a utility
+   class. Everything else is consumed as a CSS variable. */
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-text: var(--text);
-  --color-emerald: var(--emerald);
-  --color-cyan: var(--cyan);
-  --color-violet: var(--violet);
+  --color-accent: var(--accent);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
 
+/* ------------------------------------------------------------
+   4. BASE
+   ------------------------------------------------------------ */
 * {
   border-color: var(--border);
 }
 
 html {
-  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -60,27 +277,314 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  /* A theme change should feel like a light being dimmed, not a
+     hard cut — but only the page chrome animates. Transitioning
+     every descendant makes the whole UI lurch. */
+  transition: background-color var(--dur-3) var(--ease), color var(--dur-3) var(--ease);
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--emerald) 35%, transparent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
-/*
- * Keyboard focus. Several inputs set `outline-none` for the custom
- * focus-within borders, which left keyboard users with no visible focus
- * anywhere in the app. This restores it without touching mouse styling.
- */
+/* Keyboard focus. A few components set `outline: none` for custom
+   rings; this is the floor guaranteeing a keyboard user is never
+   lost. */
 :focus-visible {
-  outline: 2px solid var(--emerald);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
 }
 
-/* Visually hidden, still announced — skip links and icon-button labels. */
+/* ------------------------------------------------------------
+   5. TYPE SCALE
+
+   Named by ROLE, not size, so a screen can be re-tuned without
+   hunting `text-[13px]` across forty files.
+
+   Fluid where the string can be long: `.t-display` holds the
+   single most important sentence on a screen ("36 of 38 markers
+   are where they should be.") and must not wrap to five lines on
+   a 360px phone.
+   ------------------------------------------------------------ */
+.t-display {
+  font-size: clamp(27px, 5vw + 10px, 34px);
+  line-height: 1.14;
+  font-weight: 640;
+  letter-spacing: -0.028em;
+}
+.t-h1 {
+  font-size: clamp(23px, 3.4vw + 12px, 28px);
+  line-height: 1.18;
+  font-weight: 640;
+  letter-spacing: -0.024em;
+}
+.t-h2 {
+  font-size: clamp(18px, 1.6vw + 13px, 21px);
+  line-height: 1.26;
+  font-weight: 620;
+  letter-spacing: -0.018em;
+}
+.t-h3 {
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+/* Body is 15px, not 14px. This is a health product read by people
+   over 50 and by anyone anxious enough to be re-reading a
+   sentence. One point costs nothing and buys real legibility. */
+.t-body {
+  font-size: 15px;
+  line-height: 1.58;
+  letter-spacing: -0.003em;
+}
+.t-meta {
+  font-size: 13px;
+  line-height: 1.5;
+}
+/* The smallest type in the product. Nothing below 11px, ever, and
+   only for section eyebrows — never for content. */
+.t-label {
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 620;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+/* A measured number: the 38 in "38 µg/L". One per screen.
+   PROPORTIONAL figures, deliberately. `tabular-nums` gives every
+   digit the width of a zero, which makes a standalone number like
+   "121" look gappy at display size. Tabular is for columns that
+   must align vertically — see `.tnum` — not for a hero figure. */
+.t-numeral {
+  font-size: clamp(38px, 7vw + 14px, 50px);
+  line-height: 0.94;
+  font-weight: 640;
+  letter-spacing: -0.04em;
+}
+/* Columns of numbers that align vertically: axis ticks, table
+   rows, and any digit that changes in place (a streaming counter
+   jitters the whole row on proportional figures). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.t-prose {
+  max-width: var(--reading-max);
+}
+
+/* ------------------------------------------------------------
+   6. LAYOUT PRIMITIVES
+   ------------------------------------------------------------ */
+
+/* The phone column. */
+.app-shell {
+  width: 100%;
+  max-width: var(--app-max);
+  margin-inline: auto;
+  position: relative;
+  min-height: 100dvh;
+}
+
+/* Every scrolling surface owes the tab bar its height, or the last
+   card sits permanently behind it. */
+.app-scroll {
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + var(--s-7));
+}
+
+/* Horizontal chip rails: scrollable, no visible scrollbar. */
+.rail {
+  display: flex;
+  gap: var(--s-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail > * {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+/* Wide content (tables, charts) scrolls inside itself. The page
+   body must never scroll horizontally. */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* ------------------------------------------------------------
+   7. SURFACES
+
+   `.card` is the one container in the product. Variants change
+   the tint, never the geometry — a consistent radius and padding
+   is most of what makes a design system feel like one system.
+   ------------------------------------------------------------ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+:root[data-theme="light"] .card {
+  box-shadow: var(--shadow-2);
+}
+.card-2 {
+  background: var(--surface-2);
+}
+.card-attention {
+  background: var(--attention-soft);
+  border-color: var(--attention-line);
+}
+.card-steady {
+  background: var(--steady-soft);
+  border-color: var(--steady-line);
+}
+.card-accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+/* Sticky headers and the tab bar. Blur keeps content visible
+   underneath so the page still reads as one continuous surface. */
+.blur-bar {
+  background: color-mix(in oklab, var(--bg) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+
+/* ------------------------------------------------------------
+   8. MOTION
+
+   Every keyframe answers a question the user is actually asking.
+   Nothing animates for decoration.
+   ------------------------------------------------------------ */
+
+/* "Is it still working?" — scan status pill, lab reader. A slow
+   recognition must never read as a freeze. */
+@keyframes ns-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.ns-breathe { animation: ns-breathe 1.8s var(--ease) infinite; }
+
+/* "Is it listening?" — voice capture. */
+@keyframes ns-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.ns-bar {
+  transform-origin: center;
+  animation: ns-bar 900ms var(--ease) infinite;
+}
+
+/* "Is it thinking?" — three dots before the first token lands. */
+@keyframes ns-dot {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+.ns-dot { animation: ns-dot 1.3s var(--ease) infinite; }
+
+/* "Where am I in the answer?" — the streaming caret. */
+@keyframes ns-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.ns-caret::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: ns-caret 1s steps(1) infinite;
+}
+
+/* "Is content coming?" — skeletons. A shimmer promises arrival in
+   a way a static grey block does not. */
+@keyframes ns-shimmer {
+  100% { background-position: 200% 0; }
+}
+.ns-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: ns-shimmer 1.5s linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* "Am I being heard?" — the voice orb's outward pulse. */
+@keyframes ns-pulse {
+  0% { transform: scale(0.92); opacity: 0.6; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { opacity: 0; }
+}
+.ns-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  border: 2px solid var(--accent);
+  animation: ns-pulse 2.2s var(--ease-out) infinite;
+}
+
+/* Data drawing — range bars, sparklines, rings. Slow (--dur-5) on
+   purpose: a value sliding into place is legible as a
+   measurement, whereas an instant jump reads as a static image
+   and gets skipped. */
+@keyframes ns-draw {
+  from { stroke-dashoffset: var(--dash, 1000); }
+  to { stroke-dashoffset: 0; }
+}
+.ns-draw {
+  animation: ns-draw var(--dur-5) var(--ease-out) forwards;
+}
+
+/* Scan reticle sweep. */
+@keyframes ns-sweep {
+  0% { transform: translateY(-42%); opacity: 0; }
+  15%, 85% { opacity: 1; }
+  100% { transform: translateY(42%); opacity: 0; }
+}
+.ns-sweep { animation: ns-sweep 2.4s var(--ease) infinite; }
+
+/* ------------------------------------------------------------
+   9. ACCESSIBILITY
+
+   `prefers-reduced-motion` is honoured globally rather than per
+   component, so a new animation can never ship without it.
+
+   Note it disables ANIMATION, not FEEDBACK: transitions still
+   resolve to their end state instantly, so a user who asked for
+   less motion still sees the result — just not the travel.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* The shimmer would otherwise freeze mid-gradient and read as a
+     rendering bug rather than a loading state. */
+  .ns-skeleton { background: var(--surface-2); }
+  .ns-draw { stroke-dashoffset: 0 !important; }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -102,251 +606,58 @@ body {
   clip: auto;
   margin: 0;
   padding: 10px 16px;
-  border-radius: 10px;
-  background: var(--emerald);
-  color: #04120c;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
-/* Ambient page background — aurora + grid */
-.bg-aurora::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  background:
-    radial-gradient(60% 50% at 15% 0%, rgba(52, 211, 153, 0.14), transparent 60%),
-    radial-gradient(50% 45% at 90% 10%, rgba(167, 139, 250, 0.12), transparent 60%),
-    radial-gradient(70% 60% at 50% 110%, rgba(34, 211, 238, 0.1), transparent 60%);
-  pointer-events: none;
+/* Every interactive element clears the 44×44pt target the HIG asks
+   for, even when it looks smaller. */
+.tap {
+  position: relative;
 }
-.bg-aurora::after {
+.tap::after {
   content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(circle at 50% 0%, black, transparent 75%);
-  pointer-events: none;
+  position: absolute;
+  inset: 50% 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 
-/* ------------------------------------------------------------
-   Type scale.
+@media (prefers-contrast: more) {
+  :root {
+    --border: rgba(255, 244, 232, 0.24);
+    --border-strong: rgba(255, 244, 232, 0.4);
+    --text-3: var(--text-2);
+  }
+  :root[data-theme="light"] {
+    --border: rgba(53, 48, 43, 0.28);
+    --border-strong: rgba(53, 48, 43, 0.45);
+    --text-3: var(--text-2);
+  }
+}
 
-   The app had grown six ad-hoc sizes expressed as arbitrary values
-   (text-[10px], text-[11px], text-xs, text-sm, text-lg, text-3xl)
-   with no rule about which meant what — so the same kind of label
-   was 10px on one card and 11px on the next. Worse, 10px was
-   carrying real content: portion weights, meal times, micronutrient
-   figures. Nothing below 11px renders content any more.
-   ------------------------------------------------------------ */
-.t-label {
+/* Markdown rendered from model output. Scoped tight so a stray
+   heading in a streamed answer cannot blow up the layout. */
+.md > * + * { margin-top: 0.7em; }
+.md strong { font-weight: 640; color: var(--text); }
+.md em { font-style: normal; color: var(--text-3); font-size: 13px; }
+.md ul { padding-left: 1.05em; }
+.md li { list-style: disc; margin-top: 0.3em; }
+.md h4 {
   font-size: 11px;
-  line-height: 1.45;
-  letter-spacing: 0.01em;
+  font-weight: 620;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 1.1em;
 }
-.t-meta {
-  font-size: 12px;
-  line-height: 1.5;
-}
-.t-body {
-  font-size: 14px;
-  line-height: 1.6;
-}
-.t-title {
-  font-size: 15px;
-  line-height: 1.35;
-  font-weight: 600;
-  letter-spacing: -0.006em;
-}
-.t-hero {
-  font-size: 19px;
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-}
-.t-display {
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-/* ------------------------------------------------------------
-   App type scale — the product surfaces, not the marketing page.
-
-   The scale above is deliberately compact: it was tuned for the
-   landing page and for dense readouts (lab tables, macro chips)
-   where fitting the row matters more than presence. Those screens
-   still use it and should keep using it.
-
-   The app shell asks the opposite question. A screen whose job is
-   "help me decide in under five seconds" needs one obvious thing
-   to read first, which means real size and real air. These are
-   that register. They are additive on purpose — replacing the
-   compact scale would blow up every table in the product to make
-   five screens breathe.
-
-   Sizes are fluid so a 40px greeting on desktop doesn't wrap to
-   three lines on a 360px phone.
-   ------------------------------------------------------------ */
-.a-caption {
-  font-size: 13px;
-  line-height: 1.5;
-  letter-spacing: 0.005em;
-}
-.a-body {
-  font-size: clamp(15px, 1.2vw + 12px, 17px);
-  line-height: 1.55;
-}
-.a-h3 {
-  font-size: clamp(17px, 1vw + 14px, 20px);
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.012em;
-}
-.a-h2 {
-  font-size: clamp(20px, 1.6vw + 15px, 25px);
-  line-height: 1.22;
-  font-weight: 600;
-  letter-spacing: -0.018em;
-}
-.a-h1 {
-  font-size: clamp(26px, 2.6vw + 18px, 34px);
-  line-height: 1.14;
-  font-weight: 600;
-  letter-spacing: -0.026em;
-}
-/* Reserved for the single largest thing on a screen. One per view. */
-.a-numeral {
-  font-size: clamp(40px, 6vw + 22px, 60px);
-  line-height: 0.95;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-/*
- * Every number that changes in place — ring readouts, macro totals, live
- * counters. Proportional digits shift width as they tick and the whole row
- * jitters; tabular ones hold their column.
- */
-.tnum {
-  font-variant-numeric: tabular-nums;
-}
-
-/* ------------------------------------------------------------
-   Safe areas.
-
-   The dock is fixed to the bottom of the viewport, which on iOS is
-   underneath the home indicator. Without these, the scan button —
-   the primary action of the whole product — sits partly under a
-   system gesture area and swallows the first tap.
-   ------------------------------------------------------------ */
-:root {
-  --safe-b: env(safe-area-inset-bottom, 0px);
-  --dock-h: 64px;
-}
-
-/* Every scrolling app surface owes the dock its height, or the last
-   card in the list is unreachable behind it. */
-.app-page {
-  padding-bottom: calc(var(--dock-h) + var(--safe-b) + 28px);
-}
-
-/* Glass surfaces */
-.glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
-  border: 1px solid var(--border);
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-}
-.glass-strong {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border-strong);
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-}
-
-.gradient-text {
-  background: linear-gradient(120deg, #fff 0%, #b8f5da 40%, #a7c8ff 70%, #d9c8ff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.gradient-text-emerald {
-  background: linear-gradient(120deg, #eafff6, var(--emerald) 60%, var(--cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.glow-emerald { box-shadow: 0 0 0 1px rgba(52,211,153,0.2), 0 20px 60px -20px rgba(16,185,129,0.55); }
-.glow-violet  { box-shadow: 0 0 0 1px rgba(167,139,250,0.2), 0 20px 60px -20px rgba(167,139,250,0.5); }
-
-/* Buttons */
-.btn-primary {
-  background: linear-gradient(180deg, var(--emerald), var(--emerald-deep));
-  color: #04120c;
-  font-weight: 600;
-  box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.6), inset 0 1px 0 rgba(255,255,255,0.35);
-  transition: transform .2s ease, box-shadow .2s ease;
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 44px -12px rgba(16,185,129,0.75), inset 0 1px 0 rgba(255,255,255,0.4); }
-.btn-ghost {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  transition: background .2s ease, border-color .2s ease;
-}
-.btn-ghost:hover { background: var(--surface-2); border-color: rgba(255,255,255,0.28); }
-
-/* Animations */
-@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes pulse-ring {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  70% { transform: scale(1.35); opacity: 0; }
-  100% { opacity: 0; }
-}
-@keyframes shimmer { 100% { background-position: 200% 0; } }
-@keyframes spin-slow { to { transform: rotate(360deg); } }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
-
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-spin-slow { animation: spin-slow 22s linear infinite; }
-.pulse-dot { position: relative; }
-.pulse-dot::after {
-  content: ""; position: absolute; inset: -6px; border-radius: 999px;
-  border: 2px solid currentColor; animation: pulse-ring 2.4s ease-out infinite;
-}
-.typing-caret::after { content: "▍"; margin-left: 2px; animation: blink 1s steps(1) infinite; color: var(--emerald); }
-
-.shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-
-/* Keyboard focus — visible for keyboard users, invisible to mouse users */
-.focus-ring:focus-visible,
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--emerald);
-  outline-offset: 2px;
-  border-radius: 10px;
-}
-
-/* Scrollbar */
-.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
-.scroll-thin::-webkit-scrollbar-track { background: transparent; }
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
 }

@@ -33,7 +33,26 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   // Health URLs should never leak to third parties via the Referer header.
   { key: "Referrer-Policy", value: "no-referrer" },
-  { key: "Permissions-Policy", value: "geolocation=(), microphone=(), interest-cohort=()" },
+  /**
+   * `microphone` and `camera` are granted to SELF, not denied.
+   *
+   * They were both denied outright, which silently broke the two
+   * capture surfaces this product is built around: the voice
+   * screen's Web Speech transcription and the scanner's live
+   * `getUserMedia` viewfinder. The failure was invisible in
+   * development — both features degrade gracefully to a file
+   * picker and a "voice unavailable" message — so the app looked
+   * like it merely lacked browser support rather than like it was
+   * forbidding itself.
+   *
+   * `self` still blocks any embedded third-party frame from
+   * reaching the mic or camera, which is the threat this header
+   * exists to address. Everything else stays denied.
+   */
+  {
+    key: "Permissions-Policy",
+    value: "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()",
+  },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
@@ -47,19 +66,28 @@ const nextConfig: NextConfig = {
   },
 
   /**
-   * The app screens were renamed when the dock replaced the top nav:
-   * /dashboard split into /home (today) and /profile (memory), and
-   * /timeline became /progress.
+   * Old URLs, kept alive.
    *
-   * These are the URLs the live marketing page has been linking to, so
-   * they are permanent redirects rather than dead routes. /dashboard
-   * lands on /home because that is what someone opening it actually
-   * wants — the day's state, not the settings.
+   * The v1 shell had /dashboard, /home, /progress, /coach, /profile
+   * and /timeline. The v2 information architecture has three
+   * destinations instead, so each old path redirects to the screen
+   * that now answers the same need — not to the homepage, which is
+   * the lazy version and drops the user's intent.
+   *
+   * These were previously pointing at /home and /progress, both of
+   * which no longer exist: the redirects were resolving to 404s.
    */
   async redirects() {
     return [
-      { source: "/dashboard", destination: "/home", permanent: true },
-      { source: "/timeline", destination: "/progress", permanent: true },
+      // "Show me today" → the question field, which is the new default.
+      { source: "/dashboard", destination: "/", permanent: true },
+      { source: "/home", destination: "/", permanent: true },
+      { source: "/coach", destination: "/", permanent: true },
+      // "Show me myself over time" → Health.
+      { source: "/progress", destination: "/health", permanent: true },
+      { source: "/timeline", destination: "/health", permanent: true },
+      // "Show me my settings" → You.
+      { source: "/profile", destination: "/you", permanent: true },
     ];
   },
 };

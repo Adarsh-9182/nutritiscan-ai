@@ -103,11 +103,33 @@ const num = (min: number, max: number, fallback: number) =>
  * number the user never gave us.
  */
 const optionalNum = (min: number, max: number) =>
-  z.unknown().transform((v) => {
-    if (v === null || v === undefined || v === "") return undefined;
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
-  });
+  z
+    .unknown()
+    .transform((v) => {
+      if (v === null || v === undefined || v === "") return undefined;
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
+    })
+    /**
+     * The `.optional()` is load-bearing, not decoration.
+     *
+     * Under Zod v4 a bare `z.unknown().transform(fn)` is treated as
+     * NON-optional at the output, so a transform returning
+     * `undefined` fails the whole object with
+     * "expected nonoptional, received undefined".
+     *
+     * Without it, any profile missing `budgetPerDay` or
+     * `proteinGoal` — i.e. almost every real user, since neither is
+     * collected at onboarding — failed `safeProfile` outright and
+     * silently fell back to `demoProfile`. The consequence was not
+     * a validation warning: it meant the agents were handed
+     * somebody else's body, biomarkers and goals, and answered a
+     * real person's health question as if they were the demo user.
+     * Exactly the "invent data you weren't given" failure the
+     * SAFETY block forbids, arriving through the validator meant to
+     * prevent it.
+     */
+    .optional();
 
 export const HealthProfileSchema = z.object({
   name: text(LIMITS.name, "there"),

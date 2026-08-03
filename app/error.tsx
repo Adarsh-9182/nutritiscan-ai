@@ -3,12 +3,17 @@
 import { useEffect } from "react";
 
 /**
- * Route-level error boundary. Without this, an uncaught render error anywhere
- * in the dashboard or scanner drops the user on Next's default error screen —
- * a stack trace in development, a blank page in production.
+ * Route-level error boundary.
  *
- * The copy matters here: this is a health product, and the one thing a user
- * must not conclude from a crash is that their recorded memory is gone.
+ * The copy is the point. This is a health product, and a person
+ * who sees a crash has exactly one urgent question: IS MY DATA
+ * GONE? So that is the second sentence, before anything about
+ * retrying.
+ *
+ * And no red. A failed render is not a medical event, and
+ * borrowing the visual language of one — the reflex for every
+ * error screen ever built — would break the promise the rest of
+ * the product makes.
  */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -16,31 +21,47 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <main className="bg-aurora grid min-h-[100svh] place-items-center px-6">
-      <div className="max-w-md text-center">
-        <div aria-hidden="true" className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--rose)_16%,transparent)] text-2xl">
-          ⚠︎
+    <main className="grid min-h-dvh place-items-center px-6">
+      <div className="max-w-[34ch] text-center">
+        <div
+          aria-hidden="true"
+          className="mx-auto grid size-12 place-items-center rounded-[var(--r-md)] border border-[var(--attention-line)] bg-[var(--attention-soft)] text-[var(--attention-text)]"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <circle cx="12" cy="12" r="8.6" />
+            <path d="M12 7.8v4.6M12 16.1h.01" />
+          </svg>
         </div>
-        <h1 className="mt-4 text-xl font-semibold">That screen didn&apos;t load.</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-          Something broke on our side, not yours. Your Health Memory is stored on this device and is untouched.
+
+        <h1 className="t-h2 mt-5 text-[var(--text)]">That screen didn&apos;t load.</h1>
+        <p className="t-body mt-2 text-[var(--text-2)]">
+          Something broke on our side, not yours. Everything you&apos;ve recorded is stored on this device and is
+          untouched.
         </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button onClick={reset} className="btn-primary rounded-xl px-4 py-2.5 text-sm">
+
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={reset}
+            className="h-11 rounded-[var(--r-md)] bg-[var(--accent)] px-4 text-[14px] font-[590] text-[var(--accent-ink)]"
+          >
             Try again
           </button>
           {/*
-            A deliberate full-document navigation, not a <Link />. We are
-            already inside a client-side crash, so the router and React tree
-            are the things least worth trusting to get the user out. A hard
-            reload rebuilds both.
+            A deliberate full-document navigation, not a <Link />.
+            We are already inside a client-side crash, so the router
+            and the React tree are the two things least worth
+            trusting to get the user out. A hard reload rebuilds both.
           */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/" className="btn-ghost rounded-xl px-4 py-2.5 text-sm">
-            Back to home
+          <a
+            href="/"
+            className="grid h-11 place-items-center rounded-[var(--r-md)] border border-[var(--border-strong)] bg-[var(--surface-2)] px-4 text-[14px] font-[590] text-[var(--text)]"
+          >
+            Back to Ask
           </a>
         </div>
-        {error.digest && <p className="mt-4 text-[11px] text-[var(--text-dim)]">Reference: {error.digest}</p>}
+
+        {error.digest && <p className="t-meta mt-5 text-[var(--text-3)]">Reference: {error.digest}</p>}
       </div>
     </main>
   );

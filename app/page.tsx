@@ -1,5 +1,5 @@
-import Landing from "@/components/landing";
+import { AskHome } from "@/components/screens/ask-home";
 
 export default function Page() {
-  return <Landing />;
+  return <AskHome />;
 }

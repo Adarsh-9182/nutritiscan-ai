@@ -86,6 +86,43 @@ describe("safeProfile — shape and bounds", () => {
     expect(p.allergies.length).toBeLessThanOrEqual(20);
   });
 
+  /**
+   * Regression: the whole-profile fallback is a last resort, and it
+   * must never fire for an ordinary user.
+   *
+   * `budgetPerDay` and `proteinGoal` are not collected at
+   * onboarding, so almost every real profile omits them. A bug in
+   * `optionalNum` made those absences fail the entire parse, which
+   * silently substituted `demoProfile` — handing the agents
+   * somebody else's biomarkers and goals to answer a real person's
+   * health question with.
+   *
+   * Asserting on `name` is the sharpest probe available: if the
+   * fallback fired, the name is Adarsh's rather than the caller's.
+   */
+  it("accepts a profile that omits every optional field", () => {
+    const p = safeProfile({
+      name: "Priya",
+      heightCm: 162,
+      weightKg: 58,
+      goal: "Stay healthy",
+      sleepHours: 7,
+      exerciseDaysPerWeek: 3,
+      biomarkers: [],
+      allergies: [],
+      medicines: [],
+      conditions: [],
+    });
+
+    expect(p.name).toBe("Priya");
+    expect(p.weightKg).toBe(58);
+    // Absent stays absent — the agent prompt prints "not recorded".
+    expect(p.budgetPerDay).toBeUndefined();
+    expect(p.proteinGoal).toBeUndefined();
+    // And crucially, none of the demo user's data leaked in.
+    expect(p.biomarkers).toHaveLength(0);
+  });
+
   it("falls back on an unknown biomarker status instead of rejecting the request", () => {
     const p = safeProfile({
       ...demoProfile,
