@@ -6,7 +6,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${base}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: `${base}/scan`, lastModified: now, changeFrequency: "weekly", priority: 0.9 },
-    { url: `${base}/dashboard`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${base}/timeline`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/home`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${base}/coach`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${base}/progress`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    // /profile is deliberately absent: it is a settings surface with nothing
+    // to rank for, and listing it invites a crawler to index a page whose
+    // entire purpose is the user's health data.
   ];
 }

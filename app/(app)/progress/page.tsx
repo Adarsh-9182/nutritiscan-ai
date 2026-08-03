@@ -1,7 +1,7 @@
 import Timeline from "@/components/timeline";
 
 export const metadata = {
-  title: "Your health story — NutritiScan AI",
+  title: "Progress — NutritiScan AI",
   description: "Every lab, meal and milestone the AI remembers, in order — with the reasoning behind every claim.",
 };
 

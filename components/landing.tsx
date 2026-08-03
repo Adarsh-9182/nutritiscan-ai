@@ -155,10 +155,10 @@ export default function Landing() {
             <a href="#agents" className="hover:text-white transition">Agents</a>
             <a href="#reasoning" className="hover:text-white transition">How it thinks</a>
             <Link href="/scan" className="hover:text-white transition">Scan</Link>
-            <Link href="/timeline" className="hover:text-white transition">Timeline</Link>
+            <Link href="/progress" className="hover:text-white transition">Progress</Link>
             <a href="#memory" className="hover:text-white transition">Memory</a>
           </nav>
-          <Link href="/dashboard" className="btn-primary rounded-full px-4 py-2 text-sm">Open App</Link>
+          <Link href="/home" className="btn-primary rounded-full px-4 py-2 text-sm">Open App</Link>
         </div>
       </header>
 
@@ -194,7 +194,7 @@ export default function Landing() {
 
         <Reveal delay={0.25}>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/dashboard" className="btn-primary rounded-full px-6 py-3 text-sm sm:text-base">
+            <Link href="/home" className="btn-primary rounded-full px-6 py-3 text-sm sm:text-base">
               Meet your AI Health OS →
             </Link>
             <Link href="/scan" className="btn-ghost rounded-full px-6 py-3 text-sm sm:text-base">Scan a meal</Link>
@@ -297,7 +297,7 @@ export default function Landing() {
             </Reveal>
           ))}
           <Reveal delay={0.36}>
-            <Link href="/dashboard" className="flex h-full flex-col justify-between rounded-[var(--radius)] p-6 glass-strong glow-emerald">
+            <Link href="/home" className="flex h-full flex-col justify-between rounded-[var(--radius)] p-6 glass-strong glow-emerald">
               <div>
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--emerald)_20%,transparent)] text-xl">✦</span>
                 <p className="mt-4 font-semibold">Supervisor</p>
@@ -424,7 +424,7 @@ export default function Landing() {
             themselves better and build healthier lives — one decision at a time.
           </p>
           <div className="mt-10">
-            <Link href="/dashboard" className="btn-primary rounded-full px-7 py-3.5">Start with your Health OS →</Link>
+            <Link href="/home" className="btn-primary rounded-full px-7 py-3.5">Start with your Health OS →</Link>
           </div>
         </Reveal>
       </section>

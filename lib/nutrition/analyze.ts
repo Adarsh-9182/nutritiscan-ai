@@ -256,6 +256,11 @@ export function goalPhrase(p: HealthProfile): string {
 
 /** Daily protein target in grams, from the user's goal and body weight. */
 export function proteinTarget(p: HealthProfile): number {
+  // An explicitly stated target beats anything we derive. The user knows
+  // something we don't — a coach's programme, a renal restriction — and
+  // silently overriding it with a formula would be the product arguing
+  // with the person it is meant to serve.
+  if (p.proteinGoal) return Math.round(p.proteinGoal);
   const perKg = /muscle|gain|strength|bulk/i.test(p.goal) ? 1.8 : /lose|fat|cut|weight/i.test(p.goal) ? 1.6 : 1.2;
   return Math.round(p.weightKg * perKg);
 }

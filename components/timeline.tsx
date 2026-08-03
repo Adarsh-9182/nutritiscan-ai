@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "motion/react";
-import Nav from "@/components/nav";
-import Onboarding from "@/components/onboarding";
 import { useHydrated, useMeals, useProfile } from "@/lib/memory/store";
 import { buildTimeline, groupTimeline, KIND_META, timeAgo, type TimelineKind } from "@/lib/health/timeline";
 import { buildInsights, CERTAINTY_COLOR, type Insight } from "@/lib/health/insights";
@@ -104,9 +102,11 @@ export default function Timeline() {
 
   // aurora lives on <body>; see the note in scan.tsx
   return (
-    <div className="min-h-[100svh] px-4 py-4 sm:px-6">
-      <Onboarding />
-      <Nav width="max-w-6xl" status={{ tone: "good", label: `${all.length} events remembered` }} />
+    <div className="app-page px-4 pt-6 sm:px-6">
+      <header className="mx-auto mb-4 flex max-w-6xl items-baseline justify-between gap-3">
+        <h1 className="a-h1">Progress</h1>
+        <span className="shrink-0 t-label text-[var(--text-dim)]">{all.length} events remembered</span>
+      </header>
 
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — the story */}

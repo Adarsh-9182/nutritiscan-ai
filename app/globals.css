@@ -175,6 +175,60 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* ------------------------------------------------------------
+   App type scale — the product surfaces, not the marketing page.
+
+   The scale above is deliberately compact: it was tuned for the
+   landing page and for dense readouts (lab tables, macro chips)
+   where fitting the row matters more than presence. Those screens
+   still use it and should keep using it.
+
+   The app shell asks the opposite question. A screen whose job is
+   "help me decide in under five seconds" needs one obvious thing
+   to read first, which means real size and real air. These are
+   that register. They are additive on purpose — replacing the
+   compact scale would blow up every table in the product to make
+   five screens breathe.
+
+   Sizes are fluid so a 40px greeting on desktop doesn't wrap to
+   three lines on a 360px phone.
+   ------------------------------------------------------------ */
+.a-caption {
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.005em;
+}
+.a-body {
+  font-size: clamp(15px, 1.2vw + 12px, 17px);
+  line-height: 1.55;
+}
+.a-h3 {
+  font-size: clamp(17px, 1vw + 14px, 20px);
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+.a-h2 {
+  font-size: clamp(20px, 1.6vw + 15px, 25px);
+  line-height: 1.22;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+.a-h1 {
+  font-size: clamp(26px, 2.6vw + 18px, 34px);
+  line-height: 1.14;
+  font-weight: 600;
+  letter-spacing: -0.026em;
+}
+/* Reserved for the single largest thing on a screen. One per view. */
+.a-numeral {
+  font-size: clamp(40px, 6vw + 22px, 60px);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
 /*
  * Every number that changes in place — ring readouts, macro totals, live
  * counters. Proportional digits shift width as they tick and the whole row
@@ -182,6 +236,25 @@ body {
  */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   Safe areas.
+
+   The dock is fixed to the bottom of the viewport, which on iOS is
+   underneath the home indicator. Without these, the scan button —
+   the primary action of the whole product — sits partly under a
+   system gesture area and swallows the first tap.
+   ------------------------------------------------------------ */
+:root {
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --dock-h: 64px;
+}
+
+/* Every scrolling app surface owes the dock its height, or the last
+   card in the list is unreachable behind it. */
+.app-page {
+  padding-bottom: calc(var(--dock-h) + var(--safe-b) + 28px);
 }
 
 /* Glass surfaces */

@@ -97,12 +97,21 @@ function tracesFor(m: { parts: unknown[] }): Trace | null {
   return null;
 }
 
+/**
+ * The opening moves.
+ *
+ * These are the highest-leverage thing on an empty chat screen: they tell a
+ * first-time user what this assistant is actually for. So they deliberately
+ * span all five specialists — triage, nutrition, labs, planning, budget —
+ * rather than five phrasings of "what should I eat".
+ */
 const SUGGESTIONS = [
-  "I have a fever.",
+  "Can diabetics eat mango?",
   "Am I eating enough protein?",
   "Explain my blood report.",
-  "How's my sleep trend?",
-  "Best workout for building muscle?",
+  "Build me a muscle-gain meal plan.",
+  "Healthy breakfast under ₹100?",
+  "I have a fever.",
 ];
 
 /**

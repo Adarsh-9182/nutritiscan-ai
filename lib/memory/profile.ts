@@ -15,6 +15,59 @@ import { demoJournal, type JournalEntry } from "./journal";
 
 export type Trend = { label: string; delta: string; direction: "up" | "down" | "flat"; good: boolean };
 
+/**
+ * Diet is a hard constraint, not a preference: it gates every meal the
+ * planner may suggest and every alternative the scanner may offer. It is
+ * an enum rather than free text so a suggestion engine can filter on it
+ * — "mostly veg" is not something code can honour.
+ */
+export type Diet = "omnivore" | "eggetarian" | "vegetarian" | "vegan" | "jain" | "halal";
+
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "athlete";
+
+export const DIET_LABELS: Record<Diet, string> = {
+  omnivore: "Omnivore",
+  eggetarian: "Eggetarian",
+  vegetarian: "Vegetarian",
+  vegan: "Vegan",
+  jain: "Jain",
+  halal: "Halal",
+};
+
+export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
+  sedentary: "Sedentary — desk job, little movement",
+  light: "Light — a walk most days",
+  moderate: "Moderate — training 3–4 days a week",
+  active: "Active — training 5–6 days a week",
+  athlete: "Athlete — twice a day, or competing",
+};
+
+/** Roughly how many days a week each level trains. Keeps one source of truth. */
+export const ACTIVITY_DAYS: Record<ActivityLevel, number> = {
+  sedentary: 0,
+  light: 2,
+  moderate: 4,
+  active: 5,
+  athlete: 7,
+};
+
+/**
+ * The goals offered at first run.
+ *
+ * Several of these are medical (diabetes, heart, PCOS) and they do more than
+ * set a protein number — they are the reason the Doctor and Lab agents get
+ * told to be careful. Kept here so onboarding and the profile screen cannot
+ * drift into offering different lists.
+ */
+export const GOAL_OPTIONS = [
+  { label: "Lose weight", glyph: "🔥" },
+  { label: "Gain muscle", glyph: "🏋️" },
+  { label: "Stay healthy", glyph: "🌿" },
+  { label: "Diabetes friendly", glyph: "🩸" },
+  { label: "Heart health", glyph: "❤️" },
+  { label: "PCOS", glyph: "🌸" },
+] as const;
+
 export type HealthProfile = {
   name: string;
   /**
@@ -35,6 +88,30 @@ export type HealthProfile = {
   allergies: string[];
   medicines: string[];
   conditions: string[];
+  /**
+   * All optional for the same reason `age` and `sex` are: a health product
+   * must be able to say "not recorded". A default diet printed into the
+   * agent prompt is indistinguishable, downstream, from the user having
+   * told us they were vegan — and the cost of that mistake is a meal
+   * suggestion they can't eat.
+   */
+  diet?: Diet;
+  activityLevel?: ActivityLevel;
+  /** Daily food budget, INR. Used by meal and grocery planning only. */
+  budgetPerDay?: number;
+  /**
+   * An explicit daily protein target in grams, overriding the figure
+   * derived from weight and goal. Set only when the user names one.
+   */
+  proteinGoal?: number;
+  /**
+   * Water, scoped to the day it was logged.
+   *
+   * A bare counter would carry yesterday's eight glasses into this
+   * morning and quietly report the user as hydrated before they had
+   * drunk anything. The date is what makes the reset automatic.
+   */
+  water?: { date: string; glasses: number };
   // derived analytics for the dashboard
   trends?: Trend[];
   /** set once the user has been through first-run so we never ask twice */
@@ -42,6 +119,14 @@ export type HealthProfile = {
   /** dated, append-only history — the spine of the patient timeline */
   journal?: JournalEntry[];
 };
+
+/** Local calendar day, not UTC — "today" must mean the user's today. */
+export const dayKey = (d = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Glasses drunk today, or zero if the stored count belongs to another day. */
+export const waterToday = (p: HealthProfile): number =>
+  p.water && p.water.date === dayKey() ? p.water.glasses : 0;
 
 // Default demo memory — Adarsh (from the product brief).
 export const demoProfile: HealthProfile = {
@@ -207,9 +292,25 @@ export const ALL_MEMORY_SECTIONS: MemorySection[] = ["identity", "vitals", "goal
 const SECTION_RENDERERS: Record<MemorySection, (p: HealthProfile) => string> = {
   identity: (p) => `Name: ${p.name}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,
   vitals: (p) => `Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}`,
-  goal: (p) => `Primary goal: ${p.goal}`,
+  /**
+   * Diet rides in the goal section rather than getting a section of its own
+   * so that every specialist already scoped to `goal` — Nutrition and Coach
+   * included — inherits the constraint. A vegan asking a nutrition question
+   * must never be handed a chicken answer because the section list didn't
+   * happen to include diet.
+   */
+  goal: (p) =>
+    [
+      `Primary goal: ${p.goal}`,
+      `Diet: ${p.diet ? DIET_LABELS[p.diet] : "not recorded — do not assume one"}`,
+      p.proteinGoal ? `Protein target: ${p.proteinGoal} g/day (set by the user)` : null,
+      p.budgetPerDay ? `Food budget: about ₹${p.budgetPerDay}/day` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
   sleep: (p) => `Sleep: ~${p.sleepHours} h/night`,
-  activity: (p) => `Exercise: ${p.exerciseDaysPerWeek} days/week   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
+  activity: (p) =>
+    `Exercise: ${p.exerciseDaysPerWeek} days/week${p.activityLevel ? ` (${ACTIVITY_LABELS[p.activityLevel]})` : ""}   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
   allergies: (p) => `Allergies: ${p.allergies.length ? p.allergies.join(", ") : "none recorded"}`,
   medicines: (p) => `Medicines: ${p.medicines.length ? p.medicines.join(", ") : "none recorded"}`,
   conditions: (p) => `Conditions: ${p.conditions.length ? p.conditions.join(", ") : "none recorded"}`,

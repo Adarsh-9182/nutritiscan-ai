@@ -5,8 +5,6 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Ring from "@/components/ring";
-import Nav from "@/components/nav";
-import Onboarding from "@/components/onboarding";
 import MealList from "@/components/meal-list";
 import { proteinTarget, type ScanResult } from "@/lib/nutrition/analyze";
 import { useMeals, useProfile, readProfile } from "@/lib/memory/store";
@@ -236,14 +234,29 @@ export default function Scan() {
   // it stacked a second set of fixed gradient layers, so /scan and /timeline
   // rendered at double the intensity of /dashboard.
   return (
-    <div className="min-h-[100svh] px-4 py-4 sm:px-6">
+    <div className="app-page px-4 pt-6 sm:px-6">
       <a href="#scan-analysis" className="sr-only skip-link">
         Skip to the analysis
       </a>
-      <Onboarding />
-      <Nav width="max-w-6xl" status={vision === null ? undefined : vision ? { tone: "good", label: "vision online" } : { tone: "warn", label: "describe mode is live" }} />
 
-      <main className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
+      {/*
+        The capture-mode status used to live in the top nav's status pill.
+        The dock has no room for it and it is not decoration: it is the
+        difference between "the vision model read your photo" and "we fell
+        back to parsing your description", which changes how much to trust
+        the numbers below. It moves here, next to the thing it describes.
+      */}
+      <header className="mx-auto mb-4 flex max-w-6xl items-center justify-between gap-3">
+        <h1 className="a-h1">Scan</h1>
+        {vision !== null && (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-muted)]">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: vision ? "var(--emerald)" : "var(--amber)" }} />
+            {vision ? "Vision online" : "Describe mode"}
+          </span>
+        )}
+      </header>
+
+      <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — capture */}
         <div className="space-y-4 lg:col-span-5">
           <div className="rounded-[var(--radius)] glass p-5">
@@ -607,7 +620,7 @@ export default function Scan() {
             </AnimatePresence>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

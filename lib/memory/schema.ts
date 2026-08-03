@@ -116,6 +116,25 @@ export const HealthProfileSchema = z.object({
   heightCm: num(60, 250, demoProfile.heightCm),
   weightKg: num(20, 400, demoProfile.weightKg),
   goal: text(LIMITS.goal, "Stay healthy"),
+  /**
+   * Enums, so they cannot carry an injection at all — anything that isn't one
+   * of the known members collapses to `undefined` ("not recorded") rather than
+   * to a plausible member. Guessing "vegetarian" for an unparseable diet would
+   * be the one failure mode this field exists to prevent.
+   */
+  diet: z.enum(["omnivore", "eggetarian", "vegetarian", "vegan", "jain", "halal"]).optional().catch(undefined),
+  activityLevel: z.enum(["sedentary", "light", "moderate", "active", "athlete"]).optional().catch(undefined),
+  budgetPerDay: optionalNum(0, 100_000),
+  // Clamped hard: this figure is printed to the agents as the user's target
+  // and drives every "you're short on protein" verdict in the product.
+  proteinGoal: optionalNum(0, 500),
+  water: z
+    .object({
+      date: text(10),
+      glasses: num(0, 60, 0),
+    })
+    .optional()
+    .catch(undefined),
   sleepHours: num(0, 24, demoProfile.sleepHours),
   exerciseDaysPerWeek: num(0, 7, demoProfile.exerciseDaysPerWeek),
   restingHr: optionalNum(25, 220),

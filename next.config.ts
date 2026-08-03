@@ -45,6 +45,23 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+
+  /**
+   * The app screens were renamed when the dock replaced the top nav:
+   * /dashboard split into /home (today) and /profile (memory), and
+   * /timeline became /progress.
+   *
+   * These are the URLs the live marketing page has been linking to, so
+   * they are permanent redirects rather than dead routes. /dashboard
+   * lands on /home because that is what someone opening it actually
+   * wants — the day's state, not the settings.
+   */
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/home", permanent: true },
+      { source: "/timeline", destination: "/progress", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

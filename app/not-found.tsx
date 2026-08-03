@@ -12,7 +12,7 @@ export default function NotFound() {
           The page may have moved. Your dashboard and scanner are both still where you left them.
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <Link href="/dashboard" className="btn-primary rounded-xl px-4 py-2.5 text-sm">
+          <Link href="/home" className="btn-primary rounded-xl px-4 py-2.5 text-sm">
             Go to dashboard
           </Link>
           <Link href="/scan" className="btn-ghost rounded-xl px-4 py-2.5 text-sm">
