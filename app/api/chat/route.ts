@@ -7,6 +7,8 @@ import {
 } from "ai";
 import { buildSupervisor } from "@/lib/agents";
 import { demoAnswer, routeOf } from "@/lib/agents/demo";
+import { composeAnswer, detectEmergency, EMERGENCY_ANSWER, runEngine } from "@/lib/engine";
+import { isClinicalQuestion } from "@/lib/engine/intent";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
 import { recallRelevant } from "@/lib/memory/recall";
@@ -151,6 +153,45 @@ async function streamDemo(writer: UIMessageStreamWriter, userText: string, profi
   }
 }
 
+/** Stream a already-composed string as text deltas, word by word. */
+async function streamText(writer: UIMessageStreamWriter, text: string, signal: AbortSignal, idPrefix: string) {
+  const id = `${idPrefix}-${Date.now()}`;
+  writer.write({ type: "text-start", id });
+  for (const w of text.split(/(\s+)/)) {
+    if (signal.aborted) break;
+    writer.write({ type: "text-delta", id, delta: w });
+    await sleep(w.trim() ? 12 : 4, signal);
+  }
+  writer.write({ type: "text-end", id });
+}
+
+/**
+ * Run the clinical pipeline and stream its composed answer.
+ *
+ * Unlike the supervisor path this does not stream token-by-token from the
+ * model: the safety gate has to see a COMPLETE treatment list before any of
+ * it reaches the user, and you cannot un-send a bullet you already streamed.
+ * The composed answer is streamed afterwards purely so the UI feels alive.
+ */
+async function streamEngine(
+  writer: UIMessageStreamWriter,
+  userText: string,
+  profile: HealthProfile,
+  nutrition: string,
+  signal: AbortSignal,
+): Promise<RealOutcome> {
+  try {
+    writer.write({ type: "data-trace", id: "trace", data: { agents: ["doctor"], done: false } });
+    const result = await runEngine({ userText, profile, nutrition, signal });
+    writer.write({ type: "data-trace", id: "trace", data: { agents: ["doctor"], done: true } });
+    await streamText(writer, composeAnswer(result), signal, "engine");
+    return "ok";
+  } catch {
+    // Nothing was written except the trace, so the caller can still fall back.
+    return "unavailable";
+  }
+}
+
 /** Abort-aware delay, so a disconnected client stops costing us a timer. */
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -195,7 +236,28 @@ export async function POST(req: Request) {
 
   const stream = createUIMessageStream({
     async execute({ writer }) {
+      // Emergency screening runs on EVERY message, before any model call and
+      // regardless of whether a credential exists. It is deterministic and
+      // costs nothing, so there is no state of the system — no key, no quota,
+      // no provider outage, no demo mode — in which someone describing chest
+      // pain fails to be told to seek care.
+      if (detectEmergency(userText).length > 0) {
+        await streamText(writer, EMERGENCY_ANSWER, signal, "emergency");
+        return;
+      }
+
       if (hasModelCredential()) {
+        // Symptom-shaped questions go through the clinical pipeline
+        // (Triage → Diagnosis → Treatment → safety gate); everything else
+        // stays with the topic supervisor, which is better at nutrition,
+        // training and lab questions than a triage pipeline would be.
+        if (isClinicalQuestion(userText)) {
+          const clinical = await streamEngine(writer, userText, profile, nutrition, signal);
+          if (clinical === "ok") return;
+          // Engine failed before writing an answer — fall through rather than
+          // leaving the user with a spinner and a stale trace.
+        }
+
         // Best-effort: a failed or slow embedding call must not cost the
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
