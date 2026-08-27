@@ -2,6 +2,7 @@ import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 import { SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
 import { resolveModel } from "./provider";
+import type { Route } from "./demo";
 import { memoryContext, ALL_MEMORY_SECTIONS, type HealthProfile, type MemorySection } from "../memory/profile";
 
 // ------------------------------------------------------------
@@ -22,6 +23,33 @@ import { memoryContext, ALL_MEMORY_SECTIONS, type HealthProfile, type MemorySect
 // instructions, which explicitly tell it to consult more than one
 // specialist when a question crosses domains.
 // ------------------------------------------------------------
+
+/**
+ * The expertise text each specialist carries, without the routing framing.
+ *
+ * Shared with buildSpecialists rather than duplicated: two copies of a
+ * clinical prompt drift, and the one that drifts is always the one nobody
+ * is looking at.
+ */
+const EXPERTISE: Record<Exclude<Route, "supervisor">, string> = {
+  nutrition:
+    "Expertise: protein targets, calories, macro/micro-nutrients, vitamin & mineral deficiencies, food choices, hydration. You reason about grams per kg, meal timing, and food sources.",
+  fitness:
+    "Expertise: workout programming, BMI/body-composition context, progressive overload, muscle gain vs fat loss, recovery, training frequency.",
+  doctor:
+    "Expertise: symptom education, general condition information, and how medications work in general terms. You NEVER diagnose or prescribe. When given symptoms, you reason like a careful triage assistant.",
+  lab: "Expertise: interpreting lab reports in plain language — CBC, thyroid (TSH/T3/T4), vitamin panels (B12, D), lipids, glucose. You explain what a value means, reference ranges, and trends, without diagnosing. A recorded value is a Fact; what it might indicate is Inference — never blur the two.",
+  coach:
+    "Expertise: sleep quality, habit formation, goal setting, consistency, reminders, motivation, and turning insights into small daily actions.",
+};
+
+const SOLO_NAME: Record<Exclude<Route, "supervisor">, string> = {
+  nutrition: "Nutrition Agent",
+  fitness: "Fitness Agent",
+  doctor: "Doctor Agent (educational)",
+  lab: "Lab Agent",
+  coach: "Health Coach",
+};
 
 function specialist(name: string, expertise: string, profile: HealthProfile, sections: MemorySection[], nutrition: string | null) {
   const resolved = resolveModel("specialist");
@@ -44,33 +72,31 @@ summary the supervisor can hand to the user. Reference the user's memory when re
 export function buildSpecialists(profile: HealthProfile, nutrition: string) {
   return {
     nutrition: specialist(
-      "Nutrition Agent",
-      "Expertise: protein targets, calories, macro/micro-nutrients, vitamin & mineral deficiencies, food choices, hydration. You reason about grams per kg, meal timing, and food sources.",
+      SOLO_NAME.nutrition,
+      EXPERTISE.nutrition,
       profile,
       // Not sleep/activity — training frequency doesn't change a food answer.
       ["identity", "vitals", "goal", "allergies", "medicines", "conditions", "biomarkers"],
       nutrition,
     ),
     fitness: specialist(
-      "Fitness Agent",
-      "Expertise: workout programming, BMI/body-composition context, progressive overload, muscle gain vs fat loss, recovery, training frequency.",
+      SOLO_NAME.fitness,
+      EXPERTISE.fitness,
       profile,
       // Not allergies/medicines/biomarkers — a workout plan doesn't hinge on lab values.
       ["identity", "vitals", "goal", "sleep", "activity", "conditions"],
       nutrition,
     ),
     doctor: specialist(
-      "Doctor Agent (educational)",
-      `Expertise: symptom education, general condition information, and how medications work in general terms. You NEVER diagnose or prescribe. When given symptoms, you reason like a careful triage assistant.
-${MEDICAL_REASONING_FORMAT}`,
+      SOLO_NAME.doctor,
+      `${EXPERTISE.doctor}\n${MEDICAL_REASONING_FORMAT}`,
       profile,
       ALL_MEMORY_SECTIONS, // triage can turn on any fact — narrowing this one is the actual risk
       nutrition,
     ),
     lab: specialist(
-      "Lab Agent",
-      `Expertise: interpreting lab reports in plain language — CBC, thyroid (TSH/T3/T4), vitamin panels (B12, D), lipids, glucose. You explain what a value means, reference ranges, and trends, without diagnosing. A recorded value is a Fact; what it might indicate is Inference — never blur the two.
-${MEDICAL_REASONING_FORMAT}`,
+      SOLO_NAME.lab,
+      `${EXPERTISE.lab}\n${MEDICAL_REASONING_FORMAT}`,
       profile,
       // Not vitals/goal/sleep/activity/allergies — reading a panel doesn't need them.
       // Medicines and conditions stay: some medicines (e.g. biotin, metformin) skew
@@ -79,14 +105,71 @@ ${MEDICAL_REASONING_FORMAT}`,
       null, // meal log isn't relevant to interpreting a blood panel
     ),
     coach: specialist(
-      "Health Coach",
-      "Expertise: sleep quality, habit formation, goal setting, consistency, reminders, motivation, and turning insights into small daily actions.",
+      SOLO_NAME.coach,
+      EXPERTISE.coach,
       profile,
       // Not allergies/medicines/biomarkers — habit coaching isn't a medical read.
       ["identity", "goal", "sleep", "activity"],
       null, // food is the Nutrition Agent's job, not the Coach's
     ),
   };
+}
+
+// ------------------------------------------------------------
+// Soloist — one specialist, answering alone.
+// ------------------------------------------------------------
+
+/**
+ * One specialist, prompted to finish the job rather than hand a summary up.
+ *
+ * A supervised turn costs three model calls — route, consult, synthesise —
+ * and a clearly single-domain question does not need any of them. That price
+ * is not abstract: the free tier allows twenty requests a day per model, so
+ * the fan-out was capping the entire product at roughly six consults, and
+ * three sequential round trips was most of the latency besides.
+ *
+ * Two things change relative to the supervised version of the same agent:
+ *
+ *   It gets the FULL memory, not its usual slice. Scoping exists because the
+ *   supervisor is there to notice when a fact outside the obvious specialist's
+ *   scope matters. Nobody is watching here, so narrowing would drop the one
+ *   safeguard that made narrowing safe.
+ *
+ *   It gets MEDICAL_REASONING_FORMAT. The scoped version is told to return
+ *   "a focused summary the supervisor can hand to the user", which is not an
+ *   answer and carries none of the contract the validator enforces.
+ *
+ * Triage and the clinical brief are passed through unchanged — urgency must
+ * reach whichever agent is actually answering.
+ */
+export function buildSoloist(
+  route: Exclude<Route, "supervisor">,
+  profile: HealthProfile,
+  nutrition: string,
+  recalled?: string | null,
+  triage?: string | null,
+  brief?: string | null,
+) {
+  const resolved = resolveModel("supervisor");
+  return new ToolLoopAgent({
+    model: resolved.model,
+    providerOptions: resolved.providerOptions,
+    instructions: `You are the ${SOLO_NAME[route]} inside NutritiScan AI, a health operating system.
+${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
+${EXPERTISE[route]}
+
+You are answering the user directly — there is no supervisor to synthesize
+after you. Give one warm, complete, personalized answer. Stay within your
+expertise, and say plainly when something belongs to another specialty or to
+a real clinician.
+
+${SAFETY}
+
+${MEDICAL_REASONING_FORMAT}
+
+${memoryContext(profile, ALL_MEMORY_SECTIONS)}
+${nutrition ? `\n${nutrition}\n` : ""}${recalled ? `\n${recalled}\n` : ""}`,
+  });
 }
 
 // ------------------------------------------------------------

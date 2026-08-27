@@ -5,7 +5,7 @@ import {
   type UIMessage,
   type UIMessageStreamWriter,
 } from "ai";
-import { buildSupervisor } from "@/lib/agents";
+import { buildSoloist, buildSupervisor } from "@/lib/agents";
 import { demoAnswer, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
@@ -107,12 +107,41 @@ async function streamRealSupervisor(
   const buffered = isClinicalTurn(state);
   let held = "";
 
+  /*
+   * One agent when one is enough.
+   *
+   * A supervised turn is three model calls — route, consult, synthesise —
+   * and a question the router can already place needs none of that
+   * ceremony. The cost was not theoretical: the free tier allows twenty
+   * requests a day per model, so the fan-out capped the whole product at
+   * about six consults, and the three sequential round trips were most of
+   * the latency.
+   *
+   * The supervisor still handles anything the router cannot place, which is
+   * exactly where its job — noticing that a question crosses domains —
+   * actually applies. The soloist compensates for having no supervisor by
+   * taking the full memory rather than its usual slice; see buildSoloist.
+   */
+  const route = routeOf(lastUserText(messages));
+  const solo = route !== "supervisor";
+  const brief = clinicalBrief(state);
+
   try {
-    const stream = await createAgentUIStream({
-      agent: buildSupervisor(profile, nutrition, recalled, triage, clinicalBrief(state)),
-      uiMessages: messages,
-      abortSignal: signal,
-    });
+    // Branched rather than a ternary on `agent`: the soloist carries no
+    // tools and the supervisor does, so their types differ and the union
+    // would need a cast to pass. A cast here would be hiding a real
+    // difference rather than resolving one.
+    const stream = solo
+      ? await createAgentUIStream({
+          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief),
+          uiMessages: messages,
+          abortSignal: signal,
+        })
+      : await createAgentUIStream({
+          agent: buildSupervisor(profile, nutrition, recalled, triage, brief),
+          uiMessages: messages,
+          abortSignal: signal,
+        });
 
     for await (const chunk of stream) {
       const c = chunk as { type?: string; delta?: string };
