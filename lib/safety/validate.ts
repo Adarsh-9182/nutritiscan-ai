@@ -240,8 +240,31 @@ export function declarativeText(answer: string): string {
  * questions. Recognised so that path is not punished for having no sections.
  */
 function looksLikeQuestionsOnly(answer: string): boolean {
-  const marks = (answer.match(/\?/g) ?? []).length;
-  return marks >= 1 && answer.length < 700 && missingSections(answer).length >= 4;
+  /*
+   * Judged by shape, not by length.
+   *
+   * This was `answer.length < 700`, and the number was doing real work it
+   * could not justify: on a first turn with an empty profile the model does
+   * exactly what the prompt asks — a warm line, then five or six clarifying
+   * questions — which runs past 700 characters comfortably. Every section
+   * was then reported missing and a perfectly good reply was withheld in
+   * production. A magic threshold is a guess wearing a number's clothes.
+   *
+   * What actually distinguishes the two: a clarifying reply is mostly
+   * questions and carries none of the structure. A real answer has the
+   * headings, so it never reaches here.
+   */
+  const sentences = answer
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!sentences.length) return false;
+
+  const questions = sentences.filter((s) => s.endsWith("?")).length;
+  if (questions < 2) return false;
+
+  // Most of the substance is interrogative, and no section survived.
+  return questions / sentences.length >= 0.4 && missingSections(answer).length >= 4;
 }
 
 /**

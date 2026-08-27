@@ -78,8 +78,51 @@ describe("scope", () => {
   });
 
   it("allows a clarifying-questions reply to skip the structure", () => {
-    const q = "Since when has this been going on, and how severe is it right now?";
+    const q = "Since when has this been going on? And how severe is it right now?";
     expect(validateAnswer(q, state()).ok).toBe(true);
+  });
+
+  /*
+   * From production. On a first turn with an empty profile the model does
+   * exactly what the prompt asks — a warm line, then several clarifying
+   * questions — and the old `length < 700` guard reported all five sections
+   * missing and withheld a perfectly good reply.
+   */
+  it("allows a long clarifying reply, not just a short one", () => {
+    const real = [
+      "I'm sorry to hear you're feeling unwell, Adarsh. Let's work through this together calmly.",
+      "To understand what might be going on, I need a little more detail from you.",
+      "When exactly did the fever start, and has it been getting better or worse since then?",
+      "Have you measured your temperature, and if so what was the highest reading?",
+      "Is anything else happening alongside it, such as a cough, a sore throat, or body aches?",
+      "Have you taken any medication for it so far today?",
+      "Has anything like this happened to you before, and if so how did it resolve?",
+      "Is there anything that seems to make it noticeably better or worse during the day?",
+      "Have you been able to keep food and fluids down since it started?",
+      "Are you aware of anyone around you having been unwell with something similar recently?",
+    ].join("\n\n");
+
+    expect(real.length).toBeGreaterThan(700);
+    const r = validateAnswer(real, state());
+    expect(r.blocked).toBe(false);
+    expect(r.ok).toBe(true);
+  });
+
+  it("does not let a long unstructured answer pass as clarifying questions", () => {
+    // Mostly statements with one question tacked on is a real answer that
+    // dropped its structure, and must still be caught.
+    const prose = [
+      "Fever is usually caused by a viral infection and tends to settle on its own.",
+      "Rest and fluids are the mainstay of care in the first few days.",
+      "Paracetamol can help with the discomfort if you need it.",
+      "Most people feel better within about three days without any intervention.",
+      "Keeping the room cool also helps you feel more comfortable overnight.",
+      "Does that make sense?",
+    ].join(" ");
+
+    const r = validateAnswer(prose, state());
+    expect(r.blocked).toBe(true);
+    expect(r.violations.map((v) => v.id)).toContain("output.missing-section.medical-warning");
   });
 });
 
