@@ -26,6 +26,7 @@
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { EmbeddingModel, LanguageModel } from "ai";
+import type { SharedV4ProviderOptions } from "@ai-sdk/provider";
 
 /**
  * Gemini Flash rather than Pro.
@@ -44,13 +45,25 @@ import type { EmbeddingModel, LanguageModel } from "ai";
  * 404 for new keys — "no longer available to new users" — which is exactly
  * the kind of failure that would have shown up as the demo brain quietly
  * answering in production.
+ *
+ * Lite, and for a blunt reason. gemini-3.6-flash returned
+ * RESOURCE_EXHAUSTED after a handful of test consults:
+ * "GenerateRequestsPerDayPerProjectPerModel-FreeTier, limit: 20" — twenty
+ * requests per DAY. A single consult spends three or more of them, because
+ * the supervisor routes, a specialist answers, and the supervisor
+ * synthesises. That is roughly six consults a day for the entire product.
+ *
+ * Quota is per model, so a different one has its own allowance. This is a
+ * workaround, not a fix: the real cost is the fan-out, and the free tier
+ * will not carry real traffic whichever model is pinned. Actual limits for
+ * this key are visible at aistudio.google.com/rate-limit.
  */
-const GEMINI_MODEL = "gemini-3.6-flash";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
-/** Used only when a Gateway credential is present. */
 /** Also verified live; text-embedding-004 is not served to new keys. */
 const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
 
+/** Used only when a Gateway credential is present. */
 const GATEWAY_MODEL = "anthropic/claude-sonnet-5";
 
 /** Anthropic serves no embeddings endpoint; the Gateway routes this elsewhere. */
@@ -60,7 +73,39 @@ export type ProviderChoice = {
   model: LanguageModel;
   /** Recorded on the assessment row, so an answer can be traced to what produced it. */
   id: string;
+  /** Passed to the agent; empty for providers with nothing to configure. */
+  providerOptions: SharedV4ProviderOptions;
 };
+
+/**
+ * Thinking budgets.
+ *
+ * Measured, not guessed: the same prompt against gemini-3.6-flash took 9.45s
+ * with the default extended thinking and 0.87s with the budget at zero. A
+ * turn runs three of those sequentially — supervisor routes, specialist
+ * answers, supervisor synthesises — which is the whole of the 35–50s a
+ * clinical consult was taking, and why turns were hitting the 50s ceiling
+ * and returning nothing at all.
+ *
+ * Spending it where it helps and not where it doesn't:
+ *
+ *   Specialists get none. Their job is narrow and their prompt already tells
+ *   them exactly what to produce.
+ *
+ *   The supervisor gets a small budget, because routing and synthesis are
+ *   the parts where a moment's deliberation shows.
+ *
+ * Worth being explicit, since this is a health product: the clinical
+ * decisions are not the model's to make. Rules decide urgency before it
+ * runs and validators check the answer after, so what is being traded here
+ * is fluency, not safety.
+ */
+const SPECIALIST_THINKING = 0;
+const SUPERVISOR_THINKING = 512;
+
+function geminiOptions(thinkingBudget: number): SharedV4ProviderOptions {
+  return { google: { thinkingConfig: { thinkingBudget } } };
+}
 
 export function hasGemini(): boolean {
   return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
@@ -85,16 +130,22 @@ export function hasAnyModel(): boolean {
  * do anything useful with it, and broke agent tests that only ever inspect
  * the assembled prompt.
  */
-export function resolveModel(): ProviderChoice {
+export function resolveModel(role: "supervisor" | "specialist" = "supervisor"): ProviderChoice {
   if (hasGemini()) {
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     });
-    return { model: google(GEMINI_MODEL), id: `google/${GEMINI_MODEL}` };
+    return {
+      model: google(GEMINI_MODEL),
+      id: `google/${GEMINI_MODEL}`,
+      providerOptions: geminiOptions(
+        role === "supervisor" ? SUPERVISOR_THINKING : SPECIALIST_THINKING,
+      ),
+    };
   }
   // The Gateway resolves a bare string itself; no client to construct. Also
   // the fallback when nothing is configured, which keeps construction total.
-  return { model: GATEWAY_MODEL as unknown as LanguageModel, id: GATEWAY_MODEL };
+  return { model: GATEWAY_MODEL as unknown as LanguageModel, id: GATEWAY_MODEL, providerOptions: {} };
 }
 
 /**
