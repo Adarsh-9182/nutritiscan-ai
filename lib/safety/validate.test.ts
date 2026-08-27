@@ -98,6 +98,56 @@ describe("overreach", () => {
   it("leaves ordinary hedged language alone", () => {
     expect(validateAnswer(FULL, state()).violations).toHaveLength(0);
   });
+
+  /*
+   * These are not hypothetical. The first version of this check matched a
+   * bare "you have" and blocked a real answer end to end in testing: the
+   * model had asked "do you have any other symptoms?", which is precisely
+   * what the prompt tells it to do when it lacks facts.
+   */
+  it("does not fire on a clarifying question", () => {
+    const a = FULL.replace("Track when it happens and hydrate.", "Do you have any other symptoms?");
+    expect(ids(a, state())).not.toContain("output.diagnostic-verdict");
+    expect(validateAnswer(a, state()).blocked).toBe(false);
+  });
+
+  it("does not fire on repeating the patient back to themselves", () => {
+    const a = FULL.replace("You reported a headache for two days.", "You have had this since yesterday.");
+    expect(ids(a, state())).not.toContain("output.diagnostic-verdict");
+  });
+
+  it("does not fire on ordinary second-person sentences", () => {
+    for (const line of [
+      "You have your lab results recorded already.",
+      "Do you have a thermometer at home?",
+      "You have been tracking this for two weeks.",
+    ]) {
+      const a = FULL.replace("Track when it happens and hydrate.", line);
+      expect(ids(a, state())).not.toContain("output.diagnostic-verdict");
+    }
+  });
+
+  it("still catches a confident verdict", () => {
+    for (const line of [
+      "You definitely have a bacterial infection.",
+      "You are suffering from anaemia.",
+      "This is definitely a migraine.",
+      "You have a viral infection.",
+    ]) {
+      const a = FULL.replace("Track when it happens and hydrate.", line);
+      expect(ids(a, state())).toContain("output.diagnostic-verdict");
+    }
+  });
+
+  it("does not let a question smuggle reassurance past an escalated verdict", () => {
+    // The question filter must not become a way around the contradiction
+    // check — a statement in the same answer still counts.
+    const a = FULL.replace(
+      "Track when it happens and hydrate.",
+      "Are you worried? This is nothing to worry about.",
+    );
+    expect(ids(a, state("emergency"))).toContain("output.contradicts-triage");
+  });
 });
 
 describe("contradiction — the model may not overrule triage", () => {

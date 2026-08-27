@@ -89,7 +89,27 @@ export function missingSections(answer: string): string[] {
 const OVERREACH: { id: string; re: RegExp; detail: string }[] = [
   {
     id: "output.diagnostic-verdict",
-    re: /\b(you (definitely |certainly |clearly )?have|you are suffering from|this is definitely|you've got)\b/i,
+    /*
+     * Narrow on purpose, and narrower than it first was.
+     *
+     * The first version matched a bare "you have", which blocked a real
+     * answer in testing: it fires on "do you have any other symptoms?" —
+     * the clarifying question the prompt explicitly asks for. A check that
+     * blocks the behaviour we ask for is worse than no check, because the
+     * fix is always to switch it off.
+     *
+     * Two things keep it honest now. Questions never reach these patterns
+     * (see declarativeText), which removes the whole class of false
+     * positives at once. What is left is an assertion, so a plain "you
+     * have X" is fair to catch — except where "have" is an auxiliary or
+     * runs into a possessive, which is the model repeating the patient back
+     * ("you have had this since yesterday", "you have your results").
+     *
+     * A first narrowing overcorrected: requiring "definitely" or a named
+     * condition let "You have tension or dehydration" through, which is a
+     * verdict stated as fact and exactly what this is for.
+     */
+    re: /\b(?:you (?:definitely |certainly |clearly )?have\s+(?!had\b|been\b|any\b|your\b|my\b|our\b|the\b|no\b|not\b|to\b)\w|you are suffering from|you've got|(?:this|it) is (?:definitely|certainly))/i,
     detail: "States a diagnosis as fact. The contract allows possibilities, never verdicts.",
   },
   {
@@ -165,13 +185,19 @@ export function validateAnswer(answer: string, state: ClinicalState): Validation
       }
     }
 
+    // Overreach and contradiction are judged on statements only. A question
+    // is the model gathering information, which is exactly what the prompt
+    // asks it to do when it lacks facts — checking questions for confident
+    // language is how a validator ends up blocking good behaviour.
+    const declarative = declarativeText(answer);
+
     for (const o of OVERREACH) {
-      if (o.re.test(answer)) {
+      if (o.re.test(declarative)) {
         violations.push({ id: o.id, severity: "block", detail: o.detail });
       }
     }
 
-    if (ESCALATED.includes(state.triage.verdict) && REASSURANCE.test(answer)) {
+    if (ESCALATED.includes(state.triage.verdict) && REASSURANCE.test(declarative)) {
       violations.push({
         id: "output.contradicts-triage",
         severity: "block",
@@ -192,6 +218,21 @@ export function validateAnswer(answer: string, state: ClinicalState): Validation
       failedClosed: true,
     };
   }
+}
+
+/**
+ * The answer with its questions removed.
+ *
+ * Split on sentence ends, keeping the terminator, then drop anything that
+ * ends in a question mark. Crude, and deliberately so: the alternative is
+ * parsing English, and the only job here is to stop a confident-sounding
+ * question from reading as a confident-sounding claim.
+ */
+export function declarativeText(answer: string): string {
+  return answer
+    .split(/(?<=[.!?])\s+|\n+/)
+    .filter((s) => !s.trim().endsWith("?"))
+    .join(" ");
 }
 
 /**

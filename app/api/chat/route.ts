@@ -119,7 +119,9 @@ async function streamRealSupervisor(
       const type = c.type;
 
       if (type === "error") {
-        if (!wrote && !held) return "unavailable";
+        // Same reasoning as the catch below: in a buffered turn only the
+        // held text counts as something the reader has seen.
+        if (!(buffered ? held.length > 0 : wrote)) return "unavailable";
         if (held) writeFixed(writer, held);
         writeInterrupted(writer);
         return "partial";
@@ -163,7 +165,18 @@ async function streamRealSupervisor(
 
     return wrote ? "ok" : "unavailable";
   } catch {
-    if (!wrote && !held) return "unavailable";
+    /*
+     * `wrote` means "the reader has already seen real content", which is why
+     * it decides between falling back cleanly and admitting a cut-off answer.
+     * Buffering broke that: text never goes through in a buffered turn, so
+     * `wrote` was being set true by tool-call chunks alone and a turn that
+     * died before producing a single word reported "partial" — leaving an
+     * empty bubble and the interruption notice attached to nothing.
+     *
+     * In a buffered turn the held text is the only thing that counts.
+     */
+    const shown = buffered ? held.length > 0 : wrote;
+    if (!shown) return "unavailable";
     if (held) writeFixed(writer, held);
     writeInterrupted(writer);
     return "partial";
