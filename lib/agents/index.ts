@@ -91,7 +91,21 @@ ${MEDICAL_REASONING_FORMAT}`,
 // coherent, safe, personalized answer.
 // ------------------------------------------------------------
 
-export function buildSupervisor(profile: HealthProfile, nutrition: string, recalled?: string | null) {
+/**
+ * @param triage Directive from the deterministic safety layer (lib/safety).
+ *   Present only when triage returned `urgent`. It is injected ABOVE the
+ *   safety block rather than appended at the end: this instruction is the
+ *   one thing in the prompt the model is explicitly forbidden from
+ *   overriding, and burying it under a long memory dump is how it would get
+ *   lost. `emergency` never reaches this function at all — that turn is
+ *   answered by a fixed template with no model call.
+ */
+export function buildSupervisor(
+  profile: HealthProfile,
+  nutrition: string,
+  recalled?: string | null,
+  triage?: string | null,
+) {
   const s = buildSpecialists(profile, nutrition);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
@@ -109,6 +123,7 @@ export function buildSupervisor(profile: HealthProfile, nutrition: string, recal
   return new ToolLoopAgent({
     model: MODEL,
     instructions: `You are the Supervisor of NutritiScan AI — an AI Health Operating System.
+${triage ? `\n${triage}\n` : ""}
 You coordinate five specialists (Nutrition, Fitness, Doctor, Lab, Health Coach) to help the
 user understand their body and make better decisions.
 

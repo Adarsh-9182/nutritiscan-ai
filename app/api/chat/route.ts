@@ -13,6 +13,9 @@ import { recallRelevant } from "@/lib/memory/recall";
 import { type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
 import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
+import { assessTurn, halts } from "@/lib/safety/triage";
+import { emergencyResponse, mentalHealthResponse, urgentAgentDirective, urgentPreamble } from "@/lib/safety/templates";
+import type { ClinicalState } from "@/lib/clinical/state";
 
 export const maxDuration = 60;
 
@@ -78,12 +81,13 @@ async function streamRealSupervisor(
   profile: HealthProfile,
   nutrition: string,
   recalled: string | null,
+  triage: string | null,
   signal: AbortSignal,
 ): Promise<RealOutcome> {
   let wrote = false;
   try {
     const stream = await createAgentUIStream({
-      agent: buildSupervisor(profile, nutrition, recalled),
+      agent: buildSupervisor(profile, nutrition, recalled, triage),
       uiMessages: messages,
       abortSignal: signal,
     });
@@ -122,6 +126,39 @@ function writeInterrupted(writer: UIMessageStreamWriter) {
       "\n\n_That answer was cut off before I finished it — please don't read it as complete. Ask again and I'll start over._",
   });
   writer.write({ type: "text-end", id });
+}
+
+/**
+ * Emit a fixed escalation template.
+ *
+ * Written in one chunk rather than word-by-word like the demo brain: the
+ * typing effect is a nicety for a conversational answer and an obstacle in
+ * front of "call an ambulance". Nothing here is generated — see
+ * lib/safety/templates.ts.
+ */
+function writeFixed(writer: UIMessageStreamWriter, text: string) {
+  const id = `safety-${Date.now()}`;
+  writer.write({ type: "text-start", id });
+  writer.write({ type: "text-delta", id, delta: text });
+  writer.write({ type: "text-end", id });
+}
+
+/**
+ * Surface the triage outcome to the client alongside the text, so the UI can
+ * render urgency as urgency (a banner, a colour, an interstitial) instead of
+ * relying on the user to read to the end of a paragraph.
+ */
+function writeTriage(writer: UIMessageStreamWriter, state: ClinicalState) {
+  writer.write({
+    type: "data-triage",
+    id: "triage",
+    data: {
+      verdict: state.triage.verdict,
+      firedRules: state.triage.firedRules,
+      channel: state.triage.channel ?? null,
+      failedClosed: state.triage.failedClosed,
+    },
+  });
 }
 
 /**
@@ -189,22 +226,59 @@ export async function POST(req: Request) {
   const recent = messages.slice(-MAX_MESSAGES);
   const userText = lastUserText(recent);
 
+  // ----------------------------------------------------------------
+  // SAFETY LAYER 2 — TRIAGE. Runs before retrieval, before reasoning,
+  // and before the credential check, because it is deterministic and
+  // must work on a deployment with no model configured at all.
+  // See docs/SAFETY.md §2.
+  // ----------------------------------------------------------------
+  const state = assessTurn({
+    text: userText,
+    profile,
+    // No persisted consultation yet (docs/DATA.md §6). Per-request id keeps
+    // the audit shape correct so Phase 2 only has to change where it comes from.
+    consultationId: `req-${Date.now().toString(36)}`,
+    turn: recent.filter((m) => m.role === "user").length,
+  });
+
   // Bound the model call and drop everything if the client disconnects.
   const budget = AbortSignal.timeout(MODEL_BUDGET_MS);
   const signal = AbortSignal.any([req.signal, budget]);
 
   const stream = createUIMessageStream({
     async execute({ writer }) {
+      writeTriage(writer, state);
+
+      // A dedicated non-clinical path owns this turn entirely — no
+      // differential, no nutrition advice, nothing else alongside it.
+      if (state.triage.channel === "mental_health") {
+        writeFixed(writer, mentalHealthResponse());
+        return;
+      }
+
+      // The pipeline stops here. No model call, no specialists, no
+      // "possible explanations" while someone should be calling an ambulance.
+      if (halts(state.triage)) {
+        writeFixed(writer, emergencyResponse(state));
+        return;
+      }
+
+      const directive = state.triage.verdict === "urgent" ? urgentAgentDirective(state) : null;
+
       if (hasModelCredential()) {
         // Best-effort: a failed or slow embedding call must not cost the
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
         const recalled = await recallRelevant(userText, profile, meals, signal);
-        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, signal);
+        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, signal);
         if (outcome !== "unavailable") return;
         // "unavailable" means nothing reached the client yet — the demo
         // brain can still answer, and an honest answer beats a dead spinner.
       }
+      // The demo brain has no idea about triage, so the urgency is prepended
+      // deterministically. A keyless deployment must not lose the one part of
+      // the answer that matters most.
+      if (directive) writeFixed(writer, `${urgentPreamble(state)}\n\n---\n\n`);
       await streamDemo(writer, userText, profile, meals, signal);
     },
     onError: () => "Something went wrong on our side. Please try again.",
