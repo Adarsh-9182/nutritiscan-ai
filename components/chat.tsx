@@ -97,6 +97,73 @@ function tracesFor(m: { parts: unknown[] }): Trace | null {
   return null;
 }
 
+/**
+ * The consult note.
+ *
+ * Collapsed by default and never mixed into the answer text: it is a record,
+ * not part of the conversation, and its job is to be handed to a clinician
+ * intact. Assembled server-side from ClinicalState (lib/clinical/note.ts) —
+ * the copy button hands over exactly what the system concluded.
+ */
+type NotePart = {
+  note: { verdict: string; firedRules: string[]; generatedAt: string };
+  text: string;
+};
+
+function noteFor(m: { parts: unknown[] }): NotePart | null {
+  const parts = m.parts as { type: string; data?: NotePart }[];
+  return parts.find((p) => p.type === "data-note")?.data ?? null;
+}
+
+function ConsultNote({ note }: { note: NotePart }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(note.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard blocked — the text is still on screen to select */
+    }
+  };
+
+  const urgent = note.note.verdict === "emergency" || note.note.verdict === "urgent";
+
+  return (
+    <details className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] open:bg-[var(--surface-2)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+        <span className="flex items-center gap-2 text-[13px] font-medium">
+          Consult note
+          <span
+            className="rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+            style={{
+              color: urgent ? "var(--rose)" : "var(--text-dim)",
+              borderColor: urgent ? "color-mix(in oklab, var(--rose) 45%, transparent)" : "var(--border)",
+            }}
+          >
+            {note.note.verdict}
+          </span>
+        </span>
+        <span className="text-[11px] text-[var(--text-dim)]">for your doctor</span>
+      </summary>
+
+      <div className="border-t border-[var(--border)] px-4 py-3">
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-[var(--text-muted)]">
+          {note.text}
+        </pre>
+        <button
+          type="button"
+          onClick={copy}
+          className="mt-3 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-ring"
+        >
+          {copied ? "Copied" : "Copy note"}
+        </button>
+      </div>
+    </details>
+  );
+}
+
 const SUGGESTIONS = [
   "I have a fever.",
   "Am I eating enough protein?",
@@ -342,6 +409,7 @@ function Conversation({ profile }: { profile: HealthProfile }) {
             );
           }
           const trace = tracesFor(m);
+          const note = noteFor(m);
           const route = badgeFor(idx, trace);
           const color = agentColor(route);
           return (
@@ -367,6 +435,7 @@ function Conversation({ profile }: { profile: HealthProfile }) {
                 <div className="rounded-2xl rounded-tl-sm bg-[var(--surface-2)] px-4 py-3">
                   {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                 </div>
+                {note && <ConsultNote note={note} />}
                 {/* Structured medical guidance is exactly the kind of thing a
                     user wants to hand to a clinician verbatim — copy has to
                     exist somewhere. Hover-revealed (with focus-visible as the

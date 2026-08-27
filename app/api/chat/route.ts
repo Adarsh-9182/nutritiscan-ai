@@ -16,6 +16,7 @@ import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyReques
 import { assessTurn, halts } from "@/lib/safety/triage";
 import { isClinicalTurn, validateAnswer, withheldResponse } from "@/lib/safety/validate";
 import { clinicalBrief } from "@/lib/clinical/brief";
+import { buildConsultNote, renderNoteText } from "@/lib/clinical/note";
 import { emergencyResponse, mentalHealthResponse, urgentAgentDirective, urgentPreamble } from "@/lib/safety/templates";
 import type { ClinicalState } from "@/lib/clinical/state";
 
@@ -221,6 +222,28 @@ function writeTriage(writer: UIMessageStreamWriter, state: ClinicalState) {
 }
 
 /**
+ * Emit the consult note for a clinical turn.
+ *
+ * Sent as a data part rather than folded into the answer text so it stays a
+ * record: the UI can render it separately, and the reader can hand it to a
+ * clinician without the surrounding conversation. Assembled from
+ * ClinicalState, never asked of the model — see lib/clinical/note.ts.
+ *
+ * Only on clinical turns. A note attached to "how much protein do I need"
+ * is filing, not medicine, and would train people to ignore the ones that
+ * matter.
+ */
+function writeNote(writer: UIMessageStreamWriter, state: ClinicalState) {
+  if (!isClinicalTurn(state)) return;
+  const note = buildConsultNote(state);
+  writer.write({
+    type: "data-note",
+    id: "note",
+    data: { note, text: renderNoteText(note) },
+  });
+}
+
+/**
  * Demo brain — a safe, structured, keyless answer streamed word by word,
  * with the specialist trace the UI renders.
  */
@@ -330,7 +353,12 @@ export async function POST(req: Request) {
         // propagating a rejection into the supervisor call below it.
         const recalled = await recallRelevant(userText, profile, meals, signal);
         const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal);
-        if (outcome !== "unavailable") return;
+        if (outcome !== "unavailable") {
+          // A partial turn still gets its note: the record of what the system
+          // concluded is independent of whether the prose finished.
+          writeNote(writer, state);
+          return;
+        }
         // "unavailable" means nothing reached the client yet — the demo
         // brain can still answer, and an honest answer beats a dead spinner.
       }
@@ -339,6 +367,7 @@ export async function POST(req: Request) {
       // the answer that matters most.
       if (directive) writeFixed(writer, `${urgentPreamble(state)}\n\n---\n\n`);
       await streamDemo(writer, userText, profile, meals, signal);
+      writeNote(writer, state);
     },
     onError: () => "Something went wrong on our side. Please try again.",
   });
