@@ -14,6 +14,7 @@ import { type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
 import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { assessTurn, halts } from "@/lib/safety/triage";
+import { isClinicalTurn, validateAnswer, withheldResponse } from "@/lib/safety/validate";
 import { emergencyResponse, mentalHealthResponse, urgentAgentDirective, urgentPreamble } from "@/lib/safety/templates";
 import type { ClinicalState } from "@/lib/clinical/state";
 
@@ -82,9 +83,28 @@ async function streamRealSupervisor(
   nutrition: string,
   recalled: string | null,
   triage: string | null,
+  /** Needed to decide whether this turn is buffered, and to validate against. */
+  state: ClinicalState,
   signal: AbortSignal,
 ): Promise<RealOutcome> {
   let wrote = false;
+
+  /*
+   * Streaming and validation want opposite things.
+   *
+   * A validator can only judge a finished answer — a missing Medical Warning
+   * is invisible until the last token — but by then a straight-through stream
+   * has already put the answer on screen, and nothing can be taken back.
+   *
+   * So the turn decides. Clinical turns are buffered: text is held, checked,
+   * and only then emitted. Everything else streams exactly as before, because
+   * making someone wait for a paragraph about protein is how a safety check
+   * earns a reputation for being in the way. Non-text chunks (traces, step
+   * markers) pass through either way so the UI still shows progress.
+   */
+  const buffered = isClinicalTurn(state);
+  let held = "";
+
   try {
     const stream = await createAgentUIStream({
       agent: buildSupervisor(profile, nutrition, recalled, triage),
@@ -93,18 +113,56 @@ async function streamRealSupervisor(
     });
 
     for await (const chunk of stream) {
-      const type = (chunk as { type?: string }).type;
+      const c = chunk as { type?: string; delta?: string };
+      const type = c.type;
+
       if (type === "error") {
-        if (!wrote) return "unavailable";
+        if (!wrote && !held) return "unavailable";
+        if (held) writeFixed(writer, held);
         writeInterrupted(writer);
         return "partial";
       }
+
+      if (buffered && (type === "text-delta" || type === "text-start" || type === "text-end")) {
+        if (type === "text-delta" && c.delta) held += c.delta;
+        continue;
+      }
+
       writer.write(chunk as never);
       if (!NON_CONTENT_CHUNK_TYPES.has(type ?? "")) wrote = true;
     }
+
+    if (buffered) {
+      if (!held.trim()) return "unavailable";
+      const verdict = validateAnswer(held, state);
+
+      if (verdict.blocked) {
+        // Loud in the logs, calm on screen. The reader asked a health
+        // question and gets a usable reply; the failure is ours to fix.
+        console.error("[validate] answer withheld", {
+          consultationId: state.consultationId,
+          turn: state.turn,
+          violations: verdict.violations.map((v) => v.id),
+          failedClosed: verdict.failedClosed,
+        });
+        writeFixed(writer, withheldResponse(state));
+        return "ok";
+      }
+
+      if (!verdict.ok) {
+        console.warn("[validate] answer shown with violations", {
+          consultationId: state.consultationId,
+          violations: verdict.violations.map((v) => v.id),
+        });
+      }
+      writeFixed(writer, held);
+      return "ok";
+    }
+
     return wrote ? "ok" : "unavailable";
   } catch {
-    if (!wrote) return "unavailable";
+    if (!wrote && !held) return "unavailable";
+    if (held) writeFixed(writer, held);
     writeInterrupted(writer);
     return "partial";
   }
@@ -270,7 +328,7 @@ export async function POST(req: Request) {
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
         const recalled = await recallRelevant(userText, profile, meals, signal);
-        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, signal);
+        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal);
         if (outcome !== "unavailable") return;
         // "unavailable" means nothing reached the client yet — the demo
         // brain can still answer, and an honest answer beats a dead spinner.
