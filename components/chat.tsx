@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { dictationSupport, startDictation } from "@/lib/http/dictation";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
@@ -234,15 +234,21 @@ function Conversation({ profile }: { profile: HealthProfile }) {
    * symptom into a clinical pipeline is how "chest pain" becomes "just
    * plain" and the triage rules never see it.
    */
-  const [canDictate, setCanDictate] = useState(false);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [micError, setMicError] = useState<string | null>(null);
   const dictationRef = useRef<{ stop: () => void } | null>(null);
 
-  useEffect(() => {
-    setCanDictate(dictationSupport() === "available");
-  }, []);
+  // Read through useSyncExternalStore rather than an effect: this is exactly
+  // the case it exists for — a value the server and client disagree about,
+  // where the server snapshot is "no" and the client's is read once on
+  // hydration. An effect would set state during mount and cascade a render.
+  const canDictate = useSyncExternalStore(
+    // Support cannot change within a session, so there is nothing to subscribe to.
+    useCallback(() => () => {}, []),
+    () => dictationSupport() === "available",
+    () => false,
+  );
 
   // Never leave the microphone open behind a closed consult.
   useEffect(() => () => dictationRef.current?.stop(), []);
@@ -321,6 +327,12 @@ function Conversation({ profile }: { profile: HealthProfile }) {
    * text in sessionStorage and routes here. Read once and cleared immediately,
    * so a refresh does not re-ask it — and sessionStorage rather than local, so
    * a stale draft cannot survive the tab and surprise someone tomorrow.
+   *
+   * Sent on a microtask rather than in the effect body. Firing a request
+   * synchronously during mount cascades a render before the component has
+   * settled; deferring by a tick lets it finish mounting first, which is
+   * also the more honest description of what this is — an action taken after
+   * arrival, not part of rendering.
    */
   const handoffRef = useRef(false);
   useEffect(() => {
@@ -333,7 +345,9 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     } catch {
       return;
     }
-    if (pending?.trim()) send(pending);
+    if (!pending?.trim()) return;
+    const text = pending;
+    queueMicrotask(() => send(text));
     // Runs once on mount; `send` is stable enough for this one-shot handoff.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
