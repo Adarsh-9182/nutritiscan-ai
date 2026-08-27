@@ -559,7 +559,7 @@ export default function Landing() {
           <Reveal>
             <Label>Founder</Label>
             <h2 className="mt-4 max-w-2xl text-balance text-[28px] font-semibold leading-tight tracking-[-0.025em] sm:text-[40px]">
-              Built by one person, in the open.
+              Being built by one person, in the open.
             </h2>
           </Reveal>
 
@@ -577,7 +577,7 @@ export default function Landing() {
 
               <div className="max-w-2xl">
                 <p className="text-[15px] leading-relaxed text-[var(--m-muted)]">
-                  NutritiScan is designed and built by Adarsh Bhardwaj, an AI engineer working on
+                  NutritiScan is being designed and built by Adarsh Bhardwaj, an AI engineer working on
                   agent systems and LLM infrastructure — the specialist roster, the supervisor that
                   routes between them, the deterministic triage engine underneath, and the tested
                   code that computes every number this product quotes.
