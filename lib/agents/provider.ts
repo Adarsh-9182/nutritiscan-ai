@@ -35,10 +35,22 @@ import type { EmbeddingModel, LanguageModel } from "ai";
  * consults. Flash reasons well enough for triage-adjacent explanation, which
  * is what this product asks of it: the clinical decisions are made by rules
  * before the model runs and checked by validators after it.
+ *
+ * Pinned, not `gemini-flash-latest`. A floating alias can change the model
+ * under a medical product between one deploy and the next, with no diff to
+ * review and no eval run against the thing that is actually answering.
+ *
+ * Verified against the live API before pinning: 2.5-flash and 2.0-flash both
+ * 404 for new keys — "no longer available to new users" — which is exactly
+ * the kind of failure that would have shown up as the demo brain quietly
+ * answering in production.
  */
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 
 /** Used only when a Gateway credential is present. */
+/** Also verified live; text-embedding-004 is not served to new keys. */
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+
 const GATEWAY_MODEL = "anthropic/claude-sonnet-5";
 
 /** Anthropic serves no embeddings endpoint; the Gateway routes this elsewhere. */
@@ -97,7 +109,7 @@ export function resolveEmbeddingModel() {
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     });
-    return google.textEmbeddingModel("text-embedding-004");
+    return google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL);
   }
   // Same reasoning as resolveModel: total rather than nullable. Recall
   // already degrades to null on a failed call, which covers the no-credential
