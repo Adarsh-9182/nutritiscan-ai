@@ -1,10 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { AGENTS } from "@/lib/agents-meta";
+import { useProfile } from "@/lib/memory/store";
+
+/*
+ * The consult is loaded on demand, not with the page.
+ *
+ * It pulls in the chat runtime, the transport and the transcript store — a
+ * cost worth paying the moment someone types, and worth avoiding for the
+ * majority who are still reading. Client-only because the transcript can
+ * only be restored in the browser (see components/chat.tsx).
+ */
+const Chat = dynamic(() => import("@/components/chat"), {
+  ssr: false,
+  loading: () => (
+    <div className="grid min-h-[420px] place-items-center text-[13px] text-[var(--m-dim)]">
+      Opening the consult…
+    </div>
+  ),
+});
 
 /* =====================================================================
    NUTRITISCAN — landing
@@ -24,7 +42,7 @@ import { AGENTS } from "@/lib/agents-meta";
    Every number is read off the repository.
    ===================================================================== */
 
-const FACTS = { rules: 38, domains: 11, specialists: 5, tests: 166 };
+const FACTS = { rules: 38, domains: 11, specialists: 5, tests: 192 };
 
 const PROMPTS = [
   "I've had a fever since yesterday",
@@ -56,21 +74,13 @@ function Label({ children }: { children: React.ReactNode }) {
 
 /* ---------- the hero input: the actual front door ---------- */
 
-function Ask() {
-  const router = useRouter();
+function Ask({ onStart }: { onStart: (text: string) => void }) {
   const [value, setValue] = useState("");
 
   function start(text: string) {
     const q = text.trim();
     if (!q) return;
-    // The hero owns an input but not a conversation. Park the question and
-    // let the consult pick it up on mount; see components/chat.tsx.
-    try {
-      sessionStorage.setItem("nutritiscan:pending", q);
-    } catch {
-      /* private mode — the consult simply opens empty */
-    }
-    router.push("/dashboard");
+    onStart(q);
   }
 
   return (
@@ -127,6 +137,46 @@ function Ask() {
    ===================================================================== */
 
 export default function Landing() {
+  const [profile] = useProfile();
+  const [consulting, setConsulting] = useState(false);
+
+  /*
+   * Typing starts the consult here rather than routing to /dashboard.
+   *
+   * A page change between "I typed my symptom" and "something is reading it"
+   * reads as a form submission — you fill a thing in and get taken elsewhere.
+   * The product is the conversation, so the conversation opens where it was
+   * started. The question is handed over the same way as before, through
+   * sessionStorage, which chat.tsx reads once and clears on mount.
+   */
+  function startConsult(text: string) {
+    try {
+      sessionStorage.setItem("nutritiscan:pending", text);
+    } catch {
+      /* private mode — the consult opens empty and the person retypes */
+    }
+    setConsulting(true);
+  }
+
+  if (consulting) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[var(--bg)]">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
+          <span className="text-[14px] font-semibold text-[var(--text)]">NutritiScan</span>
+          <button
+            onClick={() => setConsulting(false)}
+            className="text-[13px] text-[var(--text-muted)] transition hover:text-[var(--text)]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-4">
+          <Chat profile={profile} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="mkt min-h-screen"
@@ -177,7 +227,7 @@ export default function Landing() {
 
         <Reveal delay={0.08}>
           <div className="mt-10 text-left">
-            <Ask />
+            <Ask onStart={startConsult} />
           </div>
         </Reveal>
 
@@ -419,7 +469,7 @@ export default function Landing() {
               says so first.
             </p>
             <div className="mt-9 text-left">
-              <Ask />
+              <Ask onStart={startConsult} />
             </div>
           </Reveal>
         </div>

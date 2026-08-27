@@ -15,6 +15,7 @@ import { type LoggedMeal } from "@/lib/memory/meals";
 import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { assessTurn, halts } from "@/lib/safety/triage";
 import { isClinicalTurn, validateAnswer, withheldResponse } from "@/lib/safety/validate";
+import { clinicalBrief } from "@/lib/clinical/brief";
 import { emergencyResponse, mentalHealthResponse, urgentAgentDirective, urgentPreamble } from "@/lib/safety/templates";
 import type { ClinicalState } from "@/lib/clinical/state";
 
@@ -107,7 +108,7 @@ async function streamRealSupervisor(
 
   try {
     const stream = await createAgentUIStream({
-      agent: buildSupervisor(profile, nutrition, recalled, triage),
+      agent: buildSupervisor(profile, nutrition, recalled, triage, clinicalBrief(state)),
       uiMessages: messages,
       abortSignal: signal,
     });

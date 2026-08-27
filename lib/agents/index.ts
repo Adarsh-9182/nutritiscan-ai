@@ -105,6 +105,13 @@ export function buildSupervisor(
   nutrition: string,
   recalled?: string | null,
   triage?: string | null,
+  /**
+   * What the deterministic extractor found in this turn (lib/clinical/brief.ts).
+   * Separate from `triage`: this is what the patient said, that is what the
+   * safety layer decided, and the model may question the first but not the
+   * second.
+   */
+  brief?: string | null,
 ) {
   const s = buildSpecialists(profile, nutrition);
 
@@ -123,7 +130,7 @@ export function buildSupervisor(
   return new ToolLoopAgent({
     model: MODEL,
     instructions: `You are the Supervisor of NutritiScan AI — an AI Health Operating System.
-${triage ? `\n${triage}\n` : ""}
+${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
 You coordinate five specialists (Nutrition, Fitness, Doctor, Lab, Health Coach) to help the
 user understand their body and make better decisions.
 
