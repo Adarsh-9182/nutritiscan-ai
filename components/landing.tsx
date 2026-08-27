@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AGENTS } from "@/lib/agents-meta";
 import { useProfile } from "@/lib/memory/store";
@@ -72,14 +72,82 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ---------- nav ---------- */
+
+/**
+ * The page had none at all, which is why it read as a document rather than a
+ * product: nothing named the thing, nothing let you leave the scroll, and
+ * the only way back to the top was to scroll there.
+ *
+ * Borderless until the page moves, so the hero opens on clean ground and the
+ * rule only appears once there is content above it to separate from.
+ */
+function SiteNav({ onStart }: { onStart: () => void }) {
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <header
+      className={`sticky top-0 z-50 backdrop-blur-md transition-colors duration-300 ${
+        stuck ? "border-b border-[var(--m-rule)] bg-[color-mix(in_srgb,var(--m-bg)_82%,transparent)]" : "border-b border-transparent"
+      }`}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
+        <a href="#top" className="flex items-center gap-2.5">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--m-accent)] text-[13px] font-semibold text-white">
+            N
+          </span>
+          <span className="text-[15px] font-semibold tracking-[-0.01em]">NutritiScan</span>
+        </a>
+
+        <nav className="hidden items-center gap-7 md:flex">
+          {[
+            ["How it works", "#how"],
+            ["Safety layer", "#safety"],
+            ["Specialists", "#panel"],
+          ].map(([label, href]) => (
+            <a
+              key={href}
+              href={href}
+              className="text-[13.5px] text-[var(--m-muted)] transition-colors hover:text-[var(--m-ink)]"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+
+        <button
+          onClick={onStart}
+          className="rounded-full bg-[var(--m-ink)] px-4 py-2 text-[13px] font-medium text-white transition hover:opacity-90"
+        >
+          Start consult
+        </button>
+      </div>
+    </header>
+  );
+}
+
 /* ---------- the hero input: the actual front door ---------- */
 
 function Ask({ onStart }: { onStart: (text: string) => void }) {
   const [value, setValue] = useState("");
 
+  const fieldRef = useRef<HTMLInputElement>(null);
+
   function start(text: string) {
     const q = text.trim();
-    if (!q) return;
+    // Nothing typed yet: put the cursor where it needs to go rather than
+    // doing nothing, which is what a disabled button felt like.
+    if (!q) {
+      fieldRef.current?.focus();
+      return;
+    }
     onStart(q);
   }
 
@@ -96,6 +164,7 @@ function Ask({ onStart }: { onStart: (text: string) => void }) {
           Describe your symptom or question
         </label>
         <input
+          ref={fieldRef}
           id="ask"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -109,8 +178,7 @@ function Ask({ onStart }: { onStart: (text: string) => void }) {
           </span>
           <button
             type="submit"
-            className="rounded-full bg-[var(--m-accent)] px-5 py-2.5 text-[13.5px] font-medium text-white transition hover:bg-[var(--m-accent-deep)] disabled:opacity-40"
-            disabled={!value.trim()}
+            className="rounded-full bg-[var(--m-accent)] px-5 py-2.5 text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgba(11,122,85,.2)] transition hover:bg-[var(--m-accent-deep)]"
           >
             Start consult
           </button>
@@ -151,7 +219,8 @@ export default function Landing() {
    */
   function startConsult(text: string) {
     try {
-      sessionStorage.setItem("nutritiscan:pending", text);
+      // The nav button opens an empty consult; only a real question is parked.
+      if (text.trim()) sessionStorage.setItem("nutritiscan:pending", text);
     } catch {
       /* private mode — the consult opens empty and the person retypes */
     }
@@ -213,19 +282,39 @@ export default function Landing() {
       */}
       <style>{`body{background:#fafbfa}`}</style>
 
+      <SiteNav onStart={() => startConsult("")} />
+
       {/* ── Hero ───────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-3xl px-5 pt-28 pb-20 text-center sm:pt-36">
+      <section id="top" className="relative mx-auto max-w-3xl px-5 pt-20 pb-24 text-center sm:pt-28">
+        {/*
+          A single soft bloom behind the input, sized so it reads as depth
+          rather than decoration. The page is otherwise flat by choice — one
+          light source, and it sits where the eye is meant to go.
+        */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-[38%] z-0 h-[420px] w-[720px] max-w-[120vw] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.55] blur-3xl"
+          style={{
+            background:
+              "radial-gradient(closest-side, color-mix(in oklab, var(--m-accent) 16%, transparent), transparent)",
+          }}
+        />
+
+        <div className="relative z-10">
         <Reveal>
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--m-rule-2)] bg-white px-3 py-1 text-[12px] text-[var(--m-muted)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--m-accent)]" />
-            AI health agent
+          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--m-rule-2)] bg-white px-3 py-1 text-[12px] text-[var(--m-muted)] shadow-[0_1px_2px_rgba(16,22,28,.04)]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--m-accent)] opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--m-accent)]" />
+            </span>
+            AI health agent · free
           </span>
 
-          <h1 className="mt-7 text-balance text-[38px] font-semibold leading-[1.06] tracking-[-0.03em] sm:text-[58px]">
+          <h1 className="mt-7 text-balance text-[42px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[68px]">
             Tell it what&rsquo;s wrong.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-balance text-[16.5px] leading-relaxed text-[var(--m-muted)] sm:text-[18px]">
-            Five specialists read your answer, and a rule engine reads it first — so if this
+          <p className="mx-auto mt-6 max-w-[34rem] text-balance text-[17px] leading-[1.6] text-[var(--m-muted)] sm:text-[19px]">
+            Five specialists read your answer — and a rule engine reads it first, so if this
             should be a doctor, you are told before anything else is said.
           </p>
         </Reveal>
@@ -242,10 +331,11 @@ export default function Landing() {
             doctor.
           </p>
         </Reveal>
+        </div>
       </section>
 
       {/* ── How it works ───────────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="how" className="border-t border-[var(--m-rule)] px-5 py-24">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>How a consult runs</Label>
@@ -285,7 +375,7 @@ export default function Landing() {
       </section>
 
       {/* ── The halt, shown ────────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="safety" className="border-t border-[var(--m-rule)] px-5 py-24">
         <div className="mx-auto grid max-w-5xl items-center gap-14 lg:grid-cols-2">
           <Reveal>
             <div>
@@ -347,7 +437,7 @@ export default function Landing() {
       </section>
 
       {/* ── The panel ──────────────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="panel" className="border-t border-[var(--m-rule)] px-5 py-24">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>The panel</Label>
