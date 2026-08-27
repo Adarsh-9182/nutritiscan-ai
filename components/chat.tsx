@@ -196,6 +196,30 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     setInput("");
   };
 
+  /**
+   * Pick up a question typed on the landing page.
+   *
+   * The marketing hero owns an input but not a conversation, so it parks the
+   * text in sessionStorage and routes here. Read once and cleared immediately,
+   * so a refresh does not re-ask it — and sessionStorage rather than local, so
+   * a stale draft cannot survive the tab and surprise someone tomorrow.
+   */
+  const handoffRef = useRef(false);
+  useEffect(() => {
+    if (handoffRef.current) return;
+    handoffRef.current = true;
+    let pending: string | null = null;
+    try {
+      pending = sessionStorage.getItem("nutritiscan:pending");
+      if (pending) sessionStorage.removeItem("nutritiscan:pending");
+    } catch {
+      return;
+    }
+    if (pending?.trim()) send(pending);
+    // Runs once on mount; `send` is stable enough for this one-shot handoff.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Grow the textarea with its content, capped by max-h-40 in the className
   // (the browser clamps the inline height itself once that's hit and the
   // native scrollbar takes over — no extra bookkeeping needed here).

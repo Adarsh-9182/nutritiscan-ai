@@ -6,6 +6,14 @@
 // the unit test suite and must not be confused with it. `npm test` covers
 // lib/**/*.test.ts; `npm run eval` covers evals/**/*.eval.ts.
 //
+// This directory is excluded from tsconfig.json, and therefore from
+// `next build`'s type check. That is deliberate: several suites probe for
+// modules that are not built yet — `(await import(path).catch(() => null))`
+// is how a Phase-4 eval asks "does the evidence layer exist", and TypeScript
+// cannot resolve an import that is meant to fail today. Including them made
+// the production build fail on a missing module that nothing ships against.
+// They are still type-aware under vitest.eval.config.ts.
+//
 // The distinction that matters is `gate` vs `advisory`:
 //
 //   gate(...)      A failure fails the build. Reserved for assertions that
