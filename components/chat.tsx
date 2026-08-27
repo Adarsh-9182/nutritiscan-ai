@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { dictationSupport, startDictation } from "@/lib/http/dictation";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -221,6 +222,56 @@ function Conversation({ profile }: { profile: HealthProfile }) {
   const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  /*
+   * Dictation.
+   *
+   * Support is read after mount, never during render: SpeechRecognition does
+   * not exist on the server, and branching on it while rendering would make
+   * the markup disagree with itself on hydration.
+   *
+   * The transcript fills the box and stops there. Auto-sending a misheard
+   * symptom into a clinical pipeline is how "chest pain" becomes "just
+   * plain" and the triage rules never see it.
+   */
+  const [canDictate, setCanDictate] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const dictationRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    setCanDictate(dictationSupport() === "available");
+  }, []);
+
+  // Never leave the microphone open behind a closed consult.
+  useEffect(() => () => dictationRef.current?.stop(), []);
+
+  const toggleDictation = () => {
+    if (listening) {
+      dictationRef.current?.stop();
+      return;
+    }
+    setMicError(null);
+    const session = startDictation(input, navigator.language || "en-IN", {
+      onCommitted: (text, tail) => {
+        setInput(text);
+        setInterim(tail);
+      },
+      onError: (message) => setMicError(message),
+      onEnd: () => {
+        setListening(false);
+        setInterim("");
+        dictationRef.current = null;
+      },
+    });
+    if (!session) {
+      setMicError("Dictation isn't available in this browser. You can type instead.");
+      return;
+    }
+    dictationRef.current = session;
+    setListening(true);
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -528,6 +579,35 @@ function Conversation({ profile }: { profile: HealthProfile }) {
             placeholder="Describe how you feel, or ask anything…"
             className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
           />
+          {/* Someone with a fever or shaking hands should not have to type a
+              paragraph to be heard. Hidden entirely where the browser cannot
+              do it, rather than offered and then doing nothing. */}
+          {canDictate && !busy && (
+            <button
+              type="button"
+              onClick={toggleDictation}
+              aria-label={listening ? "Stop dictating" : "Dictate your symptoms"}
+              aria-pressed={listening}
+              title={listening ? "Stop dictating" : "Dictate your symptoms"}
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition ${
+                listening
+                  ? "bg-[color-mix(in_oklab,var(--rose)_22%,transparent)] text-[var(--rose)]"
+                  : "btn-ghost"
+              }`}
+            >
+              {listening ? (
+                <motion.span
+                  aria-hidden="true"
+                  animate={reduceMotion ? {} : { opacity: [1, 0.35, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity }}
+                >
+                  ●
+                </motion.span>
+              ) : (
+                <span aria-hidden="true">🎙</span>
+              )}
+            </button>
+          )}
           {busy ? (
             // The supervisor can fan out across five specialists for the best
             // part of a minute. Leaving the user with no way to interrupt that
@@ -541,6 +621,16 @@ function Conversation({ profile }: { profile: HealthProfile }) {
             </button>
           )}
         </div>
+        {interim && (
+          <p className="mt-2 px-1 text-sm italic text-[var(--text-dim)]" aria-live="polite">
+            {interim}
+          </p>
+        )}
+        {micError && (
+          <p className="mt-2 px-1 text-[13px] text-[var(--rose)]" role="status">
+            {micError}
+          </p>
+        )}
         <p className="mt-2 text-center t-label text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
       </form>
     </div>
