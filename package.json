@@ -15,6 +15,7 @@
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.54",
     "@ai-sdk/react": "^4.0.37",
     "ai": "^7.0.34",
     "motion": "^12.42.2",

@@ -24,7 +24,7 @@
 // ============================================================
 
 import { embedMany } from "ai";
-import { EMBEDDING_MODEL } from "../agents/safety";
+import { resolveEmbeddingModel } from "../agents/provider";
 import type { HealthProfile } from "./profile";
 import type { LoggedMeal } from "./meals";
 
@@ -89,9 +89,11 @@ export async function recallRelevant(
   const docs = [...journalDocs(profile), ...mealDocs(meals)];
   if (!docs.length || !query.trim()) return null;
 
+  const embedding = resolveEmbeddingModel();
+
   try {
     const { embeddings } = await embedMany({
-      model: EMBEDDING_MODEL,
+      model: embedding,
       values: [query, ...docs.map((d) => d.text)],
       abortSignal: signal,
     });
