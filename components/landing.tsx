@@ -111,6 +111,7 @@ function SiteNav({ onStart }: { onStart: () => void }) {
             ["How it works", "#how"],
             ["Safety layer", "#safety"],
             ["Specialists", "#panel"],
+            ["Founder", "#founder"],
           ].map(([label, href]) => (
             <a
               key={href}
@@ -547,6 +548,62 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Founder ────────────────────────────────────────────── */}
+      <section id="founder" className="border-t border-[var(--m-rule)] px-5 py-24">
+        <div className="mx-auto max-w-5xl">
+          <Reveal>
+            <Label>Founder</Label>
+            <h2 className="mt-4 max-w-2xl text-balance text-[28px] font-semibold leading-tight tracking-[-0.025em] sm:text-[40px]">
+              Built by one person, in the open.
+            </h2>
+          </Reveal>
+
+          <Reveal delay={0.08}>
+            <div className="mt-12 grid gap-10 border-t border-[var(--m-rule)] pt-8 lg:grid-cols-[auto_1fr]">
+              <div className="flex items-center gap-4">
+                <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-[var(--m-accent)] text-[17px] font-semibold text-white">
+                  AB
+                </span>
+                <div>
+                  <p className="text-[16px] font-semibold">Adarsh Bhardwaj</p>
+                  <p className="mt-1 text-[13.5px] text-[var(--m-muted)]">Founder &amp; AI engineer</p>
+                </div>
+              </div>
+
+              <div className="max-w-2xl">
+                <p className="text-[15px] leading-relaxed text-[var(--m-muted)]">
+                  NutritiScan is designed and built by Adarsh Bhardwaj, an AI engineer working on
+                  agent systems and LLM infrastructure — the specialist roster, the supervisor that
+                  routes between them, the deterministic triage engine underneath, and the tested
+                  code that computes every number this product quotes.
+                </p>
+                <p className="mt-4 text-[15px] leading-relaxed text-[var(--m-muted)]">
+                  The repository is public on purpose. Every claim on this page — the rule count,
+                  the fail-closed behaviour, the arithmetic — can be read in the source rather than
+                  taken on trust.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+                  {[
+                    ["adarshbhardwaj.space", "https://adarshbhardwaj.space"],
+                    ["github.com/Adarsh-9182", "https://github.com/Adarsh-9182"],
+                  ].map(([label, href]) => (
+                    <a
+                      key={href}
+                      href={href}
+                      target="_blank"
+                      rel="noopener"
+                      className="text-[13.5px] text-[var(--m-muted)] underline decoration-[var(--m-rule)] underline-offset-4 transition hover:text-[var(--m-ink)]"
+                    >
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </div>
             </div>
           </Reveal>
         </div>
