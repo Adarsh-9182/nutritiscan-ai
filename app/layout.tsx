@@ -20,9 +20,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], dis
  */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nutritiscan-ai-968m.vercel.app";
 
-const TITLE = "NutritiScan AI — Your Health Has A Memory";
+const TITLE = "NutritiScan — AI health agent";
 const DESCRIPTION =
-  "An intelligent AI Health Operating System. Understand your body, track your progress, interpret your data, and make better decisions every day — with a personal AI that remembers everything.";
+  "Describe a symptom and five specialists read it — behind a rule engine that reads it first, and can stop the consult if you should be seeing a doctor. Free, no account, and nothing leaves your browser.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
