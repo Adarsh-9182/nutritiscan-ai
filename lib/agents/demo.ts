@@ -2,6 +2,7 @@ import { bmi, heightImperial, type HealthProfile } from "../memory/profile";
 import type { LoggedMeal } from "../memory/meals";
 import { dayTotals } from "../memory/meals";
 import { proteinTarget } from "../nutrition/analyze";
+import type { ClinicalState } from "@/lib/clinical/state";
 
 // ------------------------------------------------------------
 // DEMO BRAIN — a safe, rule-based responder used when no
@@ -69,7 +70,23 @@ const GOAL_PROTEIN_NOTE = (goal: string) =>
       ? "1.6 g/kg helps hold onto muscle in a deficit"
       : "1.2 g/kg covers general health";
 
-export function demoAnswer(text: string, p: HealthProfile, meals: LoggedMeal[] = []): string {
+/** Joins a list the way a person would: "a, b and c". */
+function listOf(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+export function demoAnswer(
+  text: string,
+  p: HealthProfile,
+  meals: LoggedMeal[] = [],
+  /**
+   * What the extractor found this turn. Optional so the demo brain still
+   * works standalone, but passed in practice — a keyless deployment should
+   * not be the one place that ignores the clinical state.
+   */
+  state?: ClinicalState,
+): string {
   if (EMERGENCY.test(text)) {
     return `**This may be an emergency.** Please seek emergency care right now — call your local emergency number or go to the nearest ER. I can't safely triage this over chat.\n\n_I'm an educational companion, not a substitute for emergency medical care._`;
   }
@@ -84,18 +101,39 @@ export function demoAnswer(text: string, p: HealthProfile, meals: LoggedMeal[] =
     // before guessing, not to attach a low-confidence guess anyway. Medical
     // Warning is the exception: red flags are generic, not patient-specific,
     // so they can be stated with zero facts in hand.
+    // Name what was actually reported. The extractor has already read this
+    // turn, and saying "you mentioned not feeling well" back to someone who
+    // wrote "I've had a fever since yesterday" reads as not having listened
+    // — worse here than anywhere, because the consult note beside it says
+    // "Chief complaint: Fever" and the two visibly disagree.
+    const reported = (state?.findings ?? []).filter((f) => !f.qualifiers.historical);
+    const said = reported.length
+      ? `you told me about ${listOf(reported.map((f) => f.label.toLowerCase()))}`
+      : "you mentioned not feeling well";
+
+    // Drop the follow-up that asks about something they have already reported
+    // or explicitly denied. DATA.md §3.5: do not re-ask what was answered.
+    const known = new Set(
+      [...reported.map((f) => f.label), ...(state?.negatives ?? [])].map((s) => s.toLowerCase()),
+    );
+    const alongside = ["fever", "breathlessness", "rash"].filter((s) => !known.has(s));
+
+    const questions = [
+      "When did it start, and is it getting better or worse?",
+      "How bad is it, 1–10?",
+      alongside.length ? `Is anything else happening alongside it — ${listOf(alongside)}?` : null,
+      "Have you taken any medicine for it today?",
+      "Has this happened before?",
+      "Anything that reliably makes it better or worse?",
+    ].filter((q): q is string => q !== null);
+
     return `Sorry you're not feeling well, ${name}. Let me help you think this through calmly.
 
 **Facts**
-- Here's what I have: you mentioned not feeling well. That's not enough to reason from yet — I can't tell you what you have, because I have your answers to none of the questions below, and any specific cause I named would be a guess dressed up as a read.
+- Here's what I have: ${said}. That's not enough to reason from yet — I can't tell you what you have, because I have your answers to none of the questions below, and any specific cause I named would be a guess dressed up as a read.
 
 **Clarifying questions**
-1. When did it start, and is it getting better or worse?
-2. How bad is it, 1–10?
-3. Is anything else happening alongside it — fever, breathlessness, rash?
-4. Have you taken any medicine for it today?
-5. Has this happened before?
-6. Anything that reliably makes it better or worse?
+${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 **Medical Warning**
 - Seek care urgently if you have any of these:

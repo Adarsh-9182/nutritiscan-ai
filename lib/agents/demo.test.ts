@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { demoAnswer, routeOf } from "./demo";
 import { blankProfile, demoProfile } from "../memory/profile";
 import { proteinTarget } from "../nutrition/analyze";
+import { emptyState, type ClinicalState } from "../clinical/state";
 
 // With no Gateway credential the demo brain IS the product's voice in
 // production. Every claim it makes has to come from the profile in front of
@@ -113,5 +114,79 @@ describe("routeOf", () => {
     expect(routeOf("explain my TSH")).toBe("lab");
     expect(routeOf("help me build a sleep routine")).toBe("coach");
     expect(routeOf("hello")).toBe("supervisor");
+  });
+});
+
+// ------------------------------------------------------------
+// Clinical state reaches the demo brain too.
+//
+// A keyless deployment must not be the one place that ignores what the
+// extractor found: saying "you mentioned not feeling well" to someone who
+// wrote "I've had a fever" contradicts the consult note rendered beside it.
+// ------------------------------------------------------------
+
+const finding = (label: string) => ({
+  conceptId: label,
+  label,
+  span: label.toLowerCase(),
+  index: 0,
+  qualifiers: { historical: false, severe: false, sudden: false },
+});
+
+const withState = (patch: Partial<ClinicalState> = {}): ClinicalState => ({
+  ...emptyState("c-1", 1, "text"),
+  ...patch,
+});
+
+const named = { ...blankProfile, name: "Adarsh" };
+
+describe("demo brain — uses what the extractor found", () => {
+  it("names the reported symptom instead of 'not feeling well'", () => {
+    const a = demoAnswer("I've had a fever since yesterday", named, [], withState({ findings: [finding("Fever")] }));
+    expect(a).toContain("you told me about fever");
+    expect(a).not.toContain("you mentioned not feeling well");
+  });
+
+  it("lists several findings readably", () => {
+    const a = demoAnswer("fever and a cough", named, [], withState({ findings: [finding("Fever"), finding("Cough")] }));
+    expect(a).toContain("fever and cough");
+  });
+
+  it("does not re-ask about something already reported", () => {
+    const a = demoAnswer("I've had a fever", named, [], withState({ findings: [finding("Fever")] }));
+    const question = a.split("\n").find((l) => l.includes("anything else happening alongside"));
+    expect(question).toBeDefined();
+    expect(question).not.toContain("fever");
+  });
+
+  it("does not re-ask about something explicitly denied", () => {
+    // Needs a word routeOf() sends to the doctor; "no rash" alone routes to the supervisor.
+    const a = demoAnswer("headache but no rash", named, [], withState({ negatives: ["rash"] }));
+    const question = a.split("\n").find((l) => l.includes("anything else happening alongside"));
+    expect(question).not.toContain("rash");
+  });
+
+  it("drops the follow-up entirely once nothing is left to ask", () => {
+    const a = demoAnswer(
+      "fever, breathlessness and a rash",
+      named,
+      [],
+      withState({ findings: [finding("Fever"), finding("Breathlessness"), finding("Rash")] }),
+    );
+    expect(a).not.toContain("anything else happening alongside");
+    // The remaining questions must still be numbered from 1 without a gap.
+    expect(a).toContain("1. When did it start");
+    expect(a).toContain("3. Have you taken any medicine");
+  });
+
+  it("still works with no state at all", () => {
+    const a = demoAnswer("I feel sick", named, []);
+    expect(a).toContain("you mentioned not feeling well");
+    expect(a).toContain("Medical Warning");
+  });
+
+  it("keeps the Medical Warning whatever else changes", () => {
+    const a = demoAnswer("fever", named, [], withState({ findings: [finding("Fever")] }));
+    expect(a).toContain("**Medical Warning**");
   });
 });

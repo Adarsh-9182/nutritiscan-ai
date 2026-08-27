@@ -247,7 +247,7 @@ function writeNote(writer: UIMessageStreamWriter, state: ClinicalState) {
  * Demo brain — a safe, structured, keyless answer streamed word by word,
  * with the specialist trace the UI renders.
  */
-async function streamDemo(writer: UIMessageStreamWriter, userText: string, profile: HealthProfile, meals: LoggedMeal[], signal: AbortSignal) {
+async function streamDemo(writer: UIMessageStreamWriter, userText: string, profile: HealthProfile, meals: LoggedMeal[], state: ClinicalState, signal: AbortSignal) {
   const route = routeOf(userText);
   const consulting = route === "supervisor" ? [] : [route];
 
@@ -258,7 +258,7 @@ async function streamDemo(writer: UIMessageStreamWriter, userText: string, profi
 
   const id = `msg-${Date.now()}`;
   writer.write({ type: "text-start", id });
-  for (const w of demoAnswer(userText, profile, meals).split(/(\s+)/)) {
+  for (const w of demoAnswer(userText, profile, meals, state).split(/(\s+)/)) {
     if (signal.aborted) break;
     writer.write({ type: "text-delta", id, delta: w });
     await sleep(w.trim() ? 16 : 6, signal);
@@ -366,7 +366,7 @@ export async function POST(req: Request) {
       // deterministically. A keyless deployment must not lose the one part of
       // the answer that matters most.
       if (directive) writeFixed(writer, `${urgentPreamble(state)}\n\n---\n\n`);
-      await streamDemo(writer, userText, profile, meals, signal);
+      await streamDemo(writer, userText, profile, meals, state, signal);
       writeNote(writer, state);
     },
     onError: () => "Something went wrong on our side. Please try again.",
