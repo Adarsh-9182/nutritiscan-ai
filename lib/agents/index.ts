@@ -1,6 +1,7 @@
 import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
-import { MODEL, SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
+import { SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
+import { resolveModel } from "./provider";
 import { memoryContext, ALL_MEMORY_SECTIONS, type HealthProfile, type MemorySection } from "../memory/profile";
 
 // ------------------------------------------------------------
@@ -23,8 +24,9 @@ import { memoryContext, ALL_MEMORY_SECTIONS, type HealthProfile, type MemorySect
 // ------------------------------------------------------------
 
 function specialist(name: string, expertise: string, profile: HealthProfile, sections: MemorySection[], nutrition: string | null) {
+  const resolved = resolveModel();
   return new ToolLoopAgent({
-    model: MODEL,
+    model: resolved.model,
     instructions: `You are the ${name} inside NutritiScan AI, a health operating system.
 ${expertise}
 
@@ -113,6 +115,7 @@ export function buildSupervisor(
    */
   brief?: string | null,
 ) {
+  const resolved = resolveModel();
   const s = buildSpecialists(profile, nutrition);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
@@ -128,7 +131,7 @@ export function buildSupervisor(
     });
 
   return new ToolLoopAgent({
-    model: MODEL,
+    model: resolved.model,
     instructions: `You are the Supervisor of NutritiScan AI — an AI Health Operating System.
 ${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
 You coordinate five specialists (Nutrition, Fitness, Doctor, Lab, Health Coach) to help the

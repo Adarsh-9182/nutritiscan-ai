@@ -155,6 +155,11 @@ export default function Landing() {
     } catch {
       /* private mode — the consult opens empty and the person retypes */
     }
+    // Swapping the page's contents does not move the viewport, so starting a
+    // consult from the second Ask — halfway down a long page — left people
+    // scrolled past the conversation they had just opened, looking at
+    // nothing. Reset before the swap so the consult begins where it should.
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     setConsulting(true);
   }
 

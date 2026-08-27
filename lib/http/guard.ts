@@ -1,4 +1,5 @@
 // ============================================================
+import { hasAnyModel } from "../agents/provider";
 // REQUEST GUARDS
 //
 // Both API routes are unauthenticated and call a paid frontier model.
@@ -109,5 +110,5 @@ export async function readJsonCapped(req: Request, maxBytes: number): Promise<{ 
  * canned demo text from the same deployment.
  */
 export function hasModelCredential(): boolean {
-  return !!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
+  return hasAnyModel();
 }
