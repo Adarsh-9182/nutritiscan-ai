@@ -372,7 +372,7 @@ export default function Landing() {
       </section>
 
       {/* ── Honest limits ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-5 py-24">
+      <section id="limits" className="mx-auto max-w-6xl px-5 py-24">
         <SectionHead
           eyebrow="Limits"
           title="What this is not"
@@ -391,6 +391,134 @@ export default function Landing() {
                 <h3 className="text-base font-semibold text-[var(--amber)]">{h}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-muted)]">{p}</p>
               </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Capability breadth ─────────────────────────────────── */}
+      <section id="capabilities" className="mx-auto max-w-6xl px-5 py-24">
+        <SectionHead
+          eyebrow="What you can bring it"
+          title="One consult that does it all"
+          lede="Symptoms, a lab report, last night's dinner, the medicine you were told to take — it is one conversation, and the specialists share the same record rather than making you repeat yourself."
+        />
+
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { g: "🩺", h: "Symptoms", p: "Describe what you feel in your own words. It asks the follow-ups a clinician would, and triage watches every turn.", c: "var(--blue)" },
+            { g: "🧪", h: "Lab reports", p: "CBC, thyroid, vitamin panels. It reads the values back in plain language and tracks them over time instead of judging one number in isolation.", c: "var(--violet)" },
+            { g: "🥗", h: "Meals", p: "Photograph a plate or a label. Macros and micros are computed by tested code — an unrecognised food contributes nothing rather than a guess.", c: "var(--emerald)" },
+            { g: "💊", h: "Medicines", p: "Tell it what you take so the rest of the reasoning knows. It will never recommend a prescription medicine or a dose.", c: "var(--rose)" },
+            { g: "🏋️", h: "Fitness", p: "Training, progression, recovery and body composition, informed by what your labs and nutrition actually say.", c: "var(--cyan)" },
+            { g: "🧭", h: "Habits", p: "Sleep, goals and the follow-ups that make any of the above matter more than a single good week.", c: "var(--amber)" },
+          ].map((k, i) => (
+            <Reveal key={k.h} delay={i * 0.05}>
+              <div className="glass h-full rounded-[var(--radius)] p-6">
+                <span className="grid h-11 w-11 place-items-center rounded-xl text-xl" style={{ background: `${k.c}22` }}>{k.g}</span>
+                <h3 className="mt-4 text-base font-semibold">{k.h}</h3>
+                <p className="mt-2 text-[14px] leading-relaxed text-[var(--text-muted)]">{k.p}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Worked examples ────────────────────────────────────── */}
+      <section className="mx-auto max-w-6xl px-5 py-24">
+        <SectionHead
+          eyebrow="Worked examples"
+          title="What a consult actually looks like"
+          lede="Illustrative cases, not user reviews — these are the paths the system is built to take."
+        />
+
+        <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          {[
+            {
+              q: "“Sudden worst headache of my life.”",
+              verdict: "HALTED",
+              tone: "var(--rose)",
+              a: "A neurological rule fires before any specialist reasons. The consult ends with an instruction to seek emergency care — no differential, no reassurance, no discussion.",
+            },
+            {
+              q: "“My B12 came back at 180.”",
+              verdict: "ROUTINE",
+              tone: "var(--violet)",
+              a: "The Lab agent reads it against the range printed on your report rather than a universal cutoff, explains what low B12 tends to mean, and says plainly when a doctor should confirm it.",
+            },
+            {
+              q: "“Am I getting enough protein?”",
+              verdict: "ROUTINE",
+              tone: "var(--emerald)",
+              a: "The Nutrition agent answers from computed totals, not an estimate, and marks its confidence by how many days of real meals it actually has to work from.",
+            },
+          ].map((k, i) => (
+            <Reveal key={k.q} delay={i * 0.07}>
+              <div className="glass h-full rounded-[var(--radius)] p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[15px] font-medium leading-snug">{k.q}</p>
+                  <span className="flex-none rounded-full border px-2 py-0.5 font-mono text-[10px] tracking-widest" style={{ color: k.tone, borderColor: `${k.tone}55` }}>{k.verdict}</span>
+                </div>
+                <p className="mt-3 text-[14px] leading-relaxed text-[var(--text-muted)]">{k.a}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Engineering ────────────────────────────────────────── */}
+      <section className="mx-auto max-w-6xl px-5 py-24">
+        <SectionHead
+          eyebrow="Read the engineering"
+          title="Nothing here is a black box"
+          lede="The architecture, the data model, the safety layers and the evaluation plan are written down and public — including an honest list of what is still missing."
+        />
+
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["ARCHITECTURE.md", "The system, and a gap analysis ordered by risk"],
+            ["SAFETY.md", "The seven layers and the red-flag rules"],
+            ["ORCHESTRATION.md", "ClinicalState, the reasoning loop, the agents"],
+            ["DATA.md", "Schema, provenance, retention, privacy"],
+            ["API.md", "HTTP contracts, auth, audit, error envelope"],
+            ["EVALUATION.md", "Golden dataset, suites and CI gates"],
+          ].map(([f, d], i) => (
+            <Reveal key={f} delay={i * 0.04}>
+              <a
+                href={`https://github.com/Adarsh-9182/nutritiscan-ai/blob/main/docs/${f}`}
+                target="_blank"
+                rel="noopener"
+                className="glass block h-full rounded-2xl p-5 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
+              >
+                <p className="font-mono text-[12.5px] text-[var(--emerald)]">{f}</p>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--text-muted)]">{d}</p>
+              </a>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FAQ ────────────────────────────────────────────────── */}
+      <section id="faq" className="mx-auto max-w-4xl px-5 py-24">
+        <SectionHead eyebrow="Questions" title="Before you start" />
+
+        <div className="mt-10 divide-y divide-[var(--border)]">
+          {[
+            ["Is this a real doctor?", "No. It is an AI system. It reasons about symptoms, reads reports and flags risk, and it is built to tell you when something needs a person instead. No licensed clinician has reviewed its rules yet, and it says so."],
+            ["What happens in an emergency?", "Do not use it — call your local emergency number. If you describe something the rules recognise as an emergency anyway, the consult stops immediately and tells you to get care. That behaviour is code, so it does not depend on the model cooperating."],
+            ["Where does my data go?", "Into your browser's local storage and nowhere else. There is no account and no server-side health record. Clearing your browser clears it, and it will not follow you to another device."],
+            ["Can it prescribe or change my medication?", "No, and it is built not to. It can explain what you are taking and take it into account, but it will not recommend a prescription medicine or a dose."],
+            ["Why is it free?", "Because it has not earned a price. There is no clinician review and no human doctor to hand you to. When those exist, this answer changes."],
+            ["Can I see how it works?", "Yes — the whole thing is public, including the triage rules, the tests and a written list of what is still missing."],
+          ].map(([q, a], i) => (
+            <Reveal key={q} delay={i * 0.04}>
+              <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15.5px] font-medium">
+                  {q}
+                  <span className="flex-none text-[var(--text-dim)] transition group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-3 max-w-2xl text-[14.5px] leading-relaxed text-[var(--text-muted)]">{a}</p>
+              </details>
             </Reveal>
           ))}
         </div>
@@ -438,12 +566,98 @@ export default function Landing() {
               Read the source
             </a>
           </div>
-          <p className="mt-10 text-[12px] leading-relaxed text-[var(--text-dim)]">
-            NutritiScan is an AI system, not a licensed doctor, and does not provide medical advice.
-            In an emergency, contact your local emergency services.
-          </p>
         </Reveal>
       </section>
+
+      {/* ── Footer ─────────────────────────────────────────────── */}
+      <footer className="border-t border-[var(--border)] px-5 pb-16 pt-14">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-[color-mix(in_oklab,var(--emerald)_18%,transparent)] text-sm">🩺</span>
+                <span className="font-semibold">NutritiScan</span>
+              </div>
+              <p className="mt-3 max-w-[30ch] text-[13px] leading-relaxed text-[var(--text-muted)]">
+                An AI health agent with a deterministic safety layer underneath it.
+              </p>
+            </div>
+
+            {[
+              {
+                h: "Product",
+                links: [
+                  ["Start a consult", "/dashboard"],
+                  ["Scan a meal", "/scan"],
+                  ["Timeline", "/timeline"],
+                  ["The safety layer", "#safety"],
+                  ["Specialists", "#agents"],
+                ],
+              },
+              {
+                h: "Engineering",
+                links: [
+                  ["Source", "https://github.com/Adarsh-9182/nutritiscan-ai"],
+                  ["Architecture", "https://github.com/Adarsh-9182/nutritiscan-ai/blob/main/docs/ARCHITECTURE.md"],
+                  ["Safety layers", "https://github.com/Adarsh-9182/nutritiscan-ai/blob/main/docs/SAFETY.md"],
+                  ["Evaluation", "https://github.com/Adarsh-9182/nutritiscan-ai/blob/main/docs/EVALUATION.md"],
+                ],
+              },
+              {
+                h: "Help",
+                links: [
+                  ["Questions", "#faq"],
+                  ["What this is not", "#limits"],
+                  ["Report an issue", "https://github.com/Adarsh-9182/nutritiscan-ai/issues"],
+                ],
+              },
+            ].map((col) => (
+              <div key={col.h}>
+                <p className="font-mono text-[11px] tracking-widest text-[var(--text-dim)]">{col.h.toUpperCase()}</p>
+                <ul className="mt-4 space-y-2.5">
+                  {col.links.map(([label, href]) => (
+                    <li key={label}>
+                      {href.startsWith("http") ? (
+                        <a href={href} target="_blank" rel="noopener" className="text-[13.5px] text-[var(--text-muted)] transition hover:text-[var(--text)]">
+                          {label}
+                        </a>
+                      ) : (
+                        <Link href={href} className="text-[13.5px] text-[var(--text-muted)] transition hover:text-[var(--text)]">
+                          {label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* The disclaimer is the loudest thing down here on purpose. */}
+          <div className="mt-12 rounded-2xl border border-[color-mix(in_oklab,var(--amber)_28%,transparent)] bg-[color-mix(in_oklab,var(--amber)_7%,transparent)] p-5">
+            <p className="text-[13px] font-semibold text-[var(--amber)]">Medical disclaimer</p>
+            <p className="mt-2 max-w-4xl text-[13px] leading-relaxed text-[var(--text-muted)]">
+              NutritiScan is an AI system, not a licensed doctor, and does not provide medical
+              advice, diagnosis or treatment. Its clinical rules have not been reviewed by a
+              clinician. Nothing here replaces professional care, and you should not delay seeking
+              it because of something this product said.{" "}
+              <strong className="text-[var(--text)]">
+                In an emergency, contact your local emergency services immediately — in India, dial
+                112.
+              </strong>
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--border)] pt-6">
+            <p className="font-mono text-[11.5px] text-[var(--text-dim)]">
+              © {new Date().getFullYear()} NutritiScan · built in India
+            </p>
+            <p className="font-mono text-[11.5px] text-[var(--text-dim)]">
+              {FACTS.rules} rules · {FACTS.tests} tests · no health data on our servers
+            </p>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
