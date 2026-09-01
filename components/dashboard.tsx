@@ -15,6 +15,7 @@ import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
 import { journalEntry } from "@/lib/memory/journal";
 import { dayTotals, mealsOn } from "@/lib/memory/meals";
 import { useMeals, useProfile } from "@/lib/memory/store";
+import { formatDay, useStartOfToday } from "@/lib/clock";
 import { proteinTarget } from "@/lib/nutrition/analyze";
 
 function Stepper({ label, value, unit, onDec, onInc, color }: { label: string; value: string; unit: string; onDec: () => void; onInc: () => void; color: string }) {
@@ -113,6 +114,7 @@ export default function Dashboard() {
   const todayMeals = mealsOn(meals).slice().reverse();
   const demo = isDemoMemory(profile);
   const trends = profile.trends ?? [];
+  const todayLabel = formatDay(useStartOfToday());
 
   return (
     <div className="min-h-[100svh] px-4 py-4 sm:px-6">
@@ -122,11 +124,30 @@ export default function Dashboard() {
       <Onboarding />
       <Nav status={{ tone: "good", label: "memory synced" }} />
 
-      {/* The page needs a name of its own. Promoting the first card to <h1>
-          would tell a screen reader this page is "Health Score", which is one
-          card of six. The design has no title bar, so the heading is real but
-          not drawn. */}
-      <h1 className="sr-only">Your health dashboard</h1>
+      {/*
+        A page header, which this screen did not have.
+
+        The heading used to be sr-only: real for a screen reader, invisible
+        on screen, so the page opened straight into six cards of equal weight
+        with nothing saying what you were looking at or what to do. A header
+        is what turns a pile of panels into a screen — it names the view,
+        dates it, and puts the primary action where a primary action goes.
+      */}
+      <header className="mx-auto mb-5 flex max-w-7xl flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="t-display tracking-tight">Today</h1>
+          <p className="mt-1 t-meta text-[var(--text-dim)]">
+            {/* Empty until the clock is known — the server has no timezone,
+                so a date rendered there would be someone else's day. */}
+            {todayLabel && <>{todayLabel} · </>}
+            {todayMeals.length ? `${todayMeals.length} meal${todayMeals.length > 1 ? "s" : ""} logged` : "nothing logged yet"}
+            {demo && " · demo memory"}
+          </p>
+        </div>
+        <Link href="/scan" className="btn-primary rounded-xl px-3.5 py-2 text-[13px] focus-ring">
+          Scan a meal
+        </Link>
+      </header>
 
       <main className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-12">
         {/* LEFT — score + memory */}
@@ -298,7 +319,7 @@ export default function Dashboard() {
             viewport, so a 78vh panel sat partly under the URL bar and the
             composer — the one control that matters — was the part cut off.
           */}
-          <div id="dashboard-chat" className="h-[78svh] min-h-[560px] overflow-hidden rounded-[var(--radius)] glass-strong">
+          <div id="dashboard-chat" className="h-[78svh] min-h-[560px] overflow-hidden rounded-[var(--radius)] panel-strong">
             <Chat profile={profile} />
           </div>
         </div>

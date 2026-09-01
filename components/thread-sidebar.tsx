@@ -1,48 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState } from "react";
+import { DAY_MS, useStartOfToday } from "@/lib/clock";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deleteAllThreads, deleteThread, newThread, renameThread, selectThread, useActiveThreadId, useThreads } from "@/lib/memory/store";
 import { searchThreads, textOf, type Thread } from "@/lib/memory/threads";
-
-const DAY_MS = 86_400_000;
-const startOfDay = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
-
-/**
- * Today's date boundary, as an external value.
- *
- * "Today" is a fact about the clock, not about props or state, and reading it
- * during render makes the grouping depend on when React happens to
- * re-render. `useSyncExternalStore` is the seam for exactly this: the
- * snapshot is stable for a whole day, and the subscription is a timer that
- * fires at midnight — so a tab left open overnight relabels itself instead of
- * insisting yesterday is still today.
- */
-function subscribeToMidnight(onChange: () => void) {
-  let timer: ReturnType<typeof setTimeout>;
-  const schedule = () => {
-    const now = Date.now();
-    timer = setTimeout(
-      () => {
-        onChange();
-        schedule();
-      },
-      // A second past the boundary, so a timer that fires marginally early
-      // does not re-read the clock while it is still yesterday.
-      startOfDay(now) + DAY_MS - now + 1000,
-    );
-  };
-  schedule();
-  return () => clearTimeout(timer);
-}
-
-const useStartOfToday = () =>
-  useSyncExternalStore(
-    subscribeToMidnight,
-    () => startOfDay(Date.now()),
-    // The server has no user timezone, so it renders the untimed grouping.
-    () => 0,
-  );
 
 /**
  * Group conversations the way a person remembers them — by when, not by id.

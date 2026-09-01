@@ -702,7 +702,7 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
                           <span aria-hidden="true">✎</span>
                         </button>
                       )}
-                      <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-[var(--surface-2)] px-4 py-2.5 text-sm text-white">
+                      <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[var(--surface-2)] px-4 py-2.5 text-sm text-white">
                         {text}
                       </div>
                     </div>
@@ -857,15 +857,16 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
             instead of colliding with its edge.
           */}
           {/*
-            A blur scrim, not a solid fill. The same chat renders full-page
-            over --bg and inside the dashboard's translucent glass panel; a
-            solid --bg block reads as a hole punched in the glass. Blurring
-            what passes underneath works on both, and is what actually makes
-            the text legible where it meets the composer.
+            The fade is painted in whatever this chat is standing on, which
+            is --bg full-page and the panel's own fill inside the dashboard.
+            --chat-ground is redeclared by .panel, so it arrives by
+            inheritance rather than the component being told where it is —
+            and a hard-coded colour here would have shown as a slab of the
+            wrong grey in one of the two places.
           */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-            <div className="h-16 bg-[linear-gradient(to_bottom,transparent,rgba(5,7,10,.72))] backdrop-blur-[2px]" />
-            <div className="bg-[rgba(5,7,10,.72)] px-4 pb-3 backdrop-blur-md">
+            <div className="h-16 bg-[linear-gradient(to_bottom,transparent,var(--chat-ground))]" />
+            <div className="bg-[var(--chat-ground)] px-4 pb-3">
               <div className="pointer-events-auto mx-auto max-w-2xl">
                 <AnimatePresence>
                   {!atBottom && (
@@ -935,7 +936,7 @@ function Composer({
         onSubmit();
       }}
     >
-      <div className="flex items-end gap-2 rounded-[26px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+      <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
         {/* A placeholder is not a label — it disappears on focus. */}
         <label htmlFor="chat-input" className="sr-only">
           Describe how you feel, or ask a health question

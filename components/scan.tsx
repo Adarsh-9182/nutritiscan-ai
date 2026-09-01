@@ -246,7 +246,7 @@ export default function Scan() {
       <main className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — capture */}
         <div className="space-y-4 lg:col-span-5">
-          <div className="rounded-[var(--radius)] glass p-5">
+          <div className="rounded-[var(--radius)] panel p-5">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="t-hero">Scan a meal</h1>
@@ -371,7 +371,7 @@ export default function Scan() {
           </div>
 
           {/* today's log */}
-          <div className="rounded-[var(--radius)] glass p-5">
+          <div className="rounded-[var(--radius)] panel p-5">
             <div className="flex items-center justify-between">
               <h2 className="t-title">Today</h2>
               <span className="t-label text-[var(--text-dim)]">
@@ -414,7 +414,7 @@ export default function Scan() {
         <div className="lg:col-span-7">
           <div
             id="scan-analysis"
-            className="min-h-[70vh] rounded-[var(--radius)] glass-strong p-5"
+            className="min-h-[70vh] rounded-[var(--radius)] panel-strong p-5"
             aria-live="polite"
             aria-busy={busy}
           >
