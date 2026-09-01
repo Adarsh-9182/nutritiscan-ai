@@ -23,6 +23,16 @@ import type { UIMessage } from "ai";
 import { demoProfile, PROFILE_KEY, type HealthProfile } from "./profile";
 import { MEALS_KEY, type LoggedMeal } from "./meals";
 import { capTranscript, CHAT_KEY, safeTranscript } from "./transcript";
+import {
+  ACTIVE_THREAD_KEY,
+  capThreads,
+  createThread,
+  migrateTranscript,
+  retitle,
+  safeThreads,
+  THREADS_KEY,
+  type Thread,
+} from "./threads";
 
 type Listener = () => void;
 
@@ -144,3 +154,158 @@ export const readMeals = () => mealsStore.read();
 export const readTranscript = () => safeTranscript(transcriptStore.read());
 export const writeTranscript = (messages: UIMessage[]) => transcriptStore.write(capTranscript(messages));
 export const clearTranscript = () => transcriptStore.write([]);
+
+// ------------------------------------------------------------
+// CONVERSATIONS
+//
+// The same seam as the transcript above, widened to many threads: the
+// live message list still belongs to `useChat`, and these functions are
+// where it is read from and written back to. See threads.ts.
+// ------------------------------------------------------------
+
+const threadsStore = createStore<Thread[]>(THREADS_KEY, []);
+
+/**
+ * The active id lives under its own key rather than as a field on the thread
+ * list. Switching conversations then costs one small write instead of
+ * rewriting every stored thread, and a failed write cannot lose messages —
+ * the worst case is landing back on the previous conversation.
+ */
+const activeStore = createStore<string | null>(ACTIVE_THREAD_KEY, null);
+
+/**
+ * Read the stored conversations, carrying the pre-threads transcript forward
+ * on first run.
+ *
+ * The migration is done on read rather than as a one-shot at boot: this is
+ * the first thing any chat surface calls, and a read that has to be preceded
+ * by an initialisation call is a rule someone eventually forgets.
+ *
+ * The result is cached against the value it was derived from, and that is
+ * not an optimisation — it is a correctness requirement. This function is a
+ * `useSyncExternalStore` snapshot, and `safeThreads` builds a new array on
+ * every call; returning a fresh array each time makes React see a changed
+ * store on every commit and re-render forever. The underlying store already
+ * hands back a stable value until the stored string changes, so identity on
+ * that is the right key.
+ */
+const NOT_LOADED = Symbol("threads-not-loaded");
+let cachedSource: unknown = NOT_LOADED;
+let cachedThreads: Thread[] = [];
+
+function loadThreads(): Thread[] {
+  const raw = threadsStore.read();
+  if (raw === cachedSource) return cachedThreads;
+
+  const stored = safeThreads(raw);
+  const migrated = migrateTranscript(stored, readTranscript());
+  if (migrated !== stored) {
+    threadsStore.write(migrated);
+    // The legacy key has been copied, not moved — clearing it keeps a second
+    // stale copy of a health conversation from sitting in storage forever.
+    clearTranscript();
+    cachedSource = threadsStore.read();
+    cachedThreads = migrated;
+    return migrated;
+  }
+
+  cachedSource = raw;
+  cachedThreads = stored;
+  return stored;
+}
+
+const writeThreads = (next: Thread[]) => threadsStore.write(capThreads(next));
+
+export const readThreads = loadThreads;
+
+/** The conversation in view, creating the first one if there is none. */
+export function readActiveThread(): Thread {
+  const threads = loadThreads();
+  const id = activeStore.read();
+  const found = threads.find((t) => t.id === id);
+  if (found) return found;
+  // Prefer resuming the most recent conversation over opening an empty one:
+  // an id can go stale (deleted in another tab, evicted by the cap) without
+  // meaning the user wanted to start over.
+  const fallback = threads[0] ?? createThread();
+  activeStore.write(fallback.id);
+  if (!threads.length) writeThreads([fallback]);
+  return fallback;
+}
+
+export function useThreads(): Thread[] {
+  return useSyncExternalStore(threadsStore.subscribe, loadThreads, threadsStore.serverValue);
+}
+
+export function useActiveThreadId(): string | null {
+  return useSyncExternalStore(activeStore.subscribe, activeStore.read, activeStore.serverValue);
+}
+
+/**
+ * Save the live messages into a conversation.
+ *
+ * A thread that has since been deleted is not resurrected — a save arriving
+ * after a delete is a race, not an instruction, and the user's last explicit
+ * action should win.
+ */
+export function saveThread(id: string, messages: UIMessage[]) {
+  const threads = loadThreads();
+  if (!threads.some((t) => t.id === id)) return;
+  writeThreads(
+    threads.map((t) => (t.id === id ? retitle({ ...t, messages, updatedAt: Date.now() }) : t)),
+  );
+}
+
+/**
+ * Start a conversation, reusing an empty one if it is already open.
+ *
+ * Pressing "New" twice should not leave two blank rows in the sidebar, and
+ * the second press has no work to do — the user is already looking at an
+ * empty conversation.
+ */
+export function newThread(): Thread {
+  const threads = loadThreads();
+  const active = threads.find((t) => t.id === activeStore.read());
+  if (active && active.messages.length === 0) return active;
+
+  const thread = createThread();
+  writeThreads([thread, ...threads]);
+  activeStore.write(thread.id);
+  return thread;
+}
+
+export function selectThread(id: string) {
+  if (loadThreads().some((t) => t.id === id)) activeStore.write(id);
+}
+
+export function renameThread(id: string, title: string) {
+  const clean = title.replace(/\s+/g, " ").trim();
+  if (!clean) return;
+  writeThreads(loadThreads().map((t) => (t.id === id ? { ...t, title: clean } : t)));
+}
+
+/**
+ * Delete a conversation. Health conversations are the most sensitive thing
+ * stored here, so this removes rather than archives.
+ */
+export function deleteThread(id: string) {
+  const remaining = loadThreads().filter((t) => t.id !== id);
+  if (remaining.length) {
+    writeThreads(remaining);
+    if (activeStore.read() === id) activeStore.write(remaining[0].id);
+    return;
+  }
+  // Never leave the chat with nothing to render: deleting the last
+  // conversation starts a fresh one rather than an empty sidebar.
+  const fresh = createThread();
+  writeThreads([fresh]);
+  activeStore.write(fresh.id);
+}
+
+/** Everything, gone. Separate from deleteThread because it is a different intent. */
+export function deleteAllThreads() {
+  const fresh = createThread();
+  writeThreads([fresh]);
+  activeStore.write(fresh.id);
+  clearTranscript();
+}

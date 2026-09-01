@@ -18,11 +18,27 @@ export default function Nav({ status, width = "max-w-7xl" }: { status?: { tone: 
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary" className={`mx-auto mb-5 flex ${width} items-center justify-between rounded-full glass px-3 py-2 sm:px-4`}>
-      <Link href="/" className="flex shrink-0 items-center gap-2 rounded-full px-1 py-1 focus-ring" aria-label="NutritiScan home">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">N</span>
-        <span className="hidden text-sm font-semibold sm:inline">
-          NutritiScan <span className="text-[var(--text-dim)]">Health OS</span>
+    /*
+     * A bar, not a floating pill.
+     *
+     * A rounded capsule hovering above the content reads as a widget placed
+     * on a page. Application chrome sits flush at the top with a hairline
+     * under it and lets the page scroll beneath — which is also what makes
+     * the panels below look like they belong to something.
+     */
+    <nav
+      aria-label="Primary"
+      className="sticky top-0 z-40 -mx-4 mb-5 border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:px-6"
+    >
+      {/* The bar spans the viewport; its contents stay on the page's measure,
+          so the logo lines up with the first card under it. */}
+      <div className={`mx-auto flex ${width} items-center justify-between`}>
+      <Link href="/" className="flex shrink-0 items-center gap-2 rounded-lg px-1 py-1 focus-ring" aria-label="NutritiScan home">
+        {/* The one place brand colour is spent. Everything else in the chrome
+            is grey so the data can be the thing with hue. */}
+        <span className="grid h-6 w-6 place-items-center rounded-md bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-[11px] font-bold text-[#04120c]">N</span>
+        <span className="hidden text-[13px] font-semibold tracking-tight sm:inline">
+          NutritiScan <span className="font-normal text-[var(--text-dim)]">Health OS</span>
         </span>
       </Link>
 
@@ -50,6 +66,7 @@ export default function Nav({ status, width = "max-w-7xl" }: { status?: { tone: 
             {status.label}
           </span>
         )}
+      </div>
       </div>
     </nav>
   );

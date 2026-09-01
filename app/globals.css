@@ -2,27 +2,59 @@
 
 /* ============================================================
    NUTRITISCAN AI — Design System
-   Apple Health × Linear × Stripe × AI Physician, 2030
    ============================================================ */
 
+/* ------------------------------------------------------------
+   ONE RULE, AND EVERYTHING BELOW FOLLOWS FROM IT:
+
+   the chrome is monochrome; saturated colour belongs to data.
+
+   The app used to spend emerald, cyan, violet, amber and rose on
+   the frame — glowing buttons, gradient headlines, an aurora behind
+   the page — and then reached for the same hues to mean something
+   in a ring or a status pill. When the frame is already loud, the
+   colour that carries meaning cannot be seen. So: a near-black
+   ground, two flat surfaces above it, hairline borders, a
+   near-white primary action, and hue reserved for the numbers.
+   ------------------------------------------------------------ */
+
 :root {
-  --bg: #05070a;
-  --bg-2: #080b11;
-  --surface: rgba(255, 255, 255, 0.03);
-  --surface-2: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-
-  --text: #eaf0f6;
-  --text-muted: #94a3b3; /* 7.83:1 on --bg */
   /*
-   * Was #5d6b7b — 3.70:1 on --bg, which fails WCAG AA (4.5:1) and was used
-   * for real content (portion sizes, timestamps, lab units), not decoration.
-   * #75859a is 5.36:1 and keeps a visible step below --text-muted.
+   * A ground and two raised surfaces, solid rather than translucent.
+   * Stacked white overlays are what read as "glass", and glass makes every
+   * panel the same soft object at the same depth; flat fills with hairline
+   * borders let real hierarchy come from spacing and weight instead.
    */
-  --text-dim: #75859a;
+  --bg: #08090a;
+  --surface: #101113;
+  --surface-2: #16181b;
 
-  /* health = emerald, ai = violet, vitals = cyan, warn = amber */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  /*
+   * Contrast is stated against --surface-2, the lightest thing any of these
+   * can sit on, not against the page ground — the ground is the easy case.
+   */
+  --text: #f2f4f6; /* 16.13:1 at worst */
+  --text-muted: #9ba3ad; /* 6.98:1 at worst */
+  /*
+   * --text-dim carries real content — portion weights, timestamps, lab
+   * units — so it is held to WCAG AA (4.5:1) on every surface, not just on
+   * --bg. The obvious darker greys do not clear that bar once nested:
+   * #737c86 lands at 4.03:1 and #7a828c at 4.39:1. #828a94 is 5.09:1 at its
+   * worst and is still a visible step below --text-muted.
+   */
+  --text-dim: #828a94;
+
+  /*
+   * Data colours. Nothing in the chrome may use these: they mean something
+   * — a macro, a specialist, a status — and they only mean it while the
+   * surrounding interface stays grey.
+   *
+   * The exception is --emerald, which is also the single interactive
+   * accent: focus rings and selection. One accent, one job each.
+   */
   --emerald: #34d399;
   --emerald-deep: #10b981;
   --cyan: #22d3ee;
@@ -31,7 +63,17 @@
   --amber: #fbbf24;
   --rose: #fb7185;
 
-  --radius: 20px;
+  --radius: 14px;
+
+  /*
+   * Whatever the chat is standing on. The composer floats over the
+   * transcript and has to fade the text out against the surface behind it —
+   * which is --bg full-page and a panel's fill inside the dashboard. Panels
+   * redeclare this, so the chat picks up its own ground by inheritance
+   * instead of the component having to be told where it is.
+   */
+  --chat-ground: var(--bg);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -108,28 +150,25 @@ body {
   font-weight: 600;
 }
 
-/* Ambient page background — aurora + grid */
+/*
+ * The page ground.
+ *
+ * This was three coloured aurora blooms plus a 64px grid. Both are the
+ * house style of a 2021 landing page, and behind an application they do
+ * active harm: every panel sat on a different tint, so the same card looked
+ * warm on the left of the screen and cold on the right, and no status
+ * colour could be trusted because the background was already coloured.
+ *
+ * What is left is a single achromatic lift at the top — enough to stop a
+ * flat #08090a reading as a dead rectangle, with no hue to compete with the
+ * data.
+ */
 .bg-aurora::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -2;
-  background:
-    radial-gradient(60% 50% at 15% 0%, rgba(52, 211, 153, 0.14), transparent 60%),
-    radial-gradient(50% 45% at 90% 10%, rgba(167, 139, 250, 0.12), transparent 60%),
-    radial-gradient(70% 60% at 50% 110%, rgba(34, 211, 238, 0.1), transparent 60%);
-  pointer-events: none;
-}
-.bg-aurora::after {
-  content: "";
-  position: fixed;
-  inset: 0;
   z-index: -1;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(circle at 50% 0%, black, transparent 75%);
+  background: radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.045), transparent 70%);
   pointer-events: none;
 }
 
@@ -184,52 +223,53 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Glass surfaces */
-.glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
-  border: 1px solid var(--border);
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-}
-.glass-strong {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border-strong);
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-}
-
-.gradient-text {
-  background: linear-gradient(120deg, #fff 0%, #b8f5da 40%, #a7c8ff 70%, #d9c8ff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.gradient-text-emerald {
-  background: linear-gradient(120deg, #eafff6, var(--emerald) 60%, var(--cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.glow-emerald { box-shadow: 0 0 0 1px rgba(52,211,153,0.2), 0 20px 60px -20px rgba(16,185,129,0.55); }
-.glow-violet  { box-shadow: 0 0 0 1px rgba(167,139,250,0.2), 0 20px 60px -20px rgba(167,139,250,0.5); }
-
-/* Buttons */
-.btn-primary {
-  background: linear-gradient(180deg, var(--emerald), var(--emerald-deep));
-  color: #04120c;
-  font-weight: 600;
-  box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.6), inset 0 1px 0 rgba(255,255,255,0.35);
-  transition: transform .2s ease, box-shadow .2s ease;
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 44px -12px rgba(16,185,129,0.75), inset 0 1px 0 rgba(255,255,255,0.4); }
-.btn-ghost {
-  border: 1px solid var(--border-strong);
+/*
+ * Panels.
+ *
+ * Flat fill, hairline border, no blur. The blur was doing nothing useful —
+ * these panels sit on a near-black page, so there is nothing behind them
+ * worth seeing through, and seven simultaneous backdrop-filters is a real
+ * compositing cost for an effect that mostly just greyed the edges.
+ */
+.panel {
   background: var(--surface);
-  color: var(--text);
-  transition: background .2s ease, border-color .2s ease;
+  border: 1px solid var(--border);
+  --chat-ground: var(--surface);
 }
-.btn-ghost:hover { background: var(--surface-2); border-color: rgba(255,255,255,0.28); }
+.panel-strong {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  --chat-ground: var(--surface-2);
+}
+
+/*
+ * Buttons.
+ *
+ * The primary action was an emerald gradient with a coloured glow and a 2px
+ * hover lift — three effects competing to say "press me" while emerald was
+ * simultaneously trying to mean "healthy" in the rings two inches away. It
+ * is now near-white on near-black: the highest-contrast thing on the page,
+ * which is what a primary action should be, and it leaves the hue free to
+ * carry meaning.
+ */
+.btn-primary {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 500;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.btn-primary:hover { background: #ffffff; }
+.btn-ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.btn-ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
 
 /* Animations */
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }

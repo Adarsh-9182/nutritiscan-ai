@@ -3,7 +3,7 @@
 // ============================================================
 // SURFACE PRIMITIVES
 //
-// `rounded-[var(--radius)] glass p-5` was hand-written a dozen
+// `rounded-[var(--radius)] panel p-5` was hand-written a dozen
 // times across three screens, every card title was a bare <p>,
 // and the same stat tile existed in three slightly different
 // shapes. That is how a product drifts: nothing is wrong in any
@@ -40,7 +40,7 @@ export function Card({
   as?: "section" | "div" | "aside";
 } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <Tag className={`rounded-[var(--radius)] p-5 ${strong ? "glass-strong" : "glass"} ${className}`} {...rest}>
+    <Tag className={`rounded-[var(--radius)] p-5 ${strong ? "panel-strong" : "panel"} ${className}`} {...rest}>
       {children}
     </Tag>
   );

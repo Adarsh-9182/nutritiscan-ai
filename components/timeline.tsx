@@ -111,7 +111,7 @@ export default function Timeline() {
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12">
         {/* LEFT — the story */}
         <div className="lg:col-span-7">
-          <div className="rounded-[var(--radius)] glass p-5">
+          <div className="rounded-[var(--radius)] panel p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h1 className="text-lg font-semibold">Your health story</h1>
@@ -197,7 +197,7 @@ export default function Timeline() {
 
         {/* RIGHT — what it means */}
         <div className="lg:col-span-5">
-          <div className="rounded-[var(--radius)] glass-strong p-5">
+          <div className="rounded-[var(--radius)] panel-strong p-5">
             <h2 className="text-lg font-semibold">What your history says</h2>
             <p className="t-label leading-relaxed text-[var(--text-dim)]">
               Every claim carries its confidence and the data behind it. Where there isn&apos;t enough evidence, it says so instead of guessing.

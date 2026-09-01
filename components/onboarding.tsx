@@ -84,7 +84,7 @@ export default function Onboarding() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-md rounded-[var(--radius)] glass-strong p-6"
+            className="w-full max-w-md rounded-[var(--radius)] panel-strong p-6"
           >
             <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-lg font-bold text-[#04120c]">N</div>
             <h2 id="onboarding-title" className="mt-4 text-xl font-semibold">
