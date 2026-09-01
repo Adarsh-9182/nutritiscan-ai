@@ -6,8 +6,10 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
+import { followUps } from "@/lib/agents/followups";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
-import { clearTranscript, readMeals, readProfile, readTranscript, useHydrated, writeTranscript } from "@/lib/memory/store";
+import { deleteThread, newThread, readActiveThread, readMeals, readProfile, saveThread, useActiveThreadId, useHydrated, useThreads } from "@/lib/memory/store";
+import type { Thread } from "@/lib/memory/threads";
 import type { HealthProfile } from "@/lib/memory/profile";
 
 /* --- tiny, safe markdown-lite renderer --- */
@@ -179,10 +181,33 @@ const SUGGESTIONS = [
  * gate is what lets us hand it the stored history at construction time instead
  * of pushing it in from an effect — no mismatch, no setState-in-effect.
  */
-export default function Chat({ profile }: { profile: HealthProfile }) {
+export default function Chat({ profile, embedded = true }: { profile: HealthProfile; embedded?: boolean }) {
   const hydrated = useHydrated();
   if (!hydrated) return <ChatSkeleton />;
-  return <Conversation profile={profile} />;
+  return <ThreadedChat profile={profile} embedded={embedded} />;
+}
+
+/**
+ * Bind the conversation to the selected thread.
+ *
+ * `useChat` reads its messages once, at construction, so switching
+ * conversations is a remount — hence the `key`. Pushing a different history
+ * into a live `useChat` would fight it for ownership of the list, and the
+ * failure mode is two conversations interleaved on screen.
+ */
+function ThreadedChat({ profile, embedded }: { profile: HealthProfile; embedded: boolean }) {
+  const threads = useThreads();
+  const activeId = useActiveThreadId();
+
+  // Establishing the first conversation is a write, so it happens after
+  // render rather than during it.
+  useEffect(() => {
+    readActiveThread();
+  }, []);
+
+  const thread = threads.find((t) => t.id === activeId);
+  if (!thread) return <ChatSkeleton />;
+  return <Conversation key={thread.id} thread={thread} profile={profile} embedded={embedded} />;
 }
 
 function ChatSkeleton() {
@@ -203,7 +228,7 @@ function ChatSkeleton() {
   );
 }
 
-function Conversation({ profile }: { profile: HealthProfile }) {
+function Conversation({ thread, profile, embedded }: { thread: Thread; profile: HealthProfile; embedded: boolean }) {
   // Read the live memory at send time rather than mirroring it into a ref —
   // the store is already the single source of truth.
   const transport = useMemo(
@@ -217,8 +242,9 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     [],
   );
 
-  // Restored once, at construction. `useChat` owns the list from here.
-  const restored = useMemo(() => readTranscript(), []);
+  // Restored once, at construction, from the thread this component is keyed
+  // to. `useChat` owns the list from here.
+  const restored = useMemo(() => thread.messages, [thread.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -290,8 +316,8 @@ function Conversation({ profile }: { profile: HealthProfile }) {
   // per answer.
   useEffect(() => {
     if (busy) return;
-    writeTranscript(messages);
-  }, [messages, busy]);
+    saveThread(thread.id, messages);
+  }, [messages, busy, thread.id]);
 
   /**
    * Follow the stream, but never steal the viewport.
@@ -319,6 +345,51 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     sendMessage({ text });
     setInput("");
   };
+
+  /**
+   * Re-ask an earlier question with different words.
+   *
+   * Everything after the edited message is dropped rather than kept. The
+   * answers below it were reasoning about the original wording, and leaving
+   * them in place would show a conversation that never happened — in a
+   * clinical thread that is a transcript nobody can trust.
+   */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+
+  const startEdit = (id: string, text: string) => {
+    setEditingId(id);
+    setEditDraft(text);
+  };
+
+  const submitEdit = (id: string) => {
+    const text = editDraft.trim();
+    setEditingId(null);
+    if (!text || busy) return;
+    const index = messages.findIndex((m) => m.id === id);
+    if (index < 0) return;
+    pinnedRef.current = true;
+    setMessages(messages.slice(0, index));
+    sendMessage({ text });
+  };
+
+  /**
+   * Which follow-ups to offer, and when.
+   *
+   * Only under the newest answer, and only once the turn has settled: a row
+   * of new questions appearing beside a half-written answer invites you to
+   * interrupt it. Questions already asked in this thread are excluded, so a
+   * suggestion is never something the reader has already said.
+   */
+  const suggestions = useMemo(() => {
+    if (busy || error) return [];
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return [];
+    const asked = messages
+      .filter((m) => m.role === "user")
+      .map((m) => m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" "));
+    return followUps(routeOf(asked[asked.length - 1] ?? ""), profile, asked);
+  }, [messages, busy, error, profile]);
 
   /**
    * Pick up a question typed on the landing page.
@@ -376,11 +447,23 @@ function Conversation({ profile }: { profile: HealthProfile }) {
     }
   };
 
-  /** Health conversations are the most sensitive thing stored here. */
-  const clearConversation = () => {
+  /**
+   * Set this conversation aside and open a fresh one.
+   *
+   * This used to wipe the transcript in place, which was the only way out of
+   * a thread and cost you its history to take it. Now the conversation stays
+   * in the sidebar — health history is the product's whole promise, and
+   * "start a new topic" should never be spelled "delete what you told me".
+   */
+  const startNewConversation = () => {
     stop();
-    setMessages([]);
-    clearTranscript();
+    newThread();
+  };
+
+  /** Deliberate deletion still exists; it is just no longer the only exit. */
+  const deleteConversation = () => {
+    stop();
+    deleteThread(thread.id);
   };
 
   /**
@@ -414,20 +497,44 @@ function Conversation({ profile }: { profile: HealthProfile }) {
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">✦</span>
-          <div>
-            <p className="text-sm font-semibold">NutritiScan Supervisor</p>
+          <div className="min-w-0">
+            {/* The thread's own name, once it has one. A header that always
+                read "NutritiScan Supervisor" gave no clue which of your
+                conversations you were looking at. */}
+            <p className="truncate text-sm font-semibold">{messages.length ? thread.title : "NutritiScan Supervisor"}</p>
             <p className="t-label text-[var(--text-dim)]">routing across 5 specialists · remembers your history</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {messages.length > 0 && (
-            <button
-              type="button"
-              onClick={clearConversation}
+            <>
+              <button
+                type="button"
+                onClick={startNewConversation}
+                title="Start a new conversation"
+                className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+              >
+                + New
+              </button>
+              <button
+                type="button"
+                onClick={deleteConversation}
+                title="Delete this conversation"
+                aria-label="Delete this conversation"
+                className="rounded-full border border-[var(--border-strong)] px-2 py-1 t-label text-[var(--text-dim)] transition hover:border-[color-mix(in_oklab,var(--rose)_45%,transparent)] hover:text-[var(--rose)] focus-ring"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </>
+          )}
+          {embedded && (
+            <a
+              href="/chat"
+              title="Open the full conversation view"
               className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
             >
-              Clear
-            </button>
+              Expand ↗
+            </a>
           )}
           <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 t-label text-[var(--text-muted)]">
             <span className={`h-1.5 w-1.5 rounded-full ${busy ? "bg-[var(--amber)]" : "bg-[var(--emerald)]"}`} />
@@ -465,8 +572,58 @@ function Conversation({ profile }: { profile: HealthProfile }) {
         {messages.map((m, idx) => {
           const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("");
           if (m.role === "user") {
+            if (editingId === m.id) {
+              return (
+                <div key={m.id} className="flex justify-end">
+                  <div className="w-full max-w-[85%] rounded-2xl border border-[color-mix(in_oklab,var(--emerald)_50%,transparent)] bg-[var(--surface)] p-2.5">
+                    <label htmlFor={`edit-${m.id}`} className="sr-only">
+                      Edit your message
+                    </label>
+                    <textarea
+                      id={`edit-${m.id}`}
+                      autoFocus
+                      rows={2}
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                          e.preventDefault();
+                          submitEdit(m.id);
+                        }
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="scroll-thin w-full resize-none bg-transparent text-sm text-white outline-none"
+                    />
+                    <div className="mt-1.5 flex justify-end gap-2">
+                      <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-white focus-ring">
+                        Cancel
+                      </button>
+                      <button type="button" onClick={() => submitEdit(m.id)} disabled={!editDraft.trim()} className="btn-primary rounded-lg px-2.5 py-1 t-label disabled:opacity-40">
+                        Ask again
+                      </button>
+                    </div>
+                    {/* Said plainly, because it is not recoverable. */}
+                    <p className="mt-1 t-label text-[var(--text-dim)]">Replies after this one will be replaced.</p>
+                  </div>
+                </div>
+              );
+            }
             return (
-              <div key={m.id} className="flex justify-end">
+              <div key={m.id} className="group flex items-start justify-end gap-1.5">
+                {/* Rewording a symptom is the most common correction in a
+                    health chat — "since Tuesday" turns out to be Monday —
+                    and retyping the whole thing was the only way to do it. */}
+                {!busy && (
+                  <button
+                    type="button"
+                    onClick={() => startEdit(m.id, text)}
+                    aria-label="Edit this message"
+                    title="Edit"
+                    className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
+                  >
+                    <span aria-hidden="true">✎</span>
+                  </button>
+                )}
                 <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[color-mix(in_oklab,var(--emerald)_18%,transparent)] px-4 py-2.5 text-sm text-white">
                   {text}
                 </div>
@@ -507,26 +664,71 @@ function Conversation({ profile }: { profile: HealthProfile }) {
                     keyboard/screen-reader equivalent of hover) so it doesn't
                     compete with the answer itself at rest. */}
                 {text && (
-                  <button
-                    type="button"
-                    onClick={() => copyMessage(m.id, text)}
-                    className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
-                  >
-                    {copiedId === m.id ? (
-                      <>
-                        <span aria-hidden="true">✓</span> Copied
-                      </>
-                    ) : (
-                      <>
-                        <span aria-hidden="true">⧉</span> Copy
-                      </>
+                  <div className="mt-1.5 flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => copyMessage(m.id, text)}
+                      className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                    >
+                      {copiedId === m.id ? (
+                        <>
+                          <span aria-hidden="true">✓</span> Copied
+                        </>
+                      ) : (
+                        <>
+                          <span aria-hidden="true">⧉</span> Copy
+                        </>
+                      )}
+                    </button>
+                    {/* Only the newest answer can be regenerated: `regenerate`
+                        re-runs the last turn, so offering it on an older
+                        message would silently rewrite a different one. */}
+                    {idx === messages.length - 1 && !busy && (
+                      <button
+                        type="button"
+                        onClick={() => regenerate()}
+                        title="Ask the same question again"
+                        className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                      >
+                        <span aria-hidden="true">↻</span> Retry
+                      </button>
                     )}
-                  </button>
+                  </div>
                 )}
               </div>
             </motion.div>
           );
         })}
+
+        {/*
+          Where to go next.
+
+          Placed under the answer rather than in the composer: these are a
+          continuation of what was just said, and moving them to the input
+          would make them read as generic prompts rather than as this
+          conversation's next question. Derived, never generated — see
+          lib/agents/followups.ts.
+        */}
+        {suggestions.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pl-11">
+            <p className="mb-1.5 t-label uppercase tracking-wide text-[var(--text-dim)]">Ask next</p>
+            <div className="flex flex-col items-start gap-1">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => send(s)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-2.5 py-1.5 text-left text-[13px] text-[var(--text-muted)] transition hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-white focus-ring"
+                >
+                  <span>{s}</span>
+                  <span aria-hidden="true" className="shrink-0 text-[var(--text-dim)]">
+                    +
+                  </span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {status === "submitted" && (
           <div className="flex gap-3">
