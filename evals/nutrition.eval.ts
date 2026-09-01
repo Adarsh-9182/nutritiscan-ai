@@ -57,7 +57,11 @@ evalSuite("nutrition: the fabrication boundary", () => {
    * nobody identified. See lib/nutrition/analyze.ts.
    */
   gate("an unmatched food contributes no micronutrients", () => {
-    const { items } = resolveNamed([{ name: "quinoa upma surprise", grams: 200 }]);
+    // A name with no known food token in it. The earlier fixture,
+    // "quinoa upma surprise", resolved to upma — matchFood finds a known food
+    // inside a longer phrase on purpose, which is what makes "150g basmati
+    // rice" work — so the case never exercised the unmatched path at all.
+    const { items } = resolveNamed([{ name: "zorbil casserole", grams: 200 }]);
     const unmatched = items[0];
     expect(unmatched.matched).toBe(false);
     expect(unmatched.foodId).toBeUndefined();

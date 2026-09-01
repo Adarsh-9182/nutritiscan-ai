@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { safeProfile } from "./schema";
-import { demoProfile, memoryContext } from "./profile";
+import { blankProfile, demoProfile, memoryContext } from "./profile";
 
 // The profile is attacker-controlled and lands inside agent instructions.
 // These tests exist so nobody "simplifies" the sanitizer away later.
@@ -66,9 +66,32 @@ describe("safeProfile — prompt injection", () => {
 });
 
 describe("safeProfile — shape and bounds", () => {
-  it("falls back to the demo profile for junk input", () => {
-    expect(safeProfile(null).name).toBe(demoProfile.name);
-    expect(safeProfile("not an object").name).toBe(demoProfile.name);
+  it("degrades junk input to an EMPTY memory, never to someone else's", () => {
+    // The demo profile is a specific person: age 24, male, B12 180 (low),
+    // vitamin D borderline, goal "build muscle". Handing it to the agents
+    // because the input was junk means five specialists reason about the
+    // wrong body and cite lab values this user never had. Blank is the only
+    // honest degradation — it makes them say "not recorded", which is true.
+    for (const junk of [null, "not an object", 42, []]) {
+      const p = safeProfile(junk);
+      expect(p.name).toBe(blankProfile.name);
+      expect(p.biomarkers).toEqual([]);
+      expect(p.age).toBeUndefined();
+      expect(p.sex).toBeUndefined();
+    }
+  });
+
+  it("keeps a partial profile instead of replacing it wholesale", () => {
+    // Under zod 4 a `z.unknown().transform(...)` field rejects a MISSING key
+    // rather than transforming undefined, so this shape used to fail the
+    // whole parse and every field the user DID give was thrown away along
+    // with it. Any real profile without a resting HR took that path.
+    const p = safeProfile({ name: "Priya", weightKg: 58, sex: "female" });
+    expect(p.name).toBe("Priya");
+    expect(p.weightKg).toBe(58);
+    expect(p.sex).toBe("female");
+    expect(p.biomarkers).toEqual([]);
+    expect(p.age).toBeUndefined();
   });
 
   it("clamps a weight that would otherwise produce nonsense targets", () => {

@@ -6,6 +6,7 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { buildSoloist, buildSupervisor } from "@/lib/agents";
+import { MODEL_TIERS } from "@/lib/agents/provider";
 import { demoAnswer, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
@@ -88,6 +89,8 @@ async function streamRealSupervisor(
   /** Needed to decide whether this turn is buffered, and to validate against. */
   state: ClinicalState,
   signal: AbortSignal,
+  /** Rungs down the model ladder; raised by the caller after "unavailable". */
+  tier: number,
 ): Promise<RealOutcome> {
   let wrote = false;
 
@@ -133,12 +136,12 @@ async function streamRealSupervisor(
     // difference rather than resolving one.
     const stream = solo
       ? await createAgentUIStream({
-          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief),
+          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier),
           uiMessages: messages,
           abortSignal: signal,
         })
       : await createAgentUIStream({
-          agent: buildSupervisor(profile, nutrition, recalled, triage, brief),
+          agent: buildSupervisor(profile, nutrition, recalled, triage, brief, tier),
           uiMessages: messages,
           abortSignal: signal,
         });
@@ -148,10 +151,21 @@ async function streamRealSupervisor(
       const type = c.type;
 
       if (type === "error") {
-        // Same reasoning as the catch below: in a buffered turn only the
-        // held text counts as something the reader has seen.
-        if (!(buffered ? held.length > 0 : wrote)) return "unavailable";
-        if (held) writeFixed(writer, held);
+        // A buffered turn has put no text on the wire, so nothing has to be
+        // retracted and nothing has to be salvaged: report "unavailable" and
+        // let the caller try the next rung of the model ladder.
+        //
+        // The previous behaviour flushed `held` here and called the turn
+        // "partial". That was a safety hole, not just a missed retry — held
+        // text reaches the reader on this path WITHOUT passing
+        // validateAnswer(), and validating clinical answers before they are
+        // seen is the entire reason the turn is buffered. It also stranded
+        // recoverable turns: a stray character or two before a provider 429
+        // counted as "the reader has seen content", so the ladder was
+        // skipped and the reader got the interruption notice attached to
+        // nothing.
+        if (buffered) return "unavailable";
+        if (!wrote) return "unavailable";
         writeInterrupted(writer);
         return "partial";
       }
@@ -197,16 +211,14 @@ async function streamRealSupervisor(
     /*
      * `wrote` means "the reader has already seen real content", which is why
      * it decides between falling back cleanly and admitting a cut-off answer.
-     * Buffering broke that: text never goes through in a buffered turn, so
-     * `wrote` was being set true by tool-call chunks alone and a turn that
-     * died before producing a single word reported "partial" — leaving an
-     * empty bubble and the interruption notice attached to nothing.
      *
-     * In a buffered turn the held text is the only thing that counts.
+     * A buffered turn has shown nothing by construction — its text is held
+     * for validateAnswer() and released only on the success path — so it is
+     * always cleanly recoverable, and the held text is discarded rather than
+     * flushed past the validator. See the error-chunk branch above.
      */
-    const shown = buffered ? held.length > 0 : wrote;
-    if (!shown) return "unavailable";
-    if (held) writeFixed(writer, held);
+    if (buffered) return "unavailable";
+    if (!wrote) return "unavailable";
     writeInterrupted(writer);
     return "partial";
   }
@@ -394,14 +406,37 @@ export async function POST(req: Request) {
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
         const recalled = await recallRelevant(userText, profile, meals, signal);
-        const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal);
-        if (outcome !== "unavailable") {
-          // A partial turn still gets its note: the record of what the system
-          // concluded is independent of whether the prose finished.
-          writeNote(writer, state);
-          return;
+
+        /*
+         * Step down the model ladder before giving up on a real answer.
+         *
+         * "unavailable" means the attempt produced nothing the reader has
+         * seen — which on the free tier is most often a 429, because quota
+         * is metered per model per minute (gemini-3.5-flash allows five).
+         * The next rung is a DIFFERENT quota bucket, not a retry against the
+         * exhausted one, so this recovers the turn rather than merely
+         * delaying the same failure. Without it, the sixth question in a
+         * minute was answered by the keyless demo brain — in a health
+         * product, silently.
+         *
+         * The shared `signal` still bounds the whole thing, so a ladder of
+         * slow failures cannot outrun the response budget; it aborts, and
+         * the demo brain answers as before.
+         */
+        for (let tier = 0; tier < MODEL_TIERS; tier++) {
+          if (signal.aborted) break;
+          const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal, tier);
+          if (outcome !== "unavailable") {
+            // A partial turn still gets its note: the record of what the system
+            // concluded is independent of whether the prose finished.
+            writeNote(writer, state);
+            return;
+          }
+          if (tier + 1 < MODEL_TIERS) {
+            console.warn("[provider] tier unavailable, stepping down", { tier, next: tier + 1 });
+          }
         }
-        // "unavailable" means nothing reached the client yet — the demo
+        // Every rung was spent and nothing reached the client — the demo
         // brain can still answer, and an honest answer beats a dead spinner.
       }
       // The demo brain has no idea about triage, so the urgency is prepended

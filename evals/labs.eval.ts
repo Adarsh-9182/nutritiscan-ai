@@ -40,6 +40,35 @@ evalSuite("labs: extraction", () => {
     expect(names).toEqual(expect.arrayContaining(["Hemoglobin", "Vitamin B12", "TSH", "Fasting glucose"]));
   });
 
+  gate("a column-aligned report is not silently dropped", () => {
+    // Real reports pad the value out to a column. The gap between name and
+    // value used to be capped at twelve characters, so "TSH" followed by
+    // fourteen spaces extracted nothing at all — and a missing marker looks
+    // exactly like a marker the lab did not run.
+    expect(marker("TSH              5.2 mIU/L", "TSH")?.value).toBe("5.2 mIU/L");
+  });
+
+  gate("HbA1c is read as HbA1c, not as a hemoglobin of 1", () => {
+    // The hemoglobin pattern matched `hb`, treated the "A" as padding and
+    // captured the 1 out of "A1c": the parser reported "Hemoglobin 1 g/dL,
+    // low" — inventing severe anaemia from a routine glucose-control marker,
+    // and feeding it to every agent as a recorded Fact.
+    const found = parse("HbA1c 5.6 %");
+    expect(found.map((b) => b.name)).toEqual(["HbA1c"]);
+    expect(found[0].value).toBe("5.6 %");
+    expect(found[0].status).toBe("normal");
+  });
+
+  gate("a marker cannot capture a value from the following line", () => {
+    // Matching ran against the whole document, so a name on one line could
+    // reach across the newline for a number belonging to another marker. A
+    // value attributed to the wrong marker is worse than a missing one — the
+    // reader cannot tell it is wrong.
+    const found = parse("TSH   not measured\nFasting glucose  88 mg/dL");
+    expect(found.find((b) => b.name === "TSH")).toBeUndefined();
+    expect(found.find((b) => b.name === "Fasting glucose")?.value).toBe("88 mg/dL");
+  });
+
   gate("invents nothing when a marker is absent", () => {
     expect(marker("Haemoglobin 14.6 g/dL", "Vitamin B12")).toBeUndefined();
   });
