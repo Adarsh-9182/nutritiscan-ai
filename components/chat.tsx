@@ -327,11 +327,29 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
    * hundreds of overlapping smooth-scroll animations and yanked the view back
    * every time the user scrolled up to re-read something.
    */
+  /*
+   * `pinnedRef` decides whether to follow the stream and must not cause a
+   * render — it is read hundreds of times per answer. `atBottom` is the same
+   * fact as UI state, so the jump-to-latest button can appear; it is written
+   * only when the answer changes, not on every scroll event.
+   */
+  const [atBottom, setAtBottom] = useState(true);
+
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    pinnedRef.current = pinned;
+    setAtBottom((was) => (was === pinned ? was : pinned));
   }, []);
+
+  const scrollToLatest = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    setAtBottom(true);
+    el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+  }, [reduceMotion]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -491,28 +509,50 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
     return "supervisor";
   };
 
+  const empty = messages.length === 0;
+
+  const composer = (
+    <Composer
+      centered={empty}
+      input={input}
+      setInput={setInput}
+      textareaRef={textareaRef}
+      busy={busy}
+      onSubmit={() => send(input)}
+      onStop={stop}
+      canDictate={canDictate}
+      listening={listening}
+      onToggleDictation={toggleDictation}
+      interim={interim}
+      micError={micError}
+      reduceMotion={!!reduceMotion}
+    />
+  );
+
   return (
-    <div className="flex h-full flex-col">
-      {/* header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-sm font-bold text-[#04120c]">✦</span>
-          <div className="min-w-0">
-            {/* The thread's own name, once it has one. A header that always
-                read "NutritiScan Supervisor" gave no clue which of your
-                conversations you were looking at. */}
-            <p className="truncate text-sm font-semibold">{messages.length ? thread.title : "NutritiScan Supervisor"}</p>
-            <p className="t-label text-[var(--text-dim)]">routing across 5 specialists · remembers your history</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
+    <div className="relative flex h-full flex-col overflow-hidden">
+      {/*
+        A slim bar, not a masthead.
+
+        This used to be a 9×9 gradient avatar, a product name and a strapline
+        above every conversation — a permanent 64px advertisement for the
+        thing you were already using. What a reader needs here is which
+        conversation this is and whether it is thinking; the introduction
+        belongs on the empty state, where there is nothing to read yet.
+      */}
+      <div className="group/head flex shrink-0 items-center gap-2 px-4 py-2.5">
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-muted)]">
+          {empty ? "" : thread.title}
+        </p>
+
+        <div className="flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover/head:opacity-100">
+          {!empty && (
             <>
               <button
                 type="button"
                 onClick={startNewConversation}
                 title="Start a new conversation"
-                className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                className="rounded-lg px-2 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface)] hover:text-white focus-ring"
               >
                 + New
               </button>
@@ -521,7 +561,7 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
                 onClick={deleteConversation}
                 title="Delete this conversation"
                 aria-label="Delete this conversation"
-                className="rounded-full border border-[var(--border-strong)] px-2 py-1 t-label text-[var(--text-dim)] transition hover:border-[color-mix(in_oklab,var(--rose)_45%,transparent)] hover:text-[var(--rose)] focus-ring"
+                className="grid h-7 w-7 place-items-center rounded-lg t-label text-[var(--text-dim)] transition hover:bg-[color-mix(in_oklab,var(--rose)_18%,transparent)] hover:text-[var(--rose)] focus-ring"
               >
                 <span aria-hidden="true">✕</span>
               </button>
@@ -531,324 +571,445 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
             <a
               href="/chat"
               title="Open the full conversation view"
-              className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+              className="rounded-lg px-2 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface)] hover:text-white focus-ring"
             >
               Expand ↗
             </a>
           )}
-          <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 t-label text-[var(--text-muted)]">
-            <span className={`h-1.5 w-1.5 rounded-full ${busy ? "bg-[var(--amber)]" : "bg-[var(--emerald)]"}`} />
-            {busy ? "thinking" : "ready"}
-          </span>
         </div>
+
+        {busy && (
+          <span className="flex shrink-0 items-center gap-1.5 t-label text-[var(--text-dim)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--amber)]" />
+            thinking
+          </span>
+        )}
       </div>
 
-      {/* messages */}
       {/*
-        The transcript is a live region: answers stream in token by token and
-        a screen-reader user would otherwise get no signal that a reply
-        arrived at all. "polite" so it waits for a pause rather than
-        interrupting on every delta.
+        Nothing said yet.
+
+        The composer sits in the middle of the screen rather than pinned to
+        the floor, because at this moment the input *is* the page — there is
+        no transcript for it to be the footer of. It moves down on the first
+        message, which is also the clearest possible signal that the
+        conversation has started.
       */}
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="scroll-thin flex-1 space-y-4 overflow-y-auto px-5 py-5"
-        role="log"
-        aria-live="polite"
-        aria-busy={busy}
-        aria-label="Conversation with your health companion"
-      >
-        {messages.length === 0 && (
-          <div className="grid h-full place-items-center text-center">
-            <div>
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-2xl">✦</div>
-              <p className="mt-4 text-lg font-semibold">Hi {profile.name}. How are you feeling?</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Ask about symptoms, food, training, sleep, or your labs.</p>
+      {empty ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-8">
+          <div className="w-full max-w-2xl">
+            <div className="mb-6 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-[#04120c]">
+                ✦
+              </div>
+              <h1 className="mt-4 text-[22px] font-semibold tracking-tight">Hi {profile.name}. How are you feeling?</h1>
+              <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                Five specialists read every message — symptoms, food, training, sleep, labs.
+              </p>
             </div>
-          </div>
-        )}
 
-        {messages.map((m, idx) => {
-          const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("");
-          if (m.role === "user") {
-            if (editingId === m.id) {
-              return (
-                <div key={m.id} className="flex justify-end">
-                  <div className="w-full max-w-[85%] rounded-2xl border border-[color-mix(in_oklab,var(--emerald)_50%,transparent)] bg-[var(--surface)] p-2.5">
-                    <label htmlFor={`edit-${m.id}`} className="sr-only">
-                      Edit your message
-                    </label>
-                    <textarea
-                      id={`edit-${m.id}`}
-                      autoFocus
-                      rows={2}
-                      value={editDraft}
-                      onChange={(e) => setEditDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                          e.preventDefault();
-                          submitEdit(m.id);
-                        }
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
-                      className="scroll-thin w-full resize-none bg-transparent text-sm text-white outline-none"
-                    />
-                    <div className="mt-1.5 flex justify-end gap-2">
-                      <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-white focus-ring">
-                        Cancel
-                      </button>
-                      <button type="button" onClick={() => submitEdit(m.id)} disabled={!editDraft.trim()} className="btn-primary rounded-lg px-2.5 py-1 t-label disabled:opacity-40">
-                        Ask again
-                      </button>
-                    </div>
-                    {/* Said plainly, because it is not recoverable. */}
-                    <p className="mt-1 t-label text-[var(--text-dim)]">Replies after this one will be replaced.</p>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div key={m.id} className="group flex items-start justify-end gap-1.5">
-                {/* Rewording a symptom is the most common correction in a
-                    health chat — "since Tuesday" turns out to be Monday —
-                    and retyping the whole thing was the only way to do it. */}
-                {!busy && (
-                  <button
-                    type="button"
-                    onClick={() => startEdit(m.id, text)}
-                    aria-label="Edit this message"
-                    title="Edit"
-                    className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
-                  >
-                    <span aria-hidden="true">✎</span>
-                  </button>
-                )}
-                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[color-mix(in_oklab,var(--emerald)_18%,transparent)] px-4 py-2.5 text-sm text-white">
-                  {text}
-                </div>
-              </div>
-            );
-          }
-          const trace = tracesFor(m);
-          const note = noteFor(m);
-          const route = badgeFor(idx, trace);
-          const color = agentColor(route);
-          return (
-            <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group flex gap-3">
-              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm" style={{ background: `${color}22` }}>
-                {route === "supervisor" ? "✦" : agentGlyph(route)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="mb-1 t-label font-medium" style={{ color }}>
-                  {route === "supervisor" ? "Supervisor" : agentName(route)}
-                </p>
-                {trace && (
-                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <span className="t-label text-[var(--text-dim)]">{trace.done ? "Consulted" : "Consulting"}</span>
-                    {trace.agents.map((a) => (
-                      <span key={a} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 t-label" style={{ borderColor: `${agentColor(a)}55`, color: agentColor(a) }}>
-                        {!trace.done && <motion.span className="h-1 w-1 rounded-full" style={{ background: agentColor(a) }} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity }} />}
-                        {agentGlyph(a)} {agentName(a)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="rounded-2xl rounded-tl-sm bg-[var(--surface-2)] px-4 py-3">
-                  {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
-                </div>
-                {note && <ConsultNote note={note} />}
-                {/* Structured medical guidance is exactly the kind of thing a
-                    user wants to hand to a clinician verbatim — copy has to
-                    exist somewhere. Hover-revealed (with focus-visible as the
-                    keyboard/screen-reader equivalent of hover) so it doesn't
-                    compete with the answer itself at rest. */}
-                {text && (
-                  <div className="mt-1.5 flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => copyMessage(m.id, text)}
-                      className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
-                    >
-                      {copiedId === m.id ? (
-                        <>
-                          <span aria-hidden="true">✓</span> Copied
-                        </>
-                      ) : (
-                        <>
-                          <span aria-hidden="true">⧉</span> Copy
-                        </>
-                      )}
-                    </button>
-                    {/* Only the newest answer can be regenerated: `regenerate`
-                        re-runs the last turn, so offering it on an older
-                        message would silently rewrite a different one. */}
-                    {idx === messages.length - 1 && !busy && (
-                      <button
-                        type="button"
-                        onClick={() => regenerate()}
-                        title="Ask the same question again"
-                        className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
-                      >
-                        <span aria-hidden="true">↻</span> Retry
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
+            {composer}
 
-        {/*
-          Where to go next.
-
-          Placed under the answer rather than in the composer: these are a
-          continuation of what was just said, and moving them to the input
-          would make them read as generic prompts rather than as this
-          conversation's next question. Derived, never generated — see
-          lib/agents/followups.ts.
-        */}
-        {suggestions.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pl-11">
-            <p className="mb-1.5 t-label uppercase tracking-wide text-[var(--text-dim)]">Ask next</p>
-            <div className="flex flex-col items-start gap-1">
-              {suggestions.map((s) => (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-transparent px-2.5 py-1.5 text-left text-[13px] text-[var(--text-muted)] transition hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-white focus-ring"
+                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[13px] text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-white focus-ring"
                 >
-                  <span>{s}</span>
-                  <span aria-hidden="true" className="shrink-0 text-[var(--text-dim)]">
-                    +
-                  </span>
+                  {s}
                 </button>
               ))}
             </div>
-          </motion.div>
-        )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/*
+            The transcript is a live region: answers stream in token by token
+            and a screen-reader user would otherwise get no signal that a
+            reply arrived at all. "polite" so it waits for a pause rather
+            than interrupting on every delta.
 
-        {status === "submitted" && (
-          <div className="flex gap-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[color-mix(in_oklab,var(--emerald)_16%,transparent)] text-sm">✦</span>
-            <div className="flex items-center gap-1 rounded-2xl bg-[var(--surface-2)] px-4 py-3">
-              {[0, 1, 2].map((d) => (
-                <motion.span key={d} className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]" animate={{ opacity: [0.2, 1, 0.2] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />
-              ))}
+            The bottom padding is what the floating composer sits over. It
+            has to be generous: the composer grows with the text in it, and
+            a fixed gap sized to one line hides the newest answer the moment
+            someone types a paragraph.
+          */}
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-44 pt-2"
+            role="log"
+            aria-live="polite"
+            aria-busy={busy}
+            aria-label="Conversation with your health companion"
+          >
+            <div className="mx-auto max-w-2xl space-y-5">
+              {messages.map((m, idx) => {
+                const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("");
+                if (m.role === "user") {
+                  if (editingId === m.id) {
+                    return (
+                      <div key={m.id} className="flex justify-end">
+                        <div className="w-full max-w-[85%] rounded-2xl border border-[color-mix(in_oklab,var(--emerald)_50%,transparent)] bg-[var(--surface)] p-2.5">
+                          <label htmlFor={`edit-${m.id}`} className="sr-only">
+                            Edit your message
+                          </label>
+                          <textarea
+                            id={`edit-${m.id}`}
+                            autoFocus
+                            rows={2}
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                e.preventDefault();
+                                submitEdit(m.id);
+                              }
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            className="scroll-thin w-full resize-none bg-transparent text-sm text-white outline-none"
+                          />
+                          <div className="mt-1.5 flex justify-end gap-2">
+                            <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-white focus-ring">
+                              Cancel
+                            </button>
+                            <button type="button" onClick={() => submitEdit(m.id)} disabled={!editDraft.trim()} className="btn-primary rounded-lg px-2.5 py-1 t-label disabled:opacity-40">
+                              Ask again
+                            </button>
+                          </div>
+                          {/* Said plainly, because it is not recoverable. */}
+                          <p className="mt-1 t-label text-[var(--text-dim)]">Replies after this one will be replaced.</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={m.id} className="group flex items-start justify-end gap-1.5">
+                      {/* Rewording a symptom is the most common correction in
+                          a health chat — "since Tuesday" turns out to be
+                          Monday — and retyping it was the only way to do it. */}
+                      {!busy && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(m.id, text)}
+                          aria-label="Edit this message"
+                          title="Edit"
+                          className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
+                        >
+                          <span aria-hidden="true">✎</span>
+                        </button>
+                      )}
+                      <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-[var(--surface-2)] px-4 py-2.5 text-sm text-white">
+                        {text}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const trace = tracesFor(m);
+                const note = noteFor(m);
+                const route = badgeFor(idx, trace);
+                const color = agentColor(route);
+                return (
+                  <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group">
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[11px]" style={{ background: `${color}22` }}>
+                        {route === "supervisor" ? "✦" : agentGlyph(route)}
+                      </span>
+                      <span className="t-label font-medium" style={{ color }}>
+                        {route === "supervisor" ? "Supervisor" : agentName(route)}
+                      </span>
+                      {trace && (
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="t-label text-[var(--text-dim)]">· {trace.done ? "consulted" : "consulting"}</span>
+                          {trace.agents.map((a) => (
+                            <span key={a} className="inline-flex items-center gap-1 t-label" style={{ color: agentColor(a) }}>
+                              {!trace.done && (
+                                <motion.span
+                                  className="h-1 w-1 rounded-full"
+                                  style={{ background: agentColor(a) }}
+                                  animate={{ opacity: [0.3, 1, 0.3] }}
+                                  transition={{ duration: 1, repeat: Infinity }}
+                                />
+                              )}
+                              {agentGlyph(a)} {agentName(a)}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+
+                    {/*
+                      No bubble. A bubble is right for a short turn and wrong
+                      for a differential with headings and a red-flag block —
+                      it boxes structured medical prose into a chat sticker.
+                      The answer is the page here; only the reader's own
+                      messages are bubbled, which is what makes them scan as
+                      theirs.
+                    */}
+                    <div className="pl-8">
+                      {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
+                      {note && <ConsultNote note={note} />}
+
+                      {text && (
+                        <div className="mt-1.5 flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => copyMessage(m.id, text)}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                          >
+                            {copiedId === m.id ? (
+                              <>
+                                <span aria-hidden="true">✓</span> Copied
+                              </>
+                            ) : (
+                              <>
+                                <span aria-hidden="true">⧉</span> Copy
+                              </>
+                            )}
+                          </button>
+                          {/* Only the newest answer can be regenerated:
+                              `regenerate` re-runs the last turn, so offering
+                              it on an older message would silently rewrite a
+                              different one. */}
+                          {idx === messages.length - 1 && !busy && (
+                            <button
+                              type="button"
+                              onClick={() => regenerate()}
+                              title="Ask the same question again"
+                              className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                            >
+                              <span aria-hidden="true">↻</span> Retry
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+
+              {/*
+                Where to go next.
+
+                Under the answer rather than in the composer: these continue
+                what was just said, and moving them into the input would make
+                them read as generic prompts rather than as this
+                conversation's next question. Derived, never generated — see
+                lib/agents/followups.ts.
+              */}
+              {suggestions.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pl-8">
+                  <p className="mb-1 t-label uppercase tracking-wide text-[var(--text-dim)]">Ask next</p>
+                  <div className="flex flex-col items-start">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => send(s)}
+                        className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] py-2 text-left text-[13px] text-[var(--text-muted)] transition last:border-0 hover:text-white focus-ring"
+                      >
+                        <span>{s}</span>
+                        <span aria-hidden="true" className="shrink-0 text-[var(--text-dim)]">
+                          +
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {status === "submitted" && (
+                <div className="flex items-center gap-2 pl-8">
+                  {[0, 1, 2].map((d) => (
+                    <motion.span
+                      key={d}
+                      className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]"
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {error && (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
+                  <span>That answer didn&apos;t come through.</span>
+                  {/* An error with no way out is a dead end — offer the retry. */}
+                  <button type="button" onClick={() => regenerate()} className="rounded-md border border-[color-mix(in_oklab,var(--rose)_45%,transparent)] px-2.5 py-1 font-medium transition hover:bg-[color-mix(in_oklab,var(--rose)_18%,transparent)]">
+                    Try again
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        )}
 
-        {error && (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
-            <span>That answer didn&apos;t come through.</span>
-            {/* An error with no way out is a dead end — offer the retry. */}
-            <button type="button" onClick={() => regenerate()} className="rounded-md border border-[color-mix(in_oklab,var(--rose)_45%,transparent)] px-2.5 py-1 font-medium transition hover:bg-[color-mix(in_oklab,var(--rose)_18%,transparent)]">
-              Try again
-            </button>
+          {/*
+            The composer floats over the transcript rather than sitting in a
+            bordered row beneath it. A docked footer divides the panel in two
+            and makes the conversation feel like the top half of a form; a
+            floating one keeps the transcript continuous and lets it scroll
+            *under* the input, which is what every assistant people already
+            use does. The gradient is what makes text pass behind it legibly
+            instead of colliding with its edge.
+          */}
+          {/*
+            A blur scrim, not a solid fill. The same chat renders full-page
+            over --bg and inside the dashboard's translucent glass panel; a
+            solid --bg block reads as a hole punched in the glass. Blurring
+            what passes underneath works on both, and is what actually makes
+            the text legible where it meets the composer.
+          */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+            <div className="h-16 bg-[linear-gradient(to_bottom,transparent,rgba(5,7,10,.72))] backdrop-blur-[2px]" />
+            <div className="bg-[rgba(5,7,10,.72)] px-4 pb-3 backdrop-blur-md">
+              <div className="pointer-events-auto mx-auto max-w-2xl">
+                <AnimatePresence>
+                  {!atBottom && (
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      onClick={scrollToLatest}
+                      aria-label="Jump to the latest message"
+                      className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)] transition hover:text-white focus-ring"
+                    >
+                      <span aria-hidden="true">↓</span>
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+                {composer}
+              </div>
+            </div>
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The input.
+ *
+ * Lifted out of the conversation so the same control can be the centre of an
+ * empty screen and the floating footer of a running one. Defining it inline
+ * would remount it on every render and take the caret with it mid-sentence.
+ */
+function Composer({
+  centered,
+  input,
+  setInput,
+  textareaRef,
+  busy,
+  onSubmit,
+  onStop,
+  canDictate,
+  listening,
+  onToggleDictation,
+  interim,
+  micError,
+  reduceMotion,
+}: {
+  centered: boolean;
+  input: string;
+  setInput: (v: string) => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  busy: boolean;
+  onSubmit: () => void;
+  onStop: () => void;
+  canDictate: boolean;
+  listening: boolean;
+  onToggleDictation: () => void;
+  interim: string;
+  micError: string | null;
+  reduceMotion: boolean;
+}) {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="flex items-end gap-2 rounded-[26px] border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+        {/* A placeholder is not a label — it disappears on focus. */}
+        <label htmlFor="chat-input" className="sr-only">
+          Describe how you feel, or ask a health question
+        </label>
+        <textarea
+          id="chat-input"
+          ref={textareaRef}
+          rows={1}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sends; Shift+Enter (or any IME composition) inserts a
+            // newline. Symptom descriptions run long enough that a
+            // single-line input hid what the user had already typed — this
+            // is a textarea specifically so that stays visible.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          disabled={busy}
+          placeholder={centered ? "Describe how you feel, or ask anything…" : "Reply…"}
+          className="scroll-thin max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-white outline-none placeholder:text-[var(--text-dim)]"
+        />
+        {/* Someone with a fever or shaking hands should not have to type a
+            paragraph to be heard. Hidden entirely where the browser cannot
+            do it, rather than offered and then doing nothing. */}
+        {canDictate && !busy && (
+          <button
+            type="button"
+            onClick={onToggleDictation}
+            aria-label={listening ? "Stop dictating" : "Dictate your symptoms"}
+            aria-pressed={listening}
+            title={listening ? "Stop dictating" : "Dictate your symptoms"}
+            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full transition ${
+              listening ? "bg-[color-mix(in_oklab,var(--rose)_22%,transparent)] text-[var(--rose)]" : "btn-ghost"
+            }`}
+          >
+            {listening ? (
+              <motion.span aria-hidden="true" animate={reduceMotion ? {} : { opacity: [1, 0.35, 1] }} transition={{ duration: 1.2, repeat: Infinity }}>
+                ●
+              </motion.span>
+            ) : (
+              <span aria-hidden="true">🎙</span>
+            )}
+          </button>
+        )}
+        {busy ? (
+          // The supervisor can fan out across five specialists for the best
+          // part of a minute. Leaving the user with no way to interrupt that
+          // was the single worst moment in the flow.
+          <button type="button" onClick={onStop} aria-label="Stop generating" className="btn-ghost grid h-8 w-8 shrink-0 place-items-center rounded-full">
+            <span aria-hidden="true">■</span>
+          </button>
+        ) : (
+          <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 shrink-0 place-items-center rounded-full text-base disabled:opacity-40">
+            <span aria-hidden="true">↑</span>
+          </button>
         )}
       </div>
 
-      {/* suggestions */}
-      <AnimatePresence>
-        {messages.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-wrap gap-2 px-5 pb-3">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => send(s)} className="rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition hover:bg-[var(--surface-2)] hover:text-white">
-                {s}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* input */}
-      <form
-        onSubmit={(e) => { e.preventDefault(); send(input); }}
-        className="border-t border-[var(--border)] p-4"
-      >
-        <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
-          {/* A placeholder is not a label — it disappears on focus. */}
-          <label htmlFor="chat-input" className="sr-only">
-            Describe how you feel, or ask a health question
-          </label>
-          <textarea
-            id="chat-input"
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends; Shift+Enter (or any IME composition) inserts a
-              // newline. Symptom descriptions run long enough that a
-              // single-line input hid what the user had already typed —
-              // this is a textarea specifically so that stays visible.
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                send(input);
-              }
-            }}
-            disabled={busy}
-            placeholder="Describe how you feel, or ask anything…"
-            className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
-          />
-          {/* Someone with a fever or shaking hands should not have to type a
-              paragraph to be heard. Hidden entirely where the browser cannot
-              do it, rather than offered and then doing nothing. */}
-          {canDictate && !busy && (
-            <button
-              type="button"
-              onClick={toggleDictation}
-              aria-label={listening ? "Stop dictating" : "Dictate your symptoms"}
-              aria-pressed={listening}
-              title={listening ? "Stop dictating" : "Dictate your symptoms"}
-              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition ${
-                listening
-                  ? "bg-[color-mix(in_oklab,var(--rose)_22%,transparent)] text-[var(--rose)]"
-                  : "btn-ghost"
-              }`}
-            >
-              {listening ? (
-                <motion.span
-                  aria-hidden="true"
-                  animate={reduceMotion ? {} : { opacity: [1, 0.35, 1] }}
-                  transition={{ duration: 1.2, repeat: Infinity }}
-                >
-                  ●
-                </motion.span>
-              ) : (
-                <span aria-hidden="true">🎙</span>
-              )}
-            </button>
-          )}
-          {busy ? (
-            // The supervisor can fan out across five specialists for the best
-            // part of a minute. Leaving the user with no way to interrupt that
-            // was the single worst moment in the flow.
-            <button type="button" onClick={() => stop()} aria-label="Stop generating" className="btn-ghost grid h-8 w-8 shrink-0 place-items-center rounded-xl">
-              <span aria-hidden="true">■</span>
-            </button>
-          ) : (
-            <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 shrink-0 place-items-center rounded-xl text-base disabled:opacity-40">
-              <span aria-hidden="true">↑</span>
-            </button>
-          )}
-        </div>
-        {interim && (
-          <p className="mt-2 px-1 text-sm italic text-[var(--text-dim)]" aria-live="polite">
-            {interim}
-          </p>
-        )}
-        {micError && (
-          <p className="mt-2 px-1 text-[13px] text-[var(--rose)]" role="status">
-            {micError}
-          </p>
-        )}
-        <p className="mt-2 text-center t-label text-[var(--text-dim)]">Educational only · not a diagnosis · consult a clinician for medical concerns</p>
-      </form>
-    </div>
+      {interim && (
+        <p className="mt-2 px-1 text-sm italic text-[var(--text-dim)]" aria-live="polite">
+          {interim}
+        </p>
+      )}
+      {micError && (
+        <p className="mt-2 px-1 text-[13px] text-[var(--rose)]" role="status">
+          {micError}
+        </p>
+      )}
+      <p className="mt-2 text-center t-label text-[var(--text-dim)]">
+        Educational only · not a diagnosis · consult a clinician for medical concerns
+      </p>
+    </form>
   );
 }

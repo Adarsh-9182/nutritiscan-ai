@@ -180,17 +180,38 @@ const activeStore = createStore<string | null>(ACTIVE_THREAD_KEY, null);
  * The migration is done on read rather than as a one-shot at boot: this is
  * the first thing any chat surface calls, and a read that has to be preceded
  * by an initialisation call is a rule someone eventually forgets.
+ *
+ * The result is cached against the value it was derived from, and that is
+ * not an optimisation — it is a correctness requirement. This function is a
+ * `useSyncExternalStore` snapshot, and `safeThreads` builds a new array on
+ * every call; returning a fresh array each time makes React see a changed
+ * store on every commit and re-render forever. The underlying store already
+ * hands back a stable value until the stored string changes, so identity on
+ * that is the right key.
  */
+const NOT_LOADED = Symbol("threads-not-loaded");
+let cachedSource: unknown = NOT_LOADED;
+let cachedThreads: Thread[] = [];
+
 function loadThreads(): Thread[] {
-  const stored = safeThreads(threadsStore.read());
+  const raw = threadsStore.read();
+  if (raw === cachedSource) return cachedThreads;
+
+  const stored = safeThreads(raw);
   const migrated = migrateTranscript(stored, readTranscript());
   if (migrated !== stored) {
     threadsStore.write(migrated);
     // The legacy key has been copied, not moved — clearing it keeps a second
     // stale copy of a health conversation from sitting in storage forever.
     clearTranscript();
+    cachedSource = threadsStore.read();
+    cachedThreads = migrated;
+    return migrated;
   }
-  return migrated;
+
+  cachedSource = raw;
+  cachedThreads = stored;
+  return stored;
 }
 
 const writeThreads = (next: Thread[]) => threadsStore.write(capThreads(next));

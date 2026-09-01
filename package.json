@@ -11,8 +11,9 @@
     "test:watch": "vitest",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:gate": "EVAL_GATE_ONLY=1 vitest run --config vitest.eval.config.ts",
-    "verify": "npm run lint && tsc --noEmit && vitest run && npm run eval:gate && next build",
-    "migrate": "node --experimental-strip-types scripts/migrate.ts"
+    "verify": "npm run lint && tsc --noEmit && vitest run && npm run test:ui && npm run eval:gate && next build",
+    "migrate": "node --experimental-strip-types scripts/migrate.ts",
+    "test:ui": "vitest run --config vitest.ui.config.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.54",
@@ -27,11 +28,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.7"
