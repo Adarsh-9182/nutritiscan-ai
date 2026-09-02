@@ -181,10 +181,10 @@ const SUGGESTIONS = [
  * gate is what lets us hand it the stored history at construction time instead
  * of pushing it in from an effect — no mismatch, no setState-in-effect.
  */
-export default function Chat({ profile, embedded = true }: { profile: HealthProfile; embedded?: boolean }) {
+export default function Chat({ profile }: { profile: HealthProfile }) {
   const hydrated = useHydrated();
   if (!hydrated) return <ChatSkeleton />;
-  return <ThreadedChat profile={profile} embedded={embedded} />;
+  return <ThreadedChat profile={profile} />;
 }
 
 /**
@@ -195,7 +195,7 @@ export default function Chat({ profile, embedded = true }: { profile: HealthProf
  * into a live `useChat` would fight it for ownership of the list, and the
  * failure mode is two conversations interleaved on screen.
  */
-function ThreadedChat({ profile, embedded }: { profile: HealthProfile; embedded: boolean }) {
+function ThreadedChat({ profile }: { profile: HealthProfile }) {
   const threads = useThreads();
   const activeId = useActiveThreadId();
 
@@ -207,7 +207,7 @@ function ThreadedChat({ profile, embedded }: { profile: HealthProfile; embedded:
 
   const thread = threads.find((t) => t.id === activeId);
   if (!thread) return <ChatSkeleton />;
-  return <Conversation key={thread.id} thread={thread} profile={profile} embedded={embedded} />;
+  return <Conversation key={thread.id} thread={thread} profile={profile} />;
 }
 
 function ChatSkeleton() {
@@ -228,7 +228,7 @@ function ChatSkeleton() {
   );
 }
 
-function Conversation({ thread, profile, embedded }: { thread: Thread; profile: HealthProfile; embedded: boolean }) {
+function Conversation({ thread, profile }: { thread: Thread; profile: HealthProfile }) {
   // Read the live memory at send time rather than mirroring it into a ref —
   // the store is already the single source of truth.
   const transport = useMemo(
@@ -566,15 +566,6 @@ function Conversation({ thread, profile, embedded }: { thread: Thread; profile: 
                 <span aria-hidden="true">✕</span>
               </button>
             </>
-          )}
-          {embedded && (
-            <a
-              href="/chat"
-              title="Open the full conversation view"
-              className="rounded-lg px-2 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface)] hover:text-white focus-ring"
-            >
-              Expand ↗
-            </a>
           )}
         </div>
 

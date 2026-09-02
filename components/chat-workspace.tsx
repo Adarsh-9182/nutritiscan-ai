@@ -130,7 +130,7 @@ export default function ChatWorkspace() {
         */}
         <main className="min-w-0 flex-1">
           <div className="mx-auto h-full w-full max-w-3xl">
-            <Chat profile={profile} embedded={false} />
+            <Chat profile={profile} />
           </div>
         </main>
       </div>
