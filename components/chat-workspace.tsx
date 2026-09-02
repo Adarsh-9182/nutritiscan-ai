@@ -68,12 +68,27 @@ export default function ChatWorkspace() {
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
-        <Link
-          href="/dashboard"
-          className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
-        >
-          Dashboard
-        </Link>
+        {/*
+          The same destinations the rest of the app has, in the slim bar this
+          page needs. A single "Dashboard" link meant every other surface was
+          two hops from the conversation, which is backwards for the surface
+          people spend the most time in.
+        */}
+        <nav aria-label="Primary" className="flex items-center gap-1 rounded-full border border-[var(--border)] p-1">
+          {[
+            { href: "/dashboard", label: "Dashboard" },
+            { href: "/scan", label: "Scan" },
+            { href: "/timeline", label: "Timeline" },
+          ].map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="rounded-full px-3 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface-2)] hover:text-white focus-ring"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
       </header>
 
       <div className="flex min-h-0 flex-1">
