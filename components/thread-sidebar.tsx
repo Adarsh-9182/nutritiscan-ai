@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { DAY_MS, useStartOfToday } from "@/lib/clock";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -193,6 +194,21 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
           a mis-click, so it asks — inline, rather than through a dialog that
           would trap focus over a chat someone may be mid-sentence in. */}
       <div className="border-t border-[var(--border)] p-2">
+        {/*
+          The way back to the marketing page.
+          `/` redirects a returning browser straight here (see proxy.ts), so
+          without this the page explaining what NutritiScan is becomes
+          unreachable the moment you have used it once. `?home` is the opt-out
+          that proxy.ts honours.
+        */}
+        <Link
+          href="/?home"
+          onClick={onNavigate}
+          className="block rounded-lg px-2.5 py-2 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+        >
+          About NutritiScan
+        </Link>
+
         {confirmingClearAll ? (
           <div className="flex items-center gap-2 px-1 py-1">
             <span className="flex-1 t-label text-[var(--text-muted)]">Delete every conversation?</span>

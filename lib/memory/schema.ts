@@ -16,7 +16,7 @@
 // ============================================================
 
 import { z } from "zod";
-import { demoProfile, type HealthProfile } from "./profile";
+import { blankProfile, type HealthProfile } from "./profile";
 import type { LoggedMeal } from "./meals";
 
 /** Field budgets. Generous for real use, far too small to smuggle a prompt. */
@@ -62,7 +62,7 @@ function clean(raw: unknown, max: number): string {
 
 /** A cleaned string field that falls back rather than failing the request. */
 const text = (max: number, fallback = "") =>
-  z.unknown().transform((v) => clean(v, max) || fallback);
+  z.unknown().optional().transform((v) => clean(v, max) || fallback);
 
 const BiomarkerSchema = z.object({
   name: text(LIMITS.listItem, "Unnamed marker"),
@@ -81,6 +81,7 @@ const TrendSchema = z.object({
 /** A list of short cleaned strings, deduped and capped. */
 const stringList = z
   .unknown()
+  .optional()
   .transform((v) => {
     if (!Array.isArray(v)) return [];
     const out = v.map((x) => clean(x, LIMITS.listItem)).filter(Boolean);
@@ -103,7 +104,7 @@ const num = (min: number, max: number, fallback: number) =>
  * number the user never gave us.
  */
 const optionalNum = (min: number, max: number) =>
-  z.unknown().transform((v) => {
+  z.unknown().optional().transform((v) => {
     if (v === null || v === undefined || v === "") return undefined;
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : undefined;
@@ -113,11 +114,11 @@ export const HealthProfileSchema = z.object({
   name: text(LIMITS.name, "there"),
   age: optionalNum(1, 120),
   sex: z.enum(["male", "female", "other"]).optional().catch(undefined),
-  heightCm: num(60, 250, demoProfile.heightCm),
-  weightKg: num(20, 400, demoProfile.weightKg),
+  heightCm: num(60, 250, blankProfile.heightCm),
+  weightKg: num(20, 400, blankProfile.weightKg),
   goal: text(LIMITS.goal, "Stay healthy"),
-  sleepHours: num(0, 24, demoProfile.sleepHours),
-  exerciseDaysPerWeek: num(0, 7, demoProfile.exerciseDaysPerWeek),
+  sleepHours: num(0, 24, blankProfile.sleepHours),
+  exerciseDaysPerWeek: num(0, 7, blankProfile.exerciseDaysPerWeek),
   restingHr: optionalNum(25, 220),
   biomarkers: z.array(BiomarkerSchema).catch([]).transform((b) => b.slice(0, LIMITS.biomarkers)),
   allergies: stringList,
@@ -144,6 +145,7 @@ const LoggedMealSchema = z.object({
   id: text(48, "meal"),
   at: z
     .unknown()
+    .optional()
     .transform((v) => {
       const d = new Date(typeof v === "string" || typeof v === "number" ? v : NaN);
       // An unparseable or absurd date would silently land in the wrong place on
@@ -151,7 +153,7 @@ const LoggedMealSchema = z.object({
       return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
     }),
   title: text(MEAL_LIMITS.title, "Meal"),
-  items: z.unknown().transform((v) => (Array.isArray(v) ? v.map((x) => clean(x, MEAL_LIMITS.item)).filter(Boolean).slice(0, MEAL_LIMITS.items) : [])),
+  items: z.unknown().optional().transform((v) => (Array.isArray(v) ? v.map((x) => clean(x, MEAL_LIMITS.item)).filter(Boolean).slice(0, MEAL_LIMITS.items) : [])),
   kcal: num(0, 20_000, 0),
   protein: num(0, 1_000, 0),
   carbs: num(0, 2_000, 0),
@@ -178,10 +180,28 @@ export function safeMeals(input: unknown): LoggedMeal[] {
 
 /**
  * Turn whatever the client sent into a profile that is safe to put in a
- * prompt. Never throws — a malformed profile degrades to the demo memory
- * rather than failing a health question the user actually asked.
+ * prompt. Never throws — a malformed profile degrades rather than failing a
+ * health question the user actually asked.
+ *
+ * It degrades to `blankProfile`, NOT `demoProfile`. That distinction is the
+ * whole point: the demo memory is a specific person with a low B12, a
+ * borderline vitamin D and a build-muscle goal. Handing it to the agents
+ * because a field was missing means five specialists reason about someone
+ * else's body and cite lab values the user never had — the exact failure
+ * lib/memory/profile.ts already documents having fixed on the client side.
+ * An empty memory makes the agents say "I don't have that recorded", which
+ * is true. A borrowed one makes them confidently wrong.
+ *
+ * This path used to fire constantly rather than exceptionally: under zod 4 a
+ * `z.unknown().transform(...)` field rejects a MISSING key ("expected
+ * nonoptional, received undefined") instead of transforming `undefined`, so
+ * any profile that omitted a goal, an age, a resting HR or an empty
+ * allergies list failed the whole parse. Every such request was answered
+ * about the demo person. The `.optional()` calls above are what make the
+ * omission parse; this fallback is what makes it safe when something else
+ * fails.
  */
 export function safeProfile(input: unknown): HealthProfile {
   const parsed = HealthProfileSchema.safeParse(input ?? {});
-  return parsed.success ? (parsed.data as HealthProfile) : demoProfile;
+  return parsed.success ? (parsed.data as HealthProfile) : blankProfile;
 }

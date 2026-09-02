@@ -1,28 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
+import { motion, animate, useInView, useMotionValue, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { AGENTS } from "@/lib/agents-meta";
-import { useProfile } from "@/lib/memory/store";
-
-/*
- * The consult is loaded on demand, not with the page.
- *
- * It pulls in the chat runtime, the transport and the transcript store — a
- * cost worth paying the moment someone types, and worth avoiding for the
- * majority who are still reading. Client-only because the transcript can
- * only be restored in the browser (see components/chat.tsx).
- */
-const Chat = dynamic(() => import("@/components/chat"), {
-  ssr: false,
-  loading: () => (
-    <div className="grid min-h-[420px] place-items-center text-[13px] text-[var(--m-dim)]">
-      Opening the consult…
-    </div>
-  ),
-});
 
 /* =====================================================================
    NUTRITISCAN — landing
@@ -69,6 +51,66 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--m-dim)]">{children}</p>
+  );
+}
+
+/**
+ * The one line every visitor reads before deciding whether to keep reading.
+ * A plain fade felt like every other AI product's hero; a per-word rise
+ * makes the same four words feel read rather than rendered, without adding
+ * a single new element to a page that is otherwise flat by choice.
+ */
+function HeroHeadline({ words }: { words: string[] }) {
+  return (
+    <motion.h1
+      className="mt-7 flex flex-wrap justify-center text-balance text-[42px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[68px]"
+      initial="hidden"
+      animate="show"
+      variants={{ show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } } }}
+    >
+      {words.map((w, i) => (
+        <motion.span
+          key={i}
+          className="mr-[0.28em] inline-block will-change-transform"
+          variants={{
+            hidden: { opacity: 0, y: 18, filter: "blur(6px)" },
+            show: { opacity: 1, y: 0, filter: "blur(0px)" },
+          }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {w}
+        </motion.span>
+      ))}
+    </motion.h1>
+  );
+}
+
+/**
+ * Counts up to a real number pulled from the repository (FACTS), once, the
+ * first time it scrolls into view. The numbers were already true and
+ * already on the page — this just makes the one moment where the product
+ * proves itself with arithmetic instead of adjectives feel earned.
+ */
+function CountUp({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const mv = useMotionValue(0);
+  const rounded = useTransform(mv, (v) => Math.round(v));
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    const controls = animate(mv, value, { duration: 1.1, ease: [0.22, 1, 0.36, 1] });
+    return controls.stop;
+  }, [inView, value, mv]);
+
+  useEffect(() => rounded.on("change", setDisplay), [rounded]);
+
+  return (
+    <span ref={ref} className="tabular-nums">
+      {display}
+      {suffix}
+    </span>
   );
 }
 
@@ -123,12 +165,15 @@ function SiteNav({ onStart }: { onStart: () => void }) {
           ))}
         </nav>
 
-        <button
+        <motion.button
           onClick={onStart}
-          className="rounded-full bg-[var(--m-ink)] px-4 py-2 text-[13px] font-medium text-white transition hover:opacity-90"
+          whileHover={{ y: -1, opacity: 0.9 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          className="rounded-full bg-[var(--m-ink)] px-4 py-2 text-[13px] font-medium text-white"
         >
           Start consult
-        </button>
+        </motion.button>
       </div>
     </header>
   );
@@ -177,24 +222,30 @@ function Ask({ onStart }: { onStart: (text: string) => void }) {
           <span className="text-[12px] text-[var(--m-dim)]">
             Free · no account · stays in your browser
           </span>
-          <button
+          <motion.button
             type="submit"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="rounded-full bg-[var(--m-accent)] px-5 py-2.5 text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgba(11,122,85,.2)] transition hover:bg-[var(--m-accent-deep)]"
           >
             Start consult
-          </button>
+          </motion.button>
         </div>
       </form>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {PROMPTS.map((p) => (
-          <button
+          <motion.button
             key={p}
             onClick={() => start(p)}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="rounded-full border border-[var(--m-rule-2)] bg-white px-3.5 py-2 text-[13px] text-[var(--m-muted)] transition hover:border-[var(--m-accent)] hover:text-[var(--m-accent)]"
           >
             {p}
-          </button>
+          </motion.button>
         ))}
       </div>
     </div>
@@ -206,16 +257,21 @@ function Ask({ onStart }: { onStart: (text: string) => void }) {
    ===================================================================== */
 
 export default function Landing() {
-  const [profile] = useProfile();
-  const [consulting, setConsulting] = useState(false);
+  const router = useRouter();
 
   /*
-   * Typing starts the consult here rather than routing to /dashboard.
+   * Starting a consult navigates to /chat rather than swapping this page's
+   * contents in place.
    *
-   * A page change between "I typed my symptom" and "something is reading it"
-   * reads as a form submission — you fill a thing in and get taken elsewhere.
-   * The product is the conversation, so the conversation opens where it was
-   * started. The question is handed over the same way as before, through
+   * The swap was chosen so that typing a symptom did not feel like submitting
+   * a form. What it actually produced was a view with no URL: the back button
+   * did nothing, a refresh threw the consult away, the conversation could not
+   * be linked to, and it wore the marketing page's light chrome while the
+   * same conversation on /chat wore the app's. One conversation with two
+   * skins and no address reads as a different application opening on top of
+   * this one. A route costs one navigation and buys back all four.
+   *
+   * The question is handed over the same way as before, through
    * sessionStorage, which chat.tsx reads once and clears on mount.
    */
   function startConsult(text: string) {
@@ -225,31 +281,7 @@ export default function Landing() {
     } catch {
       /* private mode — the consult opens empty and the person retypes */
     }
-    // Swapping the page's contents does not move the viewport, so starting a
-    // consult from the second Ask — halfway down a long page — left people
-    // scrolled past the conversation they had just opened, looking at
-    // nothing. Reset before the swap so the consult begins where it should.
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-    setConsulting(true);
-  }
-
-  if (consulting) {
-    return (
-      <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
-          <span className="text-[14px] font-semibold text-[var(--text)]">NutritiScan</span>
-          <button
-            onClick={() => setConsulting(false)}
-            className="text-[13px] text-[var(--text-muted)] transition hover:text-[var(--text)]"
-          >
-            Close
-          </button>
-        </div>
-        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-4">
-          <Chat profile={profile} />
-        </div>
-      </div>
-    );
+    router.push("/chat");
   }
 
   return (
@@ -311,9 +343,7 @@ export default function Landing() {
             AI health agent · free
           </span>
 
-          <h1 className="mt-7 text-balance text-[42px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[68px]">
-            Tell it what&rsquo;s wrong.
-          </h1>
+          <HeroHeadline words={["Tell", "it", "what’s", "wrong."]} />
           <p className="mx-auto mt-6 max-w-[34rem] text-balance text-[17px] leading-[1.6] text-[var(--m-muted)] sm:text-[19px]">
             Five specialists read your answer — and a rule engine reads it first, so if this
             should be a doctor, you are told before anything else is said.
@@ -412,11 +442,29 @@ export default function Landing() {
               </p>
 
               <div className="mt-5 space-y-3">
-                <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[var(--m-panel)] px-4 py-2.5 text-[14.5px]">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.4, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[var(--m-panel)] px-4 py-2.5 text-[14.5px]"
+                >
                   Chest pain since this morning, and my left arm aches.
-                </div>
+                </motion.div>
 
-                <div className="rounded-xl border border-[color-mix(in_oklab,var(--m-alert)_28%,transparent)] bg-[var(--m-alert-soft)] px-4 py-3">
+                {/*
+                  Delayed until after the message "lands", with a small scale
+                  pop instead of a plain fade — the rule is meant to read as
+                  something that catches the message, not another line that
+                  happens to render.
+                */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: 6 }}
+                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.45, delay: 0.85, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-xl border border-[color-mix(in_oklab,var(--m-alert)_28%,transparent)] bg-[var(--m-alert-soft)] px-4 py-3"
+                >
                   <p className="font-mono text-[11.5px] tracking-wide text-[var(--m-alert)]">
                     cardiac.chest-pain-with-features → EMERGENCY
                   </p>
@@ -424,7 +472,7 @@ export default function Landing() {
                     Stop here and seek emergency care now. Chest pain with arm radiation can be
                     cardiac and is not something to assess at home.
                   </p>
-                </div>
+                </motion.div>
               </div>
 
               <p className="mt-5 border-t border-[var(--m-rule)] pt-4 text-[12.5px] leading-relaxed text-[var(--m-dim)]">
@@ -454,10 +502,34 @@ export default function Landing() {
           <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-[var(--m-rule-2)] bg-[var(--m-rule-2)] sm:grid-cols-2 lg:grid-cols-3">
             {AGENTS.map((a, i) => (
               <Reveal key={a.id} delay={i * 0.05}>
-                <div className="h-full bg-white p-6">
-                  <span className="text-[22px]">{a.glyph}</span>
+                <motion.div
+                  className="h-full bg-white p-6"
+                  whileHover={{
+                    y: -3,
+                    boxShadow: `0 18px 36px -26px color-mix(in oklab, ${a.color} 60%, transparent)`,
+                  }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <span
+                    className="grid h-9 w-9 place-items-center rounded-xl text-[18px]"
+                    style={{ background: `color-mix(in oklab, ${a.color} 16%, white)` }}
+                  >
+                    {a.glyph}
+                  </span>
                   <h3 className="mt-3 text-[16px] font-semibold">{a.name}</h3>
-                  <p className="mt-1 text-[13px] text-[var(--m-accent)]">{a.tagline}</p>
+                  {/*
+                    a.color is tuned for the dark app surfaces (dashboard,
+                    timeline) — several of the five read under 3:1 against
+                    white. Darkened for text here so the palette still reads
+                    per-agent without failing contrast on the light landing
+                    page.
+                  */}
+                  <p
+                    className="mt-1 text-[13px] font-medium"
+                    style={{ color: `color-mix(in oklab, ${a.color} 62%, black)` }}
+                  >
+                    {a.tagline}
+                  </p>
                   <ul className="mt-4 space-y-1.5">
                     {a.knows.map((k) => (
                       <li key={k} className="text-[13.5px] text-[var(--m-muted)]">
@@ -465,7 +537,7 @@ export default function Landing() {
                       </li>
                     ))}
                   </ul>
-                </div>
+                </motion.div>
               </Reveal>
             ))}
             <Reveal delay={0.3}>
@@ -642,7 +714,7 @@ export default function Landing() {
               {
                 h: "Product",
                 links: [
-                  ["Start a consult", "/dashboard"],
+                  ["Start a consult", "/chat"],
                   ["Scan a meal", "/scan"],
                   ["Timeline", "/timeline"],
                 ],
@@ -700,7 +772,8 @@ export default function Landing() {
               © {new Date().getFullYear()} NutritiScan · built in India
             </p>
             <p className="text-[12px] text-[var(--m-dim)]">
-              {FACTS.rules} rules · {FACTS.domains} domains · {FACTS.tests} tests
+              <CountUp value={FACTS.rules} /> rules · <CountUp value={FACTS.domains} /> domains ·{" "}
+              <CountUp value={FACTS.tests} /> tests
             </p>
           </div>
         </div>

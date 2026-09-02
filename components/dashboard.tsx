@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import Chat from "@/components/chat";
 import Ring from "@/components/ring";
 import Nav from "@/components/nav";
 import Onboarding from "@/components/onboarding";
@@ -14,9 +14,123 @@ import { bmi, blankProfile, healthScore, heightImperial, insight, isDemoMemory }
 import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
 import { journalEntry } from "@/lib/memory/journal";
 import { dayTotals, mealsOn } from "@/lib/memory/meals";
-import { useMeals, useProfile } from "@/lib/memory/store";
+import { selectThread, useMeals, useProfile, useThreads } from "@/lib/memory/store";
 import { formatDay, useStartOfToday } from "@/lib/clock";
 import { proteinTarget } from "@/lib/nutrition/analyze";
+
+/**
+ * The way into the conversation — not a second copy of it.
+ *
+ * This column used to embed the whole chat in a 78svh panel, which meant the
+ * product had two conversation surfaces: a cramped one here and the real one
+ * at /chat. They shared a transcript but not a shape, so the same answer
+ * wrapped differently depending on which page you happened to be on, and a
+ * long differential fit in neither the panel nor the reader's patience.
+ *
+ * A dashboard's job is to tell you what is worth asking about and then get
+ * out of the way. So: one composer that opens the conversation where it
+ * belongs, and the threads you already have. The handoff is the same
+ * sessionStorage key the landing page uses, which chat.tsx reads once on
+ * mount and clears.
+ */
+function AskCard() {
+  const router = useRouter();
+  const threads = useThreads();
+  const [draft, setDraft] = useState("");
+  const boxRef = useRef<HTMLTextAreaElement>(null);
+
+  const recent = threads.filter((t) => t.messages.length > 0).slice(0, 4);
+
+  function open(text: string) {
+    try {
+      if (text.trim()) sessionStorage.setItem("nutritiscan:pending", text);
+    } catch {
+      /* private mode — the consult opens empty and the person retypes */
+    }
+    router.push("/chat");
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardTitle level={2} hint="five specialists read every message">
+          Ask your health companion
+        </CardTitle>
+
+        <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5 transition focus-within:border-[var(--border-strong)]">
+          <label htmlFor="dashboard-ask" className="sr-only">
+            Ask your health companion
+          </label>
+          <textarea
+            id="dashboard-ask"
+            ref={boxRef}
+            rows={3}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sends, Shift+Enter breaks the line — the same contract
+              // as the composer this hands off to, so the muscle memory
+              // carries across the navigation.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                open(draft);
+              }
+            }}
+            placeholder="Headache for three days, worse in the morning…"
+            className="scroll-thin w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[var(--text-dim)]"
+          />
+          <div className="mt-1.5 flex items-center justify-between">
+            <span className="t-label text-[var(--text-dim)]">Enter to send</span>
+            <button
+              type="button"
+              onClick={() => open(draft)}
+              className="btn-primary rounded-lg px-3 py-1.5 t-label"
+            >
+              Start consult
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle
+          level={2}
+          hint="picks up where you left off"
+          action={
+            <Link href="/chat" className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 t-label text-[var(--text-muted)] transition hover:text-white focus-ring">
+              All chats
+            </Link>
+          }
+        >
+          Recent conversations
+        </CardTitle>
+
+        {recent.length === 0 ? (
+          <Empty
+            glyph="✦"
+            title="No conversations yet"
+            body="Ask anything above — symptoms, a meal, a lab result, how you slept."
+          />
+        ) : (
+          <ul className="mt-3 space-y-1.5">
+            {recent.map((t) => (
+              <li key={t.id}>
+                <Link
+                  href="/chat"
+                  onClick={() => selectThread(t.id)}
+                  className="block rounded-lg bg-[var(--surface-2)] px-3 py-2.5 transition hover:bg-[var(--surface)] focus-ring"
+                >
+                  <p className="truncate text-[13px] text-white">{t.title}</p>
+                  <p className="mt-0.5 t-label text-[var(--text-dim)]">{t.messages.length} messages</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
 
 function Stepper({ label, value, unit, onDec, onInc, color }: { label: string; value: string; unit: string; onDec: () => void; onInc: () => void; color: string }) {
   return (
@@ -314,13 +428,8 @@ export default function Dashboard() {
 
         {/* CENTER — chat */}
         <div className="lg:col-span-6">
-          {/*
-            svh, not vh: on mobile Safari `vh` is measured against the *largest*
-            viewport, so a 78vh panel sat partly under the URL bar and the
-            composer — the one control that matters — was the part cut off.
-          */}
-          <div id="dashboard-chat" className="h-[78svh] min-h-[560px] overflow-hidden rounded-[var(--radius)] panel-strong">
-            <Chat profile={profile} />
+          <div id="dashboard-chat">
+            <AskCard />
           </div>
         </div>
 

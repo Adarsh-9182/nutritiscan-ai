@@ -9,6 +9,11 @@ import { motion } from "motion/react";
  * be a question, and moving between the two workspaces is always one click.
  */
 const LINKS = [
+  // Chat leads. The product is the consultation; everything else is a view
+  // onto what the consultation produced. Leaving it out of the nav — its only
+  // door was an "Expand" link inside the dashboard panel — made the main
+  // surface the hardest one to reach.
+  { href: "/chat", label: "Chat" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/scan", label: "Scan" },
   { href: "/timeline", label: "Timeline" },

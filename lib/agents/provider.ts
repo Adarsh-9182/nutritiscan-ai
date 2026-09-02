@@ -29,36 +29,59 @@ import type { EmbeddingModel, LanguageModel } from "ai";
 import type { SharedV4ProviderOptions } from "@ai-sdk/provider";
 
 /**
- * Gemini Flash rather than Pro.
+ * The model ladder, strongest first.
  *
- * The free tier's limits are per-minute and per-day, and the supervisor fans
- * out to five specialists in a single turn — Pro's quota is spent in a few
- * consults. Flash reasons well enough for triage-adjacent explanation, which
- * is what this product asks of it: the clinical decisions are made by rules
- * before the model runs and checked by validators after it.
+ * Two problems are solved by one list, because on the free tier they are the
+ * same problem.
  *
- * Pinned, not `gemini-flash-latest`. A floating alias can change the model
- * under a medical product between one deploy and the next, with no diff to
- * review and no eval run against the thing that is actually answering.
+ * ACCURACY. The single pin used to be `gemini-3.5-flash-lite`, chosen not
+ * because it reasons well but because it was the model whose quota had not
+ * run out. Measured on the same clinical prompt (low B12, vegetarian,
+ * three weeks of fingertip numbness), the lite model returns a correct but
+ * thin answer; `gemini-3.5-flash` returns roughly twice the content and is
+ * the one that connects the deficiency to the myelin sheath and names the
+ * neuropathy. For a product whose whole claim is answering like a
+ * clinician, the reasoning model has to be the default and the lite model
+ * has to be the fallback, not the other way round.
  *
- * Verified against the live API before pinning: 2.5-flash and 2.0-flash both
- * 404 for new keys — "no longer available to new users" — which is exactly
- * the kind of failure that would have shown up as the demo brain quietly
- * answering in production.
+ * AVAILABILITY. Free-tier quota is metered PER MODEL PER PROJECT —
+ * `gemini-3.5-flash` allows 5 requests per minute, verified live against
+ * this key from the 429's own QuotaFailure detail
+ * (GenerateRequestsPerMinutePerProjectPerModel-FreeTier, quotaValue "5").
+ * With one model pinned, the sixth request in a minute got no answer from
+ * any model: the route saw the failure, returned "unavailable", and the
+ * keyless demo brain answered a health question in production. Because the
+ * meter is per model, stepping DOWN the ladder is not a retry against the
+ * same exhausted bucket — it is a different bucket, and it works.
  *
- * Lite, and for a blunt reason. gemini-3.6-flash returned
- * RESOURCE_EXHAUSTED after a handful of test consults:
- * "GenerateRequestsPerDayPerProjectPerModel-FreeTier, limit: 20" — twenty
- * requests per DAY. A single consult spends three or more of them, because
- * the supervisor routes, a specialist answers, and the supervisor
- * synthesises. That is roughly six consults a day for the entire product.
+ * So the order is: reason well if there is room, reason adequately if there
+ * is not, and only tell the user we are degraded once the whole ladder is
+ * spent.
  *
- * Quota is per model, so a different one has its own allowance. This is a
- * workaround, not a fix: the real cost is the fan-out, and the free tier
- * will not carry real traffic whichever model is pinned. Actual limits for
- * this key are visible at aistudio.google.com/rate-limit.
+ * Every id here was verified live against this key. Anything 2.5-era 404s
+ * for new keys ("no longer available to new users"), and `-latest` aliases
+ * are excluded on purpose: a floating alias can change the model under a
+ * medical product between one deploy and the next, with no diff to review
+ * and no eval run against the thing that is actually answering.
  */
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const MODEL_LADDER = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"] as const;
+
+/** How many rungs a caller may step down before giving up. */
+export const MODEL_TIERS = MODEL_LADDER.length;
+
+/**
+ * Specialists start one rung down.
+ *
+ * A supervised turn fans out to several of them at once, which is exactly
+ * the shape that trips a 5-per-minute limit, and their job is narrow — the
+ * prompt already tells each one precisely what to produce. Keeping the top
+ * rung for the agent that actually talks to the user means the fan-out
+ * cannot starve the synthesis.
+ */
+function ladderIndex(role: "supervisor" | "specialist", tier: number): number {
+  const start = role === "specialist" ? 1 : 0;
+  return Math.min(MODEL_LADDER.length - 1, start + Math.max(0, tier));
+}
 
 /** Also verified live; text-embedding-004 is not served to new keys. */
 const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
@@ -130,14 +153,19 @@ export function hasAnyModel(): boolean {
  * do anything useful with it, and broke agent tests that only ever inspect
  * the assembled prompt.
  */
-export function resolveModel(role: "supervisor" | "specialist" = "supervisor"): ProviderChoice {
+export function resolveModel(
+  role: "supervisor" | "specialist" = "supervisor",
+  /** Rungs to step down the ladder. Raised by the caller after a failed attempt. */
+  tier = 0,
+): ProviderChoice {
   if (hasGemini()) {
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     });
+    const name = MODEL_LADDER[ladderIndex(role, tier)];
     return {
-      model: google(GEMINI_MODEL),
-      id: `google/${GEMINI_MODEL}`,
+      model: google(name),
+      id: `google/${name}`,
       providerOptions: geminiOptions(
         role === "supervisor" ? SUPERVISOR_THINKING : SPECIALIST_THINKING,
       ),

@@ -254,6 +254,27 @@ export function saveThread(id: string, messages: UIMessage[]) {
   writeThreads(
     threads.map((t) => (t.id === id ? retitle({ ...t, messages, updatedAt: Date.now() }) : t)),
   );
+  if (messages.length > 0) markReturning();
+}
+
+/**
+ * Tell the edge that this browser has had a conversation, so `/` can open the
+ * chat instead of the marketing page. See proxy.ts.
+ *
+ * It is deliberately the thinnest cookie possible — one bit, no identifier,
+ * no health data. `SameSite=Lax` so it survives following a link back into
+ * the app, and a year so the split root outlives a browser restart. This runs
+ * on the first *saved message*, not on page load: someone who opened the app
+ * and left has not used it, and should still see what it is.
+ */
+function markReturning() {
+  if (typeof document === "undefined") return;
+  try {
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `ns-returning=1; path=/; max-age=31536000; SameSite=Lax${secure}`;
+  } catch {
+    /* cookies blocked — `/` keeps showing the marketing page, which is safe */
+  }
 }
 
 /**

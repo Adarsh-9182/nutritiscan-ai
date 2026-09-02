@@ -51,8 +51,8 @@ const SOLO_NAME: Record<Exclude<Route, "supervisor">, string> = {
   coach: "Health Coach",
 };
 
-function specialist(name: string, expertise: string, profile: HealthProfile, sections: MemorySection[], nutrition: string | null) {
-  const resolved = resolveModel("specialist");
+function specialist(name: string, expertise: string, profile: HealthProfile, sections: MemorySection[], nutrition: string | null, tier = 0) {
+  const resolved = resolveModel("specialist", tier);
   return new ToolLoopAgent({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
@@ -69,7 +69,7 @@ summary the supervisor can hand to the user. Reference the user's memory when re
   });
 }
 
-export function buildSpecialists(profile: HealthProfile, nutrition: string) {
+export function buildSpecialists(profile: HealthProfile, nutrition: string, tier = 0) {
   return {
     nutrition: specialist(
       SOLO_NAME.nutrition,
@@ -78,6 +78,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string) {
       // Not sleep/activity — training frequency doesn't change a food answer.
       ["identity", "vitals", "goal", "allergies", "medicines", "conditions", "biomarkers"],
       nutrition,
+      tier,
     ),
     fitness: specialist(
       SOLO_NAME.fitness,
@@ -86,6 +87,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string) {
       // Not allergies/medicines/biomarkers — a workout plan doesn't hinge on lab values.
       ["identity", "vitals", "goal", "sleep", "activity", "conditions"],
       nutrition,
+      tier,
     ),
     doctor: specialist(
       SOLO_NAME.doctor,
@@ -93,6 +95,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string) {
       profile,
       ALL_MEMORY_SECTIONS, // triage can turn on any fact — narrowing this one is the actual risk
       nutrition,
+      tier,
     ),
     lab: specialist(
       SOLO_NAME.lab,
@@ -103,6 +106,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string) {
       // specific assay results, and chronic conditions contextualize an abnormal value.
       ["identity", "medicines", "conditions", "biomarkers"],
       null, // meal log isn't relevant to interpreting a blood panel
+      tier,
     ),
     coach: specialist(
       SOLO_NAME.coach,
@@ -111,6 +115,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string) {
       // Not allergies/medicines/biomarkers — habit coaching isn't a medical read.
       ["identity", "goal", "sleep", "activity"],
       null, // food is the Nutrition Agent's job, not the Coach's
+      tier,
     ),
   };
 }
@@ -149,8 +154,10 @@ export function buildSoloist(
   recalled?: string | null,
   triage?: string | null,
   brief?: string | null,
+  /** Rungs down the model ladder; see resolveModel. */
+  tier = 0,
 ) {
-  const resolved = resolveModel("supervisor");
+  const resolved = resolveModel("supervisor", tier);
   return new ToolLoopAgent({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
@@ -198,9 +205,11 @@ export function buildSupervisor(
    * second.
    */
   brief?: string | null,
+  /** Rungs down the model ladder; see resolveModel. */
+  tier = 0,
 ) {
-  const resolved = resolveModel();
-  const s = buildSpecialists(profile, nutrition);
+  const resolved = resolveModel("supervisor", tier);
+  const s = buildSpecialists(profile, nutrition, tier);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
     tool({
