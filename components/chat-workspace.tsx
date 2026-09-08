@@ -74,7 +74,7 @@ export default function ChatWorkspace() {
         </button>
 
         <Link href="/chat" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-[#04120c]">✦</span>
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-white">✦</span>
           <span className="text-[13px] font-semibold">NutritiScan</span>
         </Link>
 
@@ -115,7 +115,7 @@ export default function ChatWorkspace() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setDrawerOpen(false)}
-                className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                className="fixed inset-0 z-40 bg-[rgba(28,25,20,.28)] lg:hidden"
               />
               <motion.aside
                 initial={reduceMotion ? { opacity: 0 } : { x: -280 }}
@@ -168,7 +168,7 @@ export default function ChatWorkspace() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setChartOpen(false)}
-                className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+                className="fixed inset-0 z-40 bg-[rgba(28,25,20,.28)] xl:hidden"
               />
               <motion.aside
                 initial={reduceMotion ? { opacity: 0 } : { x: 320 }}

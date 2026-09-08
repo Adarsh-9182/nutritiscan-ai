@@ -91,7 +91,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search conversations…"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 pl-8 text-[13px] text-white outline-none transition-colors placeholder:text-[var(--text-dim)] focus:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 pl-8 text-[13px] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-dim)] focus:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]"
           />
           <span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
             ⌕
@@ -133,7 +133,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
                             if (e.key === "Escape") setEditing(null);
                           }}
                           aria-label={`Rename ${t.title}`}
-                          className="w-full rounded-lg border border-[color-mix(in_oklab,var(--emerald)_50%,transparent)] bg-[var(--surface-2)] px-2.5 py-2 text-[13px] text-white outline-none"
+                          className="w-full rounded-lg border border-[color-mix(in_oklab,var(--emerald)_50%,transparent)] bg-[var(--surface-2)] px-2.5 py-2 text-[13px] text-[var(--text)] outline-none"
                         />
                       ) : (
                         <>
@@ -148,7 +148,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
                               active ? "bg-[var(--surface-2)]" : "hover:bg-[var(--surface)]"
                             }`}
                           >
-                            <span className={`block truncate text-[13px] ${active ? "text-white" : "text-[var(--text-muted)]"}`}>
+                            <span className={`block truncate text-[13px] ${active ? "text-[var(--text)]" : "text-[var(--text-muted)]"}`}>
                               {t.title}
                             </span>
                             {previewOf(t) && (
@@ -165,7 +165,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
                               onClick={() => startRename(t)}
                               aria-label={`Rename ${t.title}`}
                               title="Rename"
-                              className="grid h-7 w-6 place-items-center rounded-md text-[11px] text-[var(--text-dim)] transition hover:bg-[var(--surface-2)] hover:text-white focus-ring"
+                              className="grid h-7 w-6 place-items-center rounded-md text-[11px] text-[var(--text-dim)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-ring"
                             >
                               <span aria-hidden="true">✎</span>
                             </button>
@@ -204,7 +204,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
         <Link
           href="/?home"
           onClick={onNavigate}
-          className="block rounded-lg px-2.5 py-2 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+          className="block rounded-lg px-2.5 py-2 t-label text-[var(--text-dim)] transition hover:text-[var(--text)] focus-ring"
         >
           About NutritiScan
         </Link>
@@ -222,7 +222,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
             >
               Delete
             </button>
-            <button type="button" onClick={() => setConfirmingClearAll(false)} className="rounded-md px-2 py-1 t-label text-[var(--text-dim)] hover:text-white focus-ring">
+            <button type="button" onClick={() => setConfirmingClearAll(false)} className="rounded-md px-2 py-1 t-label text-[var(--text-dim)] hover:text-[var(--text)] focus-ring">
               Cancel
             </button>
           </div>
@@ -231,7 +231,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
             type="button"
             onClick={() => setConfirmingClearAll(true)}
             disabled={threads.every((t) => t.messages.length === 0)}
-            className="w-full rounded-lg px-2.5 py-2 text-left t-label text-[var(--text-dim)] transition hover:text-white disabled:opacity-40 focus-ring"
+            className="w-full rounded-lg px-2.5 py-2 text-left t-label text-[var(--text-dim)] transition hover:text-[var(--text)] disabled:opacity-40 focus-ring"
           >
             Delete all conversations
           </button>

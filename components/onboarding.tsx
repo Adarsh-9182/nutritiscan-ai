@@ -71,7 +71,7 @@ export default function Onboarding() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 grid place-items-center bg-[rgba(3,5,8,.72)] px-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 grid place-items-center bg-[rgba(28,25,20,.34)] px-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="onboarding-title"
@@ -86,7 +86,7 @@ export default function Onboarding() {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-md rounded-[var(--radius)] panel-strong p-6"
           >
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-lg font-bold text-[#04120c]">N</div>
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-lg font-bold text-white">N</div>
             <h2 id="onboarding-title" className="mt-4 text-xl font-semibold">
               Your health has a memory.
             </h2>
@@ -112,7 +112,7 @@ export default function Onboarding() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your first name"
                   autoComplete="given-name"
-                  className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-[var(--text-dim)] focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
+                  className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-dim)] focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
                 />
               </div>
 
@@ -127,8 +127,8 @@ export default function Onboarding() {
                       aria-pressed={goal === g.label}
                       className={`rounded-xl border px-2 py-2.5 t-label transition focus-ring ${
                         goal === g.label
-                          ? "border-[color-mix(in_oklab,var(--emerald)_55%,transparent)] bg-[color-mix(in_oklab,var(--emerald)_14%,transparent)] text-white"
-                          : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-white"
+                          ? "border-[color-mix(in_oklab,var(--emerald)_55%,transparent)] bg-[color-mix(in_oklab,var(--emerald)_14%,transparent)] text-[var(--text)]"
+                          : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)]"
                       }`}
                     >
                       <span className="block text-base">{g.glyph}</span>
@@ -151,7 +151,7 @@ export default function Onboarding() {
                     max={250}
                     value={weight}
                     onChange={(e) => setWeight(Math.max(30, Math.min(250, Number(e.target.value) || profile.weightKg)))}
-                    className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
+                    className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text)] outline-none transition focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
                   />
                 </div>
                 <div>
@@ -166,7 +166,7 @@ export default function Onboarding() {
                     max={230}
                     value={heightCm}
                     onChange={(e) => setHeightCm(Math.max(120, Math.min(230, Number(e.target.value) || profile.heightCm)))}
-                    className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-white outline-none transition focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
+                    className="mt-1.5 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text)] outline-none transition focus:border-[color-mix(in_oklab,var(--emerald)_55%,transparent)]"
                   />
                 </div>
               </div>
@@ -176,7 +176,7 @@ export default function Onboarding() {
               </button>
             </form>
 
-            <button onClick={skip} className="mt-3 w-full rounded-lg py-1.5 t-label text-[var(--text-dim)] transition hover:text-white focus-ring">
+            <button onClick={skip} className="mt-3 w-full rounded-lg py-1.5 t-label text-[var(--text-dim)] transition hover:text-[var(--text)] focus-ring">
               Skip — explore with the demo profile
             </button>
           </motion.div>

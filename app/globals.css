@@ -13,9 +13,9 @@
    the frame — glowing buttons, gradient headlines, an aurora behind
    the page — and then reached for the same hues to mean something
    in a ring or a status pill. When the frame is already loud, the
-   colour that carries meaning cannot be seen. So: a near-black
-   ground, two flat surfaces above it, hairline borders, a
-   near-white primary action, and hue reserved for the numbers.
+   colour that carries meaning cannot be seen. So: a warm ivory
+   ground, two flat surfaces above it, hairline borders, an ink
+   primary action, and hue reserved for the numbers.
    ------------------------------------------------------------ */
 
 :root {
@@ -25,43 +25,63 @@
    * panel the same soft object at the same depth; flat fills with hairline
    * borders let real hierarchy come from spacing and weight instead.
    */
-  --bg: #08090a;
-  --surface: #101113;
-  --surface-2: #16181b;
+  /*
+   * A warm ivory rather than white. Pure #fff under a long clinical
+   * transcript is glare, and the warmth keeps the page from reading as an
+   * unstyled document — the same reason the marketing page is #fafbfa and
+   * not white either.
+   */
+  --bg: #faf9f5;
+  --surface: #ffffff;
+  --surface-2: #f1efe9;
 
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.13);
+  --border: rgba(28, 25, 20, 0.10);
+  --border-strong: rgba(28, 25, 20, 0.18);
 
   /*
-   * Contrast is stated against --surface-2, the lightest thing any of these
-   * can sit on, not against the page ground — the ground is the easy case.
+   * Contrast is stated against --surface (#fff), the lightest thing any of
+   * these can sit on, not against the ivory ground — the ground is the
+   * easy case.
    */
-  --text: #f2f4f6; /* 16.13:1 at worst */
-  --text-muted: #9ba3ad; /* 6.98:1 at worst */
+  --text: #191817; /* 17.7:1 at worst */
+  --text-muted: #5f5c57; /* 6.65:1 at worst */
   /*
    * --text-dim carries real content — portion weights, timestamps, lab
    * units — so it is held to WCAG AA (4.5:1) on every surface, not just on
-   * --bg. The obvious darker greys do not clear that bar once nested:
-   * #737c86 lands at 4.03:1 and #7a828c at 4.39:1. #828a94 is 5.09:1 at its
-   * worst and is still a visible step below --text-muted.
+   * the ground. The obvious lighter warm greys do not clear that bar on
+   * white: #8a857c lands at 4.0:1 and #827e75 at 4.3:1. #757169 is 4.86:1
+   * and is still a visible step below --text-muted.
    */
-  --text-dim: #828a94;
+  --text-dim: #757169;
+
+  /*
+   * The one bubble in the transcript. Only what the patient said is
+   * enclosed; the answer is set as plain text on the ground, because a
+   * clinical answer is a document to read, not a chat message to skim,
+   * and bubbling both halves makes the longer one unreadable.
+   */
+  --said: #e8ebfa;
 
   /*
    * Data colours. Nothing in the chrome may use these: they mean something
    * — a macro, a specialist, a status — and they only mean it while the
    * surrounding interface stays grey.
    *
+   * These are the light-ground values. The dark set (#34d399 and friends)
+   * was mixed for a #08090a page and washes out to near-invisible here;
+   * every one below clears 4.5:1 on white so a status colour stays legible
+   * as text, not just as a dot.
+   *
    * The exception is --emerald, which is also the single interactive
    * accent: focus rings and selection. One accent, one job each.
    */
-  --emerald: #34d399;
-  --emerald-deep: #10b981;
-  --cyan: #22d3ee;
-  --violet: #a78bfa;
-  --blue: #60a5fa;
-  --amber: #fbbf24;
-  --rose: #fb7185;
+  --emerald: #0d7a56;
+  --emerald-deep: #0a5f43;
+  --cyan: #0e7490;
+  --violet: #6d28d9;
+  --blue: #1d4ed8;
+  --amber: #a16207;
+  --rose: #be123c;
 
   --radius: 14px;
 
@@ -90,7 +110,7 @@
 }
 
 /*
- * The default border colour for the dark product surfaces.
+ * The default border colour for the product surfaces.
  *
  * It MUST stay inside `@layer base`. Written unlayered, a bare `*` rule
  * outranks every Tailwind utility — unlayered styles beat layered ones in
@@ -120,8 +140,8 @@ body {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--emerald) 35%, transparent);
-  color: #fff;
+  background: color-mix(in oklab, var(--emerald) 22%, transparent);
+  color: var(--text);
 }
 
 /*
@@ -172,8 +192,8 @@ body {
  * warm on the left of the screen and cold on the right, and no status
  * colour could be trusted because the background was already coloured.
  *
- * What is left is a single achromatic lift at the top — enough to stop a
- * flat #08090a reading as a dead rectangle, with no hue to compete with the
+ * What is left is a single achromatic shade at the top — enough to stop a
+ * flat ivory reading as a dead rectangle, with no hue to compete with the
  * data.
  */
 .bg-aurora::before {
@@ -181,7 +201,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.045), transparent 70%);
+  background: radial-gradient(120% 60% at 50% -10%, rgba(28, 25, 20, 0.035), transparent 70%);
   pointer-events: none;
 }
 
@@ -271,7 +291,7 @@ body {
   font-weight: 500;
   transition: background 0.15s ease, opacity 0.15s ease;
 }
-.btn-primary:hover { background: #ffffff; }
+.btn-primary:hover { background: #000000; }
 .btn-ghost {
   border: 1px solid var(--border);
   background: transparent;
@@ -305,7 +325,7 @@ body {
 .typing-caret::after { content: "▍"; margin-left: 2px; animation: blink 1s steps(1) infinite; color: var(--emerald); }
 
 .shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(90deg, rgba(28,25,20,0.04) 25%, rgba(28,25,20,0.10) 50%, rgba(28,25,20,0.04) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -323,7 +343,7 @@ textarea:focus-visible {
 
 /* Scrollbar */
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgba(28,25,20,0.16); border-radius: 8px; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 
 /* Reduced motion */
