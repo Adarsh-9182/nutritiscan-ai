@@ -18,7 +18,7 @@ import { AGENTS } from "@/lib/agents-meta";
    here is the real one, and what you type is carried into the consult.
 
    Light tokens are scoped to `.mkt` rather than set globally, because
-   /dashboard, /scan and /timeline are designed for the dark palette and
+   the consult surface at /chat is designed for the dark palette and
    converting them is a separate job.
 
    Every number is read off the repository.
@@ -736,8 +736,7 @@ export default function Landing() {
                 h: "Product",
                 links: [
                   ["Start a consult", "/chat"],
-                  ["Scan a meal", "/scan"],
-                  ["Timeline", "/timeline"],
+
                 ],
               },
               {
