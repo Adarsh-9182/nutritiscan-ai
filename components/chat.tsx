@@ -18,7 +18,7 @@ function Inline({ text }: { text: string }) {
   return (
     <>
       {parts.map((p, i) => {
-        if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} className="font-semibold text-white">{p.slice(2, -2)}</strong>;
+        if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} className="font-semibold text-[var(--text)]">{p.slice(2, -2)}</strong>;
         if (p.startsWith("_") && p.endsWith("_")) return <em key={i} className="text-[var(--text-dim)]">{p.slice(1, -1)}</em>;
         return <span key={i}>{p}</span>;
       })}
@@ -552,7 +552,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 type="button"
                 onClick={startNewConversation}
                 title="Start a new conversation"
-                className="rounded-lg px-2 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface)] hover:text-white focus-ring"
+                className="rounded-lg px-2 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface)] hover:text-[var(--text)] focus-ring"
               >
                 + New
               </button>
@@ -590,7 +590,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-8">
           <div className="w-full max-w-2xl">
             <div className="mb-6 text-center">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-[#04120c]">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-white">
                 ✦
               </div>
               <h1 className="mt-4 text-[22px] font-semibold tracking-tight">Hi {profile.name}. How are you feeling?</h1>
@@ -607,7 +607,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[13px] text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-white focus-ring"
+                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[13px] text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)] focus-ring"
                 >
                   {s}
                 </button>
@@ -661,10 +661,10 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                               }
                               if (e.key === "Escape") setEditingId(null);
                             }}
-                            className="scroll-thin w-full resize-none bg-transparent text-sm text-white outline-none"
+                            className="scroll-thin w-full resize-none bg-transparent text-sm text-[var(--text)] outline-none"
                           />
                           <div className="mt-1.5 flex justify-end gap-2">
-                            <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-white focus-ring">
+                            <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-[var(--text)] focus-ring">
                               Cancel
                             </button>
                             <button type="button" onClick={() => submitEdit(m.id)} disabled={!editDraft.trim()} className="btn-primary rounded-lg px-2.5 py-1 t-label disabled:opacity-40">
@@ -688,12 +688,12 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           onClick={() => startEdit(m.id, text)}
                           aria-label="Edit this message"
                           title="Edit"
-                          className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
+                          className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-[var(--text)] focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
                         >
                           <span aria-hidden="true">✎</span>
                         </button>
                       )}
-                      <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[var(--surface-2)] px-4 py-2.5 text-sm text-white">
+                      <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[var(--said)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--text)]">
                         {text}
                       </div>
                     </div>
@@ -750,7 +750,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           <button
                             type="button"
                             onClick={() => copyMessage(m.id, text)}
-                            className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-[var(--text)] focus-ring"
                           >
                             {copiedId === m.id ? (
                               <>
@@ -771,7 +771,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                               type="button"
                               onClick={() => regenerate()}
                               title="Ask the same question again"
-                              className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-white focus-ring"
+                              className="flex items-center gap-1 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] transition hover:text-[var(--text)] focus-ring"
                             >
                               <span aria-hidden="true">↻</span> Retry
                             </button>
@@ -801,7 +801,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                         key={s}
                         type="button"
                         onClick={() => send(s)}
-                        className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] py-2 text-left text-[13px] text-[var(--text-muted)] transition last:border-0 hover:text-white focus-ring"
+                        className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] py-2 text-left text-[13px] text-[var(--text-muted)] transition last:border-0 hover:text-[var(--text)] focus-ring"
                       >
                         <span>{s}</span>
                         <span aria-hidden="true" className="shrink-0 text-[var(--text-dim)]">
@@ -868,7 +868,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                       exit={{ opacity: 0, y: 6 }}
                       onClick={scrollToLatest}
                       aria-label="Jump to the latest message"
-                      className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)] transition hover:text-white focus-ring"
+                      className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)] transition hover:text-[var(--text)] focus-ring"
                     >
                       <span aria-hidden="true">↓</span>
                     </motion.button>
@@ -927,7 +927,7 @@ function Composer({
         onSubmit();
       }}
     >
-      <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_50%,transparent)]">
+      <div className="flex items-end gap-2 rounded-[18px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 py-4 shadow-[0_1px_2px_rgba(28,25,20,.04),0_10px_28px_-18px_rgba(28,25,20,.22)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_45%,transparent)]">
         {/* A placeholder is not a label — it disappears on focus. */}
         <label htmlFor="chat-input" className="sr-only">
           Describe how you feel, or ask a health question
@@ -950,7 +950,7 @@ function Composer({
           }}
           disabled={busy}
           placeholder={centered ? "Describe how you feel, or ask anything…" : "Reply…"}
-          className="scroll-thin max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-white outline-none placeholder:text-[var(--text-dim)]"
+          className="scroll-thin max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-[15px] text-[var(--text)] outline-none placeholder:text-[var(--text-dim)]"
         />
         {/* Someone with a fever or shaking hands should not have to type a
             paragraph to be heard. Hidden entirely where the browser cannot
