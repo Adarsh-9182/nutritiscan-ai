@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
+import PatientChart from "@/components/patient-chart";
+import Onboarding from "@/components/onboarding";
 import { newThread, useProfile } from "@/lib/memory/store";
 
 /**
@@ -22,6 +24,7 @@ import { newThread, useProfile } from "@/lib/memory/store";
 export default function ChatWorkspace() {
   const [profile] = useProfile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
   /*
@@ -39,7 +42,10 @@ export default function ChatWorkspace() {
         newThread();
         setDrawerOpen(false);
       }
-      if (e.key === "Escape") setDrawerOpen(false);
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+        setChartOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -47,6 +53,14 @@ export default function ChatWorkspace() {
 
   return (
     <div className="flex h-[100svh] flex-col overflow-hidden">
+      {/*
+        Onboarding used to be mounted by the dashboard. With that route
+        gone it was mounted by nothing, and a first-time visitor would
+        never be asked their name or their goal — so every answer would be
+        written for the demo profile. It belongs to the app, not to a page.
+      */}
+      <Onboarding />
+
       {/* Slim top bar — the conversation owns the rest of the screen. */}
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
         <button
@@ -59,7 +73,7 @@ export default function ChatWorkspace() {
           <span aria-hidden="true">☰</span>
         </button>
 
-        <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
+        <Link href="/chat" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-[#04120c]">✦</span>
           <span className="text-[13px] font-semibold">NutritiScan</span>
         </Link>
@@ -69,26 +83,19 @@ export default function ChatWorkspace() {
         </span>
 
         {/*
-          The same destinations the rest of the app has, in the slim bar this
-          page needs. A single "Dashboard" link meant every other surface was
-          two hops from the conversation, which is backwards for the surface
-          people spend the most time in.
+          There is no primary nav any more, because there is nowhere else to
+          go. Dashboard, Scan and Timeline were three destinations holding
+          one patient's record between them; the record now sits in the panel
+          on the right, and this button is how it opens on a narrower screen.
         */}
-        <nav aria-label="Primary" className="flex items-center gap-1 rounded-full border border-[var(--border)] p-1">
-          {[
-            { href: "/dashboard", label: "Dashboard" },
-            { href: "/scan", label: "Scan" },
-            { href: "/timeline", label: "Timeline" },
-          ].map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="rounded-full px-3 py-1 t-label text-[var(--text-dim)] transition hover:bg-[var(--surface-2)] hover:text-white focus-ring"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <button
+          type="button"
+          onClick={() => setChartOpen((v) => !v)}
+          aria-expanded={chartOpen}
+          className="btn-ghost rounded-full px-3 py-1 t-label xl:hidden"
+        >
+          {chartOpen ? "Hide chart" : "Chart"}
+        </button>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -133,6 +140,48 @@ export default function ChatWorkspace() {
             <Chat profile={profile} />
           </div>
         </main>
+
+        {/*
+          The record, beside the note.
+
+          This was three routes — /dashboard, /scan, /timeline — which made
+          the chart something you left the consultation to go and read. A
+          clinician does not do that, and neither should this: the panel is
+          open while you talk, and what the conversation changes shows up in
+          it without a navigation.
+
+          Hidden below xl, where there is no room for a third column and the
+          conversation has the stronger claim on the width.
+        */}
+        <aside className="hidden w-[320px] shrink-0 border-l border-[var(--border)] xl:block">
+          <PatientChart />
+        </aside>
+
+        {/* The same chart as a right-hand drawer below xl. */}
+        <AnimatePresence>
+          {chartOpen && (
+            <>
+              <motion.button
+                type="button"
+                aria-label="Close chart"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setChartOpen(false)}
+                className="fixed inset-0 z-40 bg-black/50 xl:hidden"
+              />
+              <motion.aside
+                initial={reduceMotion ? { opacity: 0 } : { x: 320 }}
+                animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { x: 320 }}
+                transition={{ type: "spring", stiffness: 380, damping: 36 }}
+                className="fixed inset-y-0 right-0 z-50 w-[320px] max-w-[86vw] border-l border-[var(--border)] bg-[var(--bg)] xl:hidden"
+              >
+                <PatientChart />
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
