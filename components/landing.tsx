@@ -318,7 +318,7 @@ export default function Landing() {
       <SiteNav onStart={() => startConsult("")} />
 
       {/* ── Hero ───────────────────────────────────────────────── */}
-      <section id="top" className="relative mx-auto max-w-3xl px-5 pt-20 pb-24 text-center sm:pt-28">
+      <section id="top" className="relative mx-auto max-w-3xl px-5 pt-16 pb-20 text-center sm:pt-24">
         {/*
           A single soft bloom behind the input, sized so it reads as depth
           rather than decoration. The page is otherwise flat by choice — one
@@ -366,7 +366,7 @@ export default function Landing() {
       </section>
 
       {/* ── How it works ───────────────────────────────────────── */}
-      <section id="how" className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="how" className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>How a consult runs</Label>
@@ -375,7 +375,7 @@ export default function Landing() {
             </h2>
           </Reveal>
 
-          <div className="mt-14 grid gap-10 sm:grid-cols-3">
+          <div className="mt-10 grid gap-10 sm:grid-cols-3">
             {[
               {
                 n: "01",
@@ -406,7 +406,7 @@ export default function Landing() {
       </section>
 
       {/* ── The halt, shown ────────────────────────────────────── */}
-      <section id="safety" className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="safety" className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto grid max-w-5xl items-center gap-14 lg:grid-cols-2">
           <Reveal>
             <div>
@@ -486,7 +486,7 @@ export default function Landing() {
       </section>
 
       {/* ── The panel ──────────────────────────────────────────── */}
-      <section id="panel" className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="panel" className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>The panel</Label>
@@ -499,7 +499,7 @@ export default function Landing() {
             </p>
           </Reveal>
 
-          <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-[var(--m-rule-2)] bg-[var(--m-rule-2)] sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-[var(--m-rule-2)] bg-[var(--m-rule-2)] sm:grid-cols-2 lg:grid-cols-3">
             {AGENTS.map((a, i) => (
               <Reveal key={a.id} delay={i * 0.05}>
                 <motion.div
@@ -555,7 +555,7 @@ export default function Landing() {
       </section>
 
       {/* ── What you can bring ─────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>One consult</Label>
@@ -564,19 +564,40 @@ export default function Landing() {
             </h2>
           </Reveal>
 
-          <div className="mt-12 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+          {/*
+            This was six abstract nouns in a three-column grid — the same
+            shape as every other section on the page, and it told you the
+            categories rather than what to say. A person does not arrive
+            thinking "lab reports"; they arrive with a sentence. So the
+            sentence is the thing shown, and what the system does with it
+            sits beside it as the answer to "and then what".
+          */}
+          {/*
+            The rule sits on each row rather than on the container as a
+            `first:` exception: every row is the first child of its own
+            Reveal wrapper, so `first:border-t-0` would match all six and
+            erase the lines entirely.
+          */}
+          <div className="mt-10 border-b border-[var(--m-rule-2)]">
             {[
-              ["Symptoms", "Describe it in your own words. It asks the follow-ups a clinician would."],
-              ["Lab reports", "Read against the range printed on your report, not a universal cutoff."],
-              ["Meals", "Macros computed by tested code. An unrecognised food contributes nothing."],
-              ["Medicines", "Taken into account throughout. It will never recommend one or a dose."],
-              ["Fitness", "Training and recovery, informed by what your labs actually say."],
-              ["Habits", "Sleep and goals, and the follow-ups that make the rest matter."],
-            ].map(([h, p], i) => (
-              <Reveal key={h} delay={i * 0.04}>
-                <div className="border-t border-[var(--m-rule)] pt-5">
-                  <h3 className="text-[15.5px] font-semibold">{h}</h3>
-                  <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--m-muted)]">{p}</p>
+              ["Symptoms", "I've had a fever since yesterday and my throat hurts.", "Asks the follow-ups a clinician would before anything reasons about it."],
+              ["Lab reports", "My B12 came back at 180 — is that low?", "Read against the range printed on your report, not a universal cutoff."],
+              ["Meals", "2 rotis, a katori of dal and curd.", "Macros computed by tested code. An unrecognised food contributes nothing."],
+              ["Medicines", "I take metformin twice a day.", "Carried into every answer. It will never recommend one, or a dose."],
+              ["Fitness", "Can I train today on five hours of sleep?", "Training and recovery, informed by what your labs actually say."],
+              ["Habits", "I've been sleeping badly for two weeks.", "Sleep and goals, and the follow-ups that make the rest matter."],
+            ].map(([tag, said, does], i) => (
+              <Reveal key={tag} delay={i * 0.04}>
+                <div className="grid items-baseline gap-x-8 gap-y-1.5 border-t border-[var(--m-rule-2)] py-5 sm:grid-cols-[108px_minmax(0,1fr)] lg:grid-cols-[108px_minmax(0,1.05fr)_minmax(0,1fr)]">
+                  <span className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-[var(--m-dim)]">
+                    {tag}
+                  </span>
+                  <p className="text-[16.5px] leading-snug tracking-[-0.01em] text-[var(--m-ink)]">
+                    &ldquo;{said}&rdquo;
+                  </p>
+                  <p className="text-[14px] leading-relaxed text-[var(--m-muted)] sm:col-start-2 lg:col-start-3">
+                    {does}
+                  </p>
                 </div>
               </Reveal>
             ))}
@@ -585,7 +606,7 @@ export default function Landing() {
       </section>
 
       {/* ── Privacy + limits ───────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-2">
           <Reveal>
             <div>
@@ -626,7 +647,7 @@ export default function Landing() {
       </section>
 
       {/* ── Founder ────────────────────────────────────────────── */}
-      <section id="founder" className="border-t border-[var(--m-rule)] px-5 py-24">
+      <section id="founder" className="border-t border-[var(--m-rule)] px-5 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <Label>Founder</Label>
@@ -636,7 +657,7 @@ export default function Landing() {
           </Reveal>
 
           <Reveal delay={0.08}>
-            <div className="mt-12 grid gap-10 border-t border-[var(--m-rule)] pt-8 lg:grid-cols-[auto_1fr]">
+            <div className="mt-10 grid items-start gap-10 border-t border-[var(--m-rule)] pt-8 lg:grid-cols-[auto_1fr]">
               <div className="flex items-center gap-4">
                 <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl bg-[var(--m-accent)] text-[17px] font-semibold text-white">
                   AB
@@ -682,7 +703,7 @@ export default function Landing() {
       </section>
 
       {/* ── Close ──────────────────────────────────────────────── */}
-      <section className="border-t border-[var(--m-rule)] px-5 py-28">
+      <section className="border-t border-[var(--m-rule)] px-5 py-20 sm:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
             <h2 className="text-balance text-[30px] font-semibold leading-tight tracking-[-0.025em] sm:text-[44px]">

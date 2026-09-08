@@ -89,8 +89,21 @@
   --font-mono: var(--font-mono);
 }
 
-* {
-  border-color: var(--border);
+/*
+ * The default border colour for the dark product surfaces.
+ *
+ * It MUST stay inside `@layer base`. Written unlayered, a bare `*` rule
+ * outranks every Tailwind utility — unlayered styles beat layered ones in
+ * the cascade regardless of specificity — so `border-[var(--m-rule)]` on
+ * the light marketing page silently resolved to this white 7% instead,
+ * and every hairline on that page rendered white-on-white. Inside `base`,
+ * the utilities layer wins where a border colour is stated and this still
+ * applies everywhere one is not.
+ */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 html {
