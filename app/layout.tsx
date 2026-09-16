@@ -18,7 +18,7 @@ import "./globals.css";
  * Set NEXT_PUBLIC_SITE_URL once nutritiscan.com resolves here instead of
  * redirecting away from it.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nutritiscan-ai.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
 
 const TITLE = "NutritiScan — AI health agent";
 const DESCRIPTION =

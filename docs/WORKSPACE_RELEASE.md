@@ -45,7 +45,7 @@ Required values:
 | --- | --- |
 | `DATABASE_URL` | TLS Postgres connection (pooler supported, prepared statements disabled) |
 | `HEALTH_DATA_KEY` | Random 32-byte key encoded as 64 hex characters; back up securely |
-| `APP_ORIGIN` | Exact trusted browser origin, e.g. `https://nutritiscan-ai.vercel.app` |
+| `APP_ORIGIN` | Exact trusted browser origin, e.g. `https://www.nutritiscan.com` |
 | `NEXT_PUBLIC_SITE_URL` | Same canonical site URL for metadata |
 
 Run `npm run migrate:workspace` with `DATABASE_URL` supplied before deployment. Migration takes an advisory lock and only adds `ns_*` workspace tables; old patient/consultation tables are retained. Use an isolated database branch to test later migrations against representative synthetic records.
@@ -57,8 +57,10 @@ Encryption is server-side, not end-to-end: the application operator can decrypt 
 Deploy with the existing Vercel project. After deployment, run:
 
 ```sh
-SMOKE_ORIGIN=https://nutritiscan-ai.vercel.app node scripts/smoke-workspace.mjs
+SMOKE_ORIGIN=https://www.nutritiscan.com node scripts/smoke-workspace.mjs
 ```
+
+The working public origin is `https://www.nutritiscan.com`. The apex `nutritiscan.com` currently resolves to registrar parking; Vercel domain inspection recommends updating its A record to `76.76.21.21` at the external DNS provider. Keep canonical metadata and `APP_ORIGIN` on the working www origin until DNS and redirects are verified. Production credentials marked Secret cannot be downloaded by the CLI; `[SENSITIVE]` placeholders in env-pull output are not valid local secrets.
 
 This creates and removes a synthetic account and checks persistence, sessions, report tools, tasks, export, concurrency and CSRF. Never run synthetic data tools against real patient accounts.
 

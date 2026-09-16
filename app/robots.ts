@@ -6,7 +6,7 @@ import type { MetadataRoute } from "next";
  * disallowed explicitly rather than left to a crawler's judgement.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nutritiscan-ai.vercel.app";
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
   return {
     rules: [{ userAgent: "*", allow: "/", disallow: ["/api/", "/workspace", "/chat"] }],
     sitemap: `${base}/sitemap.xml`,
