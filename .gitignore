@@ -40,3 +40,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+/.local/
+/test-results/
+/playwright-report/
+/public/pdf.worker.min.mjs
+!.env.example
+
+# Local tooling installed by the hosting CLI
+/.agents/
+/skills-lock.json

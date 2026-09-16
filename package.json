@@ -4,23 +4,30 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:gate": "EVAL_GATE_ONLY=1 vitest run --config vitest.eval.config.ts",
-    "verify": "npm run lint && tsc --noEmit && vitest run && npm run test:ui && npm run eval:gate && next build",
+    "verify": "npm run lint && tsc --noEmit && vitest run && npm run test:ui && npm run eval:gate && npm run build",
     "migrate": "node --experimental-strip-types scripts/migrate.ts",
-    "test:ui": "vitest run --config vitest.ui.config.ts"
+    "test:ui": "vitest run --config vitest.ui.config.ts",
+    "predev": "node scripts/pdf-worker.mjs",
+    "prebuild": "node scripts/pdf-worker.mjs",
+    "migrate:workspace": "node scripts/workspace-migrate.mjs",
+    "test:e2e": "node scripts/smoke-workspace.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.54",
     "@ai-sdk/react": "^4.0.37",
+    "@electric-sql/pglite": "^0.5.8",
     "ai": "^7.0.34",
+    "lucide-react": "^1.46.0",
     "motion": "^12.42.2",
-    "next": "16.2.11",
+    "next": "^16.3.5",
+    "pdfjs-dist": "^6.3.289",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -34,10 +41,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "^16.3.5",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }

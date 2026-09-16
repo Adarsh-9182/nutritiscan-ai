@@ -84,7 +84,24 @@ export async function readJsonCapped(req: Request, maxBytes: number): Promise<{ 
 
   let raw: string;
   try {
-    raw = await req.text();
+    if (!req.body) return { ok: false, status: 400, error: 'Request body is required.' };
+    const reader = req.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let size = 0;
+    raw = '';
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBytes) {
+          await reader.cancel();
+          return { ok: false, status: 413, error: 'That request is too large.' };
+        }
+        raw += decoder.decode(value, { stream: true });
+      }
+      raw += decoder.decode();
+    } finally { reader.releaseLock(); }
   } catch {
     return { ok: false, status: 400, error: "Could not read the request body." };
   }

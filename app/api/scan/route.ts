@@ -109,6 +109,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const safeFilename = (name: string) => name.replace(/[\\/]/g, " ").slice(0, 120);
 
 export async function POST(req: Request) {
+  if (process.env.LEGACY_CLINICAL_ENABLED !== "true") return Response.json({ error: "Please use the secure workspace. This legacy endpoint is retired." }, { status: 410, headers: { "cache-control": "no-store" } });
   const rate = checkRate(`scan:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "That's a lot of scans at once — give it a few seconds and try again.");
@@ -268,5 +269,5 @@ export async function POST(req: Request) {
 
 /** Lets the client show whether real vision is configured. */
 export async function GET() {
-  return Response.json({ vision: hasModelCredential() }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ vision: process.env.LEGACY_CLINICAL_ENABLED === "true" && hasModelCredential() }, { headers: { "cache-control": "no-store" } });
 }

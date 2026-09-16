@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+
 import Providers from "@/components/providers";
 import "./globals.css";
 
@@ -7,7 +7,7 @@ import "./globals.css";
 // the app ever used — a whole extra font file fetched on first paint for no
 // rendered glyph. The `ui-monospace` stack in globals.css covers the case if a
 // monospace surface ever appears.
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
+
 
 /**
  * `metadataBase` is what makes Next resolve Open Graph and canonical URLs to
@@ -18,18 +18,18 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], dis
  * Set NEXT_PUBLIC_SITE_URL once nutritiscan.com resolves here instead of
  * redirecting away from it.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nutritiscan-ai-968m.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nutritiscan-ai.vercel.app";
 
 const TITLE = "NutritiScan — AI health agent";
 const DESCRIPTION =
-  "Describe a symptom and five specialists read it — behind a rule engine that reads it first, and can stop the consult if you should be seeing a doctor. Free, no account, and nothing leaves your browser.";
+  "Understand your reports, organise your health history, and prepare for your next doctor visit. A personal workspace for confirmed records and source-linked education.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: TITLE, template: "%s — NutritiScan AI" },
   description: DESCRIPTION,
   applicationName: "NutritiScan AI",
-  keywords: ["AI health", "health OS", "nutrition AI", "AI coach", "health memory", "Indian food database", "calorie tracker"],
+  keywords: ["AI health", "health OS", "nutrition AI", "health records", "lab reports", "visit preparation"],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -56,7 +56,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} bg-aurora antialiased`}>
+      <body className={"antialiased"}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,0 +1,26 @@
+// Additive, isolated tables: existing anonymous patient records are untouched.
+export const workspaceSchema = `
+CREATE TABLE IF NOT EXISTS ns_users (
+  id text PRIMARY KEY, username text NOT NULL UNIQUE,
+  password_hash text NOT NULL, recovery_hash text NOT NULL,
+  record_count integer NOT NULL DEFAULT 0 CHECK (record_count BETWEEN 0 AND 500),
+  profile text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE ns_users ADD COLUMN IF NOT EXISTS record_count integer NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS ns_sessions (
+  token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ns_sessions_user ON ns_sessions(user_id);
+CREATE TABLE IF NOT EXISTS ns_records (
+  id text PRIMARY KEY, user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('report','task','message')),
+  payload text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+  version integer NOT NULL DEFAULT 1
+);
+UPDATE ns_users SET record_count=(SELECT count(*) FROM ns_records WHERE user_id=ns_users.id);
+CREATE INDEX IF NOT EXISTS ns_records_owner ON ns_records(user_id, kind, created_at);
+CREATE TABLE IF NOT EXISTS ns_rate_limits (
+  key text PRIMARY KEY, count integer NOT NULL, expires_at timestamptz NOT NULL
+);
+`;

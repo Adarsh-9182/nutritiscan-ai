@@ -15,7 +15,8 @@ import type { NextConfig } from "next";
  */
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+  "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   // data: covers the in-browser canvas preview of the user's meal photo
   "img-src 'self' data: blob:",
@@ -41,6 +42,7 @@ const nextConfig: NextConfig = {
   // This project has its own lockfile; pin the workspace root to silence
   // Next's multi-lockfile inference warning.
   turbopack: { root: __dirname },
+  serverExternalPackages: ["@electric-sql/pglite"],
 
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

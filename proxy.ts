@@ -25,7 +25,7 @@ export function proxy(request: NextRequest) {
   if (request.cookies.get(RETURNING_COOKIE)?.value !== "1") return NextResponse.next();
 
   const url = request.nextUrl.clone();
-  url.pathname = "/chat";
+  url.pathname = "/workspace";
   url.search = "";
   return NextResponse.redirect(url);
 }

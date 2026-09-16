@@ -1,0 +1,108 @@
+import { z } from "zod";
+
+export const ProfileSchema = z.object({
+  name: z.string().trim().min(1).max(70),
+  language: z.enum(["English", "Hindi / Hinglish"]).default("English"),
+  allergies: z.string().max(1000).default(""),
+  medicines: z.string().max(2000).default(""),
+  conditions: z.string().max(2000).default(""),
+});
+export type Profile = z.infer<typeof ProfileSchema>;
+export const ObservationSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    value: z.number().finite().min(0).max(1e9),
+    unit: z.string().trim().min(1).max(40),
+    low: z.number().finite().min(0).max(1e9).nullable(),
+    high: z.number().finite().min(0).max(1e9).nullable(),
+  })
+  .refine((o) => o.low === null || o.high === null || o.low <= o.high, {
+    message: "Reference minimum must not exceed maximum.",
+  });
+export type Observation = z.infer<typeof ObservationSchema>;
+export const ReportSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  date: z.iso.date(),
+  lab: z.string().trim().max(100),
+  observations: z.array(ObservationSchema).min(1).max(80),
+  notes: z.string().max(2000).default(""),
+  confirmed: z.literal(true),
+});
+export type Report = z.infer<typeof ReportSchema>;
+export const TaskSchema = z.object({
+  title: z.string().trim().min(1).max(180),
+  date: z.iso.date(),
+  done: z.boolean().default(false),
+});
+export type CareTask = z.infer<typeof TaskSchema>;
+export type Saved<T> = T & { id: string; createdAt: string; version: number };
+export type Workspace = {
+  profile: Profile;
+  reports: Saved<Report>[];
+  tasks: Saved<CareTask>[];
+};
+
+export function rangeStatus(
+  o: Observation,
+): "below" | "above" | "within" | "unknown" {
+  if (o.low !== null && o.value < o.low) return "below";
+  if (o.high !== null && o.value > o.high) return "above";
+  if (o.low === null || o.high === null) return "unknown";
+  return "within";
+}
+export const statusLabel = {
+  below: "Below report range",
+  above: "Above report range",
+  within: "Within report range",
+  unknown: "Range not supplied",
+};
+
+export function comparableHistory(
+  reports: Saved<Report>[],
+  observation: Observation,
+) {
+  return reports
+    .flatMap((r) =>
+      r.observations
+        .filter(
+          (o) =>
+            o.name.toLowerCase() === observation.name.toLowerCase() &&
+            o.unit.toLowerCase() === observation.unit.toLowerCase(),
+        )
+        .map((o) => ({ date: r.date, value: o.value, lab: r.lab })),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function summaryText(workspace: Workspace): string {
+  return [
+    "NUTRITISCAN · VISIT PREPARATION",
+    `Prepared ${new Date().toISOString().slice(0, 10)}`,
+    "Patient-entered and patient-confirmed information. Not a diagnosis or clinician-verified record.",
+    "",
+    `Name: ${workspace.profile.name}`,
+    `Conditions: ${workspace.profile.conditions || "Not recorded"}`,
+    `Medicines: ${workspace.profile.medicines || "Not recorded"}`,
+    `Allergies: ${workspace.profile.allergies || "Not recorded (does not mean none)"}`,
+    "",
+    "REPORTS",
+    ...workspace.reports.flatMap((r) => [
+      `${r.date} — ${r.title} · ${r.lab || "Lab not recorded"}`,
+      ...r.observations.map(
+        (o) =>
+          `  ${o.name}: ${o.value} ${o.unit} | Report range: ${o.low ?? "?"}–${o.high ?? "?"} | ${statusLabel[rangeStatus(o)]}`,
+      ),
+      ...(r.notes ? [`  Patient note: ${r.notes}`] : []),
+    ]),
+    "",
+    "QUESTIONS TO DISCUSS",
+    "Which results matter in the context of my symptoms and history?",
+    "Do any results need confirmation or follow-up, and when?",
+    "What should I watch for before our next visit?",
+    "",
+    "MY FOLLOW-UP LIST",
+    ...workspace.tasks
+      .filter((t) => !t.done)
+      .map((t) => `${t.date} — ${t.title}`),
+  ].join("\n");
+}

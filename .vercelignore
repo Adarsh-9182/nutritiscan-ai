@@ -1,0 +1,7 @@
+.local/
+.env*
+.agents/
+skills-lock.json
+playwright-report/
+test-results/
+.git/

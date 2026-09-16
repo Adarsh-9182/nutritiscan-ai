@@ -339,6 +339,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 export async function POST(req: Request) {
+  if (process.env.LEGACY_CLINICAL_ENABLED !== "true") return Response.json({ error: "Please use the secure workspace. This legacy endpoint is retired." }, { status: 410, headers: { "cache-control": "no-store" } });
   const rate = checkRate(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "You're sending messages faster than I can think. Give me a few seconds.");
