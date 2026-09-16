@@ -38,7 +38,8 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { Brand } from "./product-landing";
-import { escalation } from "@/lib/workspace/escalation";
+import { recordAnswer } from "@/lib/workspace/record-tools";
+import { HealthTrends, VisitPreparation } from "./health-story";
 import { DEMO } from "@/lib/workspace/demo";
 import { extractReport } from "@/lib/workspace/reports";
 import {
@@ -77,6 +78,8 @@ const NAV = [
   ["today", "Overview", LayoutDashboard],
   ["assistant", "Health assistant", Sparkles],
   ["records", "My records", FileText],
+  ["trends", "Health trends", Activity],
+  ["visit", "Visit preparation", CalendarDays],
   ["care", "Care & follow-ups", Heart],
 ] as const;
 type View = (typeof NAV)[number][0] | "settings";
@@ -538,18 +541,10 @@ export default function HealthWorkspace() {
     try {
       let result: AssistantAnswer;
       if (demo) {
-        const report = workspace.reports[0];
-        result = escalation(text, workspace.profile) ?? {
-          mode: "record-summary",
-          text: report
-            ? `This is an example using fictional records.\n\n${report.title} · ${dateText(report.date)}\n\n${report.observations.map((o) => `${o.name}: ${o.value} ${o.unit} — ${statusLabel[rangeStatus(o)]}`).join("\n")}\n\nA reference-range comparison is not a diagnosis. In your own workspace, you can confirm report values, organise your history and prepare questions for a clinician.`
-            : "Add a fictional report to explore the records workflow.",
-          sources: [
-            {
-              title: "Understanding lab results · MedlinePlus",
-              url: "https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/",
-            },
-          ],
+        result = recordAnswer(text, workspace) ?? {
+          mode: "unavailable",
+          text: "This demo can summarise fictional reports, compare recorded values and prepare visit questions. General AI conversation is not connected in the demo.",
+          sources: [],
         };
       } else
         result = await api<AssistantAnswer>("assistant", "POST", {
@@ -636,7 +631,7 @@ export default function HealthWorkspace() {
           </span>
           <h3>Your story. Your control.</h3>
           <p>Export your records whenever you need them.</p>
-          <button onClick={() => setSummary(true)}>
+          <button onClick={() => navigate("visit")}>
             Prepare a visit summary <ArrowUpRight size={14} />
           </button>
         </div>
@@ -882,6 +877,10 @@ export default function HealthWorkspace() {
                   </button>
                 </Empty>
               )}
+              <section className="ns-story-entry">
+                <div><span className="ns-eyebrow">ONE REPORT IS A MOMENT. TOGETHER, A STORY.</span><h2>See what changed since last time.</h2><p>Explore your recorded results across dates, with the original report behind every number.</p></div>
+                <button className="ns-button ns-dark" onClick={() => navigate("trends")}>Explore health trends <ArrowUpRight size={17} /></button>
+              </section>
               <div className="ns-overview-bottom">
                 <section className="ns-card">
                   <div className="ns-section-heading">
@@ -947,7 +946,7 @@ export default function HealthWorkspace() {
                   </p>
                   <button
                     className="ns-text-button"
-                    onClick={() => setSummary(true)}
+                    onClick={() => navigate("visit")}
                   >
                     Prepare my summary <ArrowRight size={16} />
                   </button>
@@ -1060,6 +1059,8 @@ export default function HealthWorkspace() {
                 )}
             </>
           )}
+          {view === "trends" && <HealthTrends workspace={workspace} openReport={id => setSelected(workspace.reports.find(r => r.id === id) ?? null)} addReport={() => setUpload(true)} />}
+          {view === "visit" && <VisitPreparation workspace={workspace} download={download} demo={demo} />}
           {view === "assistant" && (
             <div className="ns-assistant">
               <div className="ns-assistant-head">
@@ -1106,6 +1107,7 @@ export default function HealthWorkspace() {
                       {[
                         ["Summarise my latest report", FileText],
                         ["Prepare questions for my doctor", MessageCircle],
+                        ["Compare my results over time", Activity],
                       ].map(([text, Icon]) => {
                         const I = Icon as typeof FileText;
                         return (

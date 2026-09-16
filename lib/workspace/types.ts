@@ -74,7 +74,7 @@ export function comparableHistory(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export function summaryText(workspace: Workspace): string {
+export function summaryText(workspace: Workspace, visit?: { notes: string; questions: string[] }): string {
   return [
     "NUTRITISCAN · VISIT PREPARATION",
     `Prepared ${new Date().toISOString().slice(0, 10)}`,
@@ -95,10 +95,15 @@ export function summaryText(workspace: Workspace): string {
       ...(r.notes ? [`  Patient note: ${r.notes}`] : []),
     ]),
     "",
-    "QUESTIONS TO DISCUSS",
-    "Which results matter in the context of my symptoms and history?",
-    "Do any results need confirmation or follow-up, and when?",
-    "What should I watch for before our next visit?",
+    ...(visit ? [
+      "MY VISIT NOTES", visit.notes.trim() || "No additional notes.", "",
+      "QUESTIONS I CHOSE", ...(visit.questions.length ? visit.questions : ["No questions selected."]),
+    ] : [
+      "QUESTIONS TO DISCUSS",
+      "Which results matter in the context of my symptoms and history?",
+      "Do any results need confirmation or follow-up, and when?",
+      "What should I watch for before our next visit?",
+    ]),
     "",
     "MY FOLLOW-UP LIST",
     ...workspace.tasks

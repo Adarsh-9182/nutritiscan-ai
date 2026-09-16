@@ -11,6 +11,9 @@ This release provides account-based health records and visit preparation. It is 
 - Reference-range comparisons use the printed range and unit. Missing ranges remain unknown. The product does not diagnose from results.
 - User-created follow-up tasks, JSON export, downloadable visit summary, password-confirmed account deletion.
 - Fictional demo is isolated in browser memory and resets on reload.
+- Health trends group confirmed observations by test name and exact unit, display dated readings with source-report links, and suppress changes when dates, labs or ranges are ambiguous. Numerical changes are not clinical interpretations.
+- Visit preparation creates record-based discussion questions, lets users choose questions and add temporary notes, and exports a customised brief. Notes and selections are not saved and reset when leaving the page.
+- The demo and authenticated assistant share the same record tools for summaries, comparisons, visit questions and escalation; the demo does not simulate a model response.
 - Deterministic report summaries and visit questions work without an LLM. Existing emergency-pattern checks run before server assistant answers. These checks are incomplete and have not been clinically validated.
 
 ## Run locally at zero provider cost
@@ -29,6 +32,8 @@ node scripts/smoke-workspace.mjs
 ```
 
 `verify` runs lint, type checking, unit/integration tests, legacy UI tests, reviewed evaluation gates and the production build. A passing software suite is not clinical validation. Thirty existing clinical evaluation cases are skipped by the reviewed-case gate.
+
+The test runner explicitly uses `NODE_ENV=test` even inside a production hosting build and strips database, model and encryption credentials from the child process. The subsequent Next.js build retains its own production configuration. This fixes the React `act` production-bundle failure that blocked the previous release and prevents isolated tests from connecting to the live database.
 
 ## Production configuration
 
@@ -83,7 +88,7 @@ The release uses a short authored summary of [MedlinePlus lab-result guidance](h
 - Add verified contact recovery, abuse controls/bot challenges, MFA and account security events; test load, cross-account access and restore/recovery.
 - Build clinician hand-off with real availability and ownership if offering consultations. No doctor network, diagnosis, prescribing, treatment plan, automatic booking or emergency monitoring is implemented.
 - Add a real hosted payment processor with signed webhooks, entitlements, idempotency, refunds and cancellation before selling subscriptions. There is no billing flow in this release.
-- Image OCR, meal analysis, family accounts, longitudinal clinical interpretation and email/push reminders remain future work.
+- Image OCR, meal analysis, family accounts, clinical interpretation of longitudinal changes and email/push reminders remain future work. Numerical history and source-linked trend views are available.
 
 Do not market this build as a replacement for a doctor, a medical device approval, or the best health agent in the market.
 

@@ -1,16 +1,8 @@
 import { z } from "zod";
 import type { Workspace } from "./types";
-import { rangeStatus, statusLabel } from "./types";
-import { escalation } from "./escalation";
+import { LAB_SOURCE, recordAnswer } from "./record-tools";
 
-export const SOURCES = [
-  {
-    id: "lab",
-    title: "Understanding your lab test results",
-    url: "https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/",
-    text: "Reference ranges can differ between laboratories. A result outside a reference range does not by itself establish a diagnosis, and a result within range does not rule out illness.",
-  },
-];
+export const SOURCES = [LAB_SOURCE];
 export type AssistantAnswer = {
   text: string;
   mode: "record-summary" | "ai" | "unavailable" | "escalation";
@@ -29,41 +21,8 @@ export async function answer(
   workspace: Workspace,
   signal?: AbortSignal,
 ): Promise<AssistantAnswer> {
-  const urgent = escalation(question, workspace.profile);
-  if (urgent) return urgent;
-
-  const report = [...workspace.reports].sort((a, b) =>
-    b.date.localeCompare(a.date),
-  )[0];
-  // A records tool works without an LLM and declares its mode explicitly.
-  if (/summar|report|result|range|रिपोर्ट/i.test(question)) {
-    const text = report
-      ? [
-          `Here is your latest confirmed report: ${report.title} (${report.date}).`,
-          "",
-          ...report.observations.map(
-            (o) =>
-              `${o.name}: ${o.value} ${o.unit} — ${statusLabel[rangeStatus(o)]}.`,
-          ),
-          "",
-          "These comparisons use only the ranges you confirmed from this report. They do not establish a diagnosis or rule out illness. A clinician can interpret them alongside your symptoms, history and medicines.",
-          "",
-          "For your visit: ask which results need follow-up, whether previous results are comparable, and when to repeat any tests.",
-        ].join("\n")
-      : "Add a report in Records and confirm its values first. Then I can organise the results and help you prepare questions for your doctor. I will not fill in missing results.";
-    return {
-      text,
-      mode: "record-summary",
-      sources: report ? [SOURCES[0]] : [],
-    };
-  }
-  if (/appointment|doctor|visit|question|follow.?up|डॉक्टर/i.test(question)) {
-    return {
-      text: "For your next appointment, bring your reports and a current medicine list. Write down what changed, when it started, and what you most want to understand.\n\nQuestions to prepare:\n• Which findings matter for my situation?\n• What follow-up do you recommend, and when?\n• What changes should prompt me to seek help sooner?\n\nOpen Care to add your own follow-up tasks or export a visit summary.",
-      mode: "record-summary",
-      sources: [],
-    };
-  }
+  const recorded = recordAnswer(question, workspace);
+  if (recorded) return recorded;
   if (!modelConfigured())
     return {
       text: "AI conversation is not connected on this deployment yet. I can still summarise your confirmed reports and prepare a doctor-visit summary. For a medical concern, contact a qualified clinician; this app cannot assess whether you are safe.",

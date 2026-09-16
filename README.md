@@ -2,6 +2,8 @@
 
 A personal health workspace for confirmed lab records, follow-ups and better-prepared doctor visits. Built with Next.js, TypeScript and Postgres.
 
+Explore dated health trends with source-report links, compare recorded values, and prepare a personalised visit brief with questions grounded in your confirmed reports. The records assistant and fictional demo use the same comparison and visit-preparation tools.
+
 **Early access:** this is an educational records product, not a clinically validated doctor. AI generation is optional and explicitly unavailable when no approved endpoint is configured.
 
 ## Start

@@ -59,6 +59,14 @@ try {
     (await call("assistant", "POST", { question: "Summarise my report" })).mode,
     "record-summary",
   );
+  const earlier = await call("records", "POST", {
+    kind: "report", data: { ...report, date: "2026-06-16", observations: [{ ...report.observations[0], value: 218 }] },
+  }, 201);
+  const comparison = await call("assistant", "POST", { question: "Compare my reports over time" });
+  assert.equal(comparison.mode, "record-summary");
+  assert.ok(comparison.text.includes("Recorded change: +27 pg/mL"));
+  assert.ok((await call("assistant", "POST", { question: "Prepare questions for my doctor" })).text.includes("Questions prepared from your confirmed records"));
+  await call("records", "DELETE", { id: earlier.id });
   assert.equal(
     (
       await call("assistant", "POST", {
