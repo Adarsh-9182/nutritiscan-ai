@@ -1,10 +1,14 @@
 # NutritiScan
 
-A personal health workspace for confirmed lab records, follow-ups and better-prepared doctor visits. Built with Next.js, TypeScript and Postgres.
+A conversational health companion with source-linked education, private on-device AI, confirmed records, follow-ups and visit preparation. Built with Next.js, TypeScript and Postgres.
 
-Explore dated health trends with source-report links, compare recorded values, and prepare a personalised visit brief with questions grounded in your confirmed reports. The records assistant and fictional demo use the same comparison and visit-preparation tools.
+The home screen brings together questions about everyday health, nutrition, sleep, medicines and wellbeing. Records remain supporting tools: compare dated values, open their sources and prepare a personalised visit brief. Review any proposed follow-up before saving it.
 
-**Early access:** this is an educational records product, not a clinically validated doctor. AI generation is optional and explicitly unavailable when no approved endpoint is configured.
+**Early access:** limited educational coverage, not a clinically validated doctor. Optional Qwen2.5 runs in a WebGPU-compatible browser after an explicit model download; references and record tools work without it. No cloud API key is required for this mode. AI can make mistakes.
+
+## Delivery roadmap
+
+See the [phased product roadmap](docs/PRODUCT_ROADMAP.md): frontend → health-data backend → connected records → evidence-based AI → agent workflows → pilot and subscriptions. It includes Hubble-inspired patient-authorized record retrieval, build-versus-partner constraints and a completion gate for every phase. Live provider retrieval, voice agents and billing are future work.
 
 ## Start
 

@@ -1,6 +1,6 @@
 # Health workspace release
 
-This release provides account-based health records and visit preparation. It is an early-access product, not a clinically validated autonomous doctor.
+This release puts a health companion at the centre of the workspace, with account-based health records and visit preparation. It is an early-access product, not a clinically validated autonomous doctor.
 
 ## Implemented
 
@@ -15,6 +15,22 @@ This release provides account-based health records and visit preparation. It is 
 - Visit preparation creates record-based discussion questions, lets users choose questions and add temporary notes, and exports a customised brief. Notes and selections are not saved and reset when leaving the page.
 - The demo and authenticated assistant share the same record tools for summaries, comparisons, visit questions and escalation; the demo does not simulate a model response.
 - Deterministic report summaries and visit questions work without an LLM. Existing emergency-pattern checks run before server assistant answers. These checks are incomplete and have not been clinically validated.
+
+## Companion release — 16 September 2026
+
+- The workspace opens directly to the conversation. Signed-in visits to `/` redirect to the workspace; `/?home` opens the public site.
+- Original editorial design: ivory surfaces, quiet green navigation, terracotta serif headlines, a prominent composer and a contextual records rail. The [Figma dashboard template directory](https://www.figma.com/templates/dashboard-designs/) informed the compact navigation and hierarchy; no community file or artwork was copied.
+- Eight curated educational topics: nutrition, sleep, medicines, mental health, prevention, women’s health, diabetes and lab results. These are authored summaries with MedlinePlus links, not a comprehensive medical dataset, live retrieval or clinical review.
+- Symptom intake asks users to describe what they noticed; existing deterministic escalation runs first, including recent conversation context. It does not diagnose or establish that someone is safe.
+- Optional on-device Qwen2.5-1.5B-Instruct through WebLLM 0.2.85, Apache-2.0 model. Download is opt-in, roughly 1 GB; configured runtime estimates about 1.9 GB GPU memory. Device/browser support varies. The initial files come from Hugging Face and GitHub; patient text stays inside the browser worker.
+- Bounded model planning (allowlisted read tools, at most three) followed by educational synthesis. The model cannot mutate records, fetch arbitrary URLs, prescribe, send messages or book care. Reference links come from the supplied notes, never generated URLs. Links indicate context used, not independent verification of each generated claim. Record arithmetic is deterministic. Lexical output checks are limited, not a medical safety guarantee.
+- Download progress, cancellation, per-turn timeout, stop control, GPU cleanup, unavailable-model fallback and explicit inference labels. Model weights can remain in browser cache after turning inference off; clearing site data removes them.
+- Follow-up proposals require an editable title/date and a separate confirmation. They are care-list items, not notifications or bookings. Conversations are transient and reset on refresh or sign-out.
+- Free cloud inference is not silently enabled for patient content. See [Gemini API data-use terms](https://ai.google.dev/gemini-api/terms) before changing this policy.
+
+### Validation and limits
+
+The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
 
 ## Run locally at zero provider cost
 
@@ -81,7 +97,7 @@ The current model experiment is constrained to explaining the included lab-refer
 
 ## Source and dataset policy
 
-The release uses a short authored summary of [MedlinePlus lab-result guidance](https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/) and hand-authored synthetic report fixtures. It does not ship a patient dataset or claim training on medical data. Record source URL, usage rights, revision, geography and clinician review for every future knowledge entry. Do not ingest arbitrary scraped patient records or assume every MedlinePlus-linked third-party page has the same reuse terms.
+The release uses authored summaries in `lib/workspace/health-library.ts`, including [MedlinePlus lab-result guidance](https://medlineplus.gov/lab-tests/how-to-understand-your-lab-results/) and hand-authored synthetic report fixtures. It does not ship a patient dataset or claim training on medical data. Record source URL, usage rights, revision, geography and clinician review for every future knowledge entry. Do not ingest arbitrary scraped patient records or assume every MedlinePlus-linked third-party page has the same reuse terms.
 
 ## Before clinical or paid launch
 

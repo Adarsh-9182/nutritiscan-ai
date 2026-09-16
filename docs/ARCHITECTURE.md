@@ -1,5 +1,7 @@
 # NutritiScan — Architecture
 
+> Historical architecture baseline. The original “Current state” section below predates the account-based workspace. For the current implementation see [WORKSPACE_RELEASE.md](WORKSPACE_RELEASE.md); for future work and milestone gates see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+
 > Status: design document. Describes both what exists today and the target
 > system. Every "target" section states what is *not* built yet, explicitly.
 > Nothing in this document should be read as a description of shipped behaviour

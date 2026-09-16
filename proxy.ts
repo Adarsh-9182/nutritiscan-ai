@@ -22,7 +22,11 @@ export const RETURNING_COOKIE = "ns-returning";
 
 export function proxy(request: NextRequest) {
   if (request.nextUrl.searchParams.has("home")) return NextResponse.next();
-  if (request.cookies.get(RETURNING_COOKIE)?.value !== "1") return NextResponse.next();
+  if (
+    !request.cookies.get("ns-session")?.value &&
+    request.cookies.get(RETURNING_COOKIE)?.value !== "1"
+  )
+    return NextResponse.next();
 
   const url = request.nextUrl.clone();
   url.pathname = "/workspace";

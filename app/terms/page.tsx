@@ -4,7 +4,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">EARLY ACCESS · 15 SEPTEMBER 2026</span>
+      <span className="ns-eyebrow">EARLY ACCESS · 16 SEPTEMBER 2026</span>
       <h1>
         A clearer picture.
         <br />
@@ -15,7 +15,10 @@ export default function Page() {
         NutritiScan helps adults organise confirmed report values, compare them
         with the reference ranges printed on those reports, maintain their own
         follow-up list and prepare information for a clinician. It may provide
-        source-linked general education when configured.
+        source-linked general education. Optional on-device AI is a small
+        general-purpose model, requires a compatible browser and a model
+        download, and can produce inaccurate answers. Educational coverage
+        is limited; source links are reference material, not clinical verification.
       </p>
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>

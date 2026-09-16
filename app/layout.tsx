@@ -22,7 +22,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.co
 
 const TITLE = "NutritiScan — AI health agent";
 const DESCRIPTION =
-  "Understand your reports, organise your health history, and prepare for your next doctor visit. A personal workspace for confirmed records and source-linked education.";
+  "A personal health companion for your questions, daily wellbeing, medicines and records. Source-linked education, private on-device AI and tools to prepare for care.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

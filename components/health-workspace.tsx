@@ -38,7 +38,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { Brand } from "./product-landing";
-import { recordAnswer } from "@/lib/workspace/record-tools";
+import HealthAgent from "./health-agent";
 import { HealthTrends, VisitPreparation } from "./health-story";
 import { DEMO } from "@/lib/workspace/demo";
 import { extractReport } from "@/lib/workspace/reports";
@@ -54,7 +54,6 @@ import {
   type CareTask,
   type Profile,
 } from "@/lib/workspace/types";
-import type { AssistantAnswer } from "@/lib/workspace/assistant";
 
 const blank: Workspace = {
   profile: {
@@ -75,8 +74,8 @@ const dateText = (date: string) =>
     year: "numeric",
   });
 const NAV = [
+  ["assistant", "Health companion", MessageCircle],
   ["today", "Overview", LayoutDashboard],
-  ["assistant", "Health assistant", Sparkles],
   ["records", "My records", FileText],
   ["trends", "Health trends", Activity],
   ["visit", "Visit preparation", CalendarDays],
@@ -406,7 +405,7 @@ export default function HealthWorkspace() {
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
   const [demo, setDemo] = useState(false);
-  const [view, setView] = useState<View>("today");
+  const [view, setView] = useState<View>("assistant");
   const [mobile, setMobile] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -416,21 +415,18 @@ export default function HealthWorkspace() {
   const [recovery, setRecovery] = useState("");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
-  const [model, setModel] = useState(false);
   const [accounts, setAccounts] = useState(true);
-  const [messages, setMessages] = useState<
-    { role: "user" | "assistant"; text: string; answer?: AssistantAnswer }[]
-  >([]);
-  const [question, setQuestion] = useState("");
-  const [asking, setAsking] = useState(false);
-  const messagesEnd = useRef<HTMLDivElement>(null);
+  const [agentSeed, setAgentSeed] = useState<{
+    text: string;
+    id: number;
+  } | null>(null);
   function openDemo() {
     setDemo(true);
     setSignedIn(false);
     setWorkspace(structuredClone(DEMO));
     setLoading(false);
-    setMessages([]);
-    setView("today");
+    setAgentSeed(null);
+    setView("assistant");
     setError("");
   }
   async function refresh() {
@@ -439,7 +435,6 @@ export default function HealthWorkspace() {
       api<{ model: boolean; accounts: boolean }>("status"),
     ]);
     setWorkspace(w);
-    setModel(s.model);
     setAccounts(s.accounts);
     setSignedIn(true);
     setDemo(false);
@@ -447,10 +442,15 @@ export default function HealthWorkspace() {
   useEffect(() => {
     let alive = true;
     if (new URLSearchParams(location.search).has("demo")) {
-      setDemo(true);
-      setWorkspace(structuredClone(DEMO));
-      setLoading(false);
-      return;
+      queueMicrotask(() => {
+        if (!alive) return;
+        setDemo(true);
+        setWorkspace(structuredClone(DEMO));
+        setLoading(false);
+      });
+      return () => {
+        alive = false;
+      };
     }
     Promise.allSettled([
       api<Workspace>("state"),
@@ -458,7 +458,6 @@ export default function HealthWorkspace() {
     ]).then(([w, s]) => {
       if (!alive) return;
       if (s.status === "fulfilled") {
-        setModel(s.value.model);
         setAccounts(s.value.accounts);
       } else {
         setAccounts(false);
@@ -475,12 +474,6 @@ export default function HealthWorkspace() {
       alive = false;
     };
   }, []);
-  useEffect(() => {
-    messagesEnd.current?.scrollIntoView({
-      behavior: "instant",
-      block: "nearest",
-    });
-  }, [messages, asking]);
   async function ready(key?: string) {
     try {
       await refresh();
@@ -532,39 +525,41 @@ export default function HealthWorkspace() {
       "Report saved. These results are confirmed by you, not clinically verified.",
     );
   }
-  async function ask(text: string) {
-    if (!text.trim() || asking) return;
-    setQuestion("");
-    setMessages((m) => [...m, { role: "user", text }]);
-    setAsking(true);
+  function ask(text: string) {
+    setAgentSeed({ text, id: Date.now() });
     setView("assistant");
-    try {
-      let result: AssistantAnswer;
-      if (demo) {
-        result = recordAnswer(text, workspace) ?? {
-          mode: "unavailable",
-          text: "This demo can summarise fictional reports, compare recorded values and prepare visit questions. General AI conversation is not connected in the demo.",
-          sources: [],
-        };
-      } else
-        result = await api<AssistantAnswer>("assistant", "POST", {
-          question: text,
-        });
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: result.text, answer: result },
-      ]);
-    } catch (e) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          text: (e as Error).message,
-          answer: { mode: "unavailable", text: "", sources: [] },
-        },
-      ]);
-    } finally {
-      setAsking(false);
+  }
+  async function saveAgentTask(task: CareTask) {
+    if (demo)
+      setWorkspace((w) => ({
+        ...w,
+        tasks: [
+          {
+            ...task,
+            id: crypto.randomUUID(),
+            createdAt: new Date().toISOString(),
+            version: 1,
+          },
+          ...w.tasks,
+        ],
+      }));
+    else {
+      const saved = await api<{ id: string }>("records", "POST", {
+        kind: "task",
+        data: task,
+      });
+      setWorkspace((w) => ({
+        ...w,
+        tasks: [
+          {
+            ...task,
+            id: saved.id,
+            createdAt: new Date().toISOString(),
+            version: 1,
+          },
+          ...w.tasks,
+        ],
+      }));
     }
   }
   if (loading)
@@ -593,7 +588,7 @@ export default function HealthWorkspace() {
     .filter((t) => !t.done)
     .sort((a, b) => a.date.localeCompare(b.date));
   return (
-    <div className="ns-app">
+    <div className="ns-app ns-companion-app">
       <a href="#workspace-main" className="sr-only skip-link">
         Skip to workspace
       </a>
@@ -605,7 +600,7 @@ export default function HealthWorkspace() {
         />
       )}
       <aside className={`ns-sidebar ${mobile ? "open" : ""}`}>
-        <Link className="ns-sidebar-brand" href="/">
+        <Link className="ns-sidebar-brand" href="/?home">
           <Brand />
         </Link>
         <div className="ns-space-label">PERSONAL WORKSPACE</div>
@@ -625,15 +620,13 @@ export default function HealthWorkspace() {
             </button>
           ))}
         </nav>
-        <div className="ns-sidebar-card">
-          <span className="ns-icon soft">
-            <ShieldCheck size={20} />
-          </span>
-          <h3>Your story. Your control.</h3>
-          <p>Export your records whenever you need them.</p>
-          <button onClick={() => navigate("visit")}>
-            Prepare a visit summary <ArrowUpRight size={14} />
-          </button>
+        <div className="ns-sidebar-note">
+          <LockKeyhole size={15} />
+          <p>
+            A private space.
+            <br />
+            <span>For a healthier everyday.</span>
+          </p>
         </div>
         <div className="ns-sidebar-bottom">
           <button
@@ -720,7 +713,7 @@ export default function HealthWorkspace() {
               onClick={() => {
                 setDemo(false);
                 setWorkspace(blank);
-                setMessages([]);
+                setAgentSeed(null);
               }}
             >
               Create your own <ArrowRight size={14} />
@@ -878,8 +871,22 @@ export default function HealthWorkspace() {
                 </Empty>
               )}
               <section className="ns-story-entry">
-                <div><span className="ns-eyebrow">ONE REPORT IS A MOMENT. TOGETHER, A STORY.</span><h2>See what changed since last time.</h2><p>Explore your recorded results across dates, with the original report behind every number.</p></div>
-                <button className="ns-button ns-dark" onClick={() => navigate("trends")}>Explore health trends <ArrowUpRight size={17} /></button>
+                <div>
+                  <span className="ns-eyebrow">
+                    ONE REPORT IS A MOMENT. TOGETHER, A STORY.
+                  </span>
+                  <h2>See what changed since last time.</h2>
+                  <p>
+                    Explore your recorded results across dates, with the
+                    original report behind every number.
+                  </p>
+                </div>
+                <button
+                  className="ns-button ns-dark"
+                  onClick={() => navigate("trends")}
+                >
+                  Explore health trends <ArrowUpRight size={17} />
+                </button>
               </section>
               <div className="ns-overview-bottom">
                 <section className="ns-card">
@@ -1059,160 +1066,32 @@ export default function HealthWorkspace() {
                 )}
             </>
           )}
-          {view === "trends" && <HealthTrends workspace={workspace} openReport={id => setSelected(workspace.reports.find(r => r.id === id) ?? null)} addReport={() => setUpload(true)} />}
-          {view === "visit" && <VisitPreparation workspace={workspace} download={download} demo={demo} />}
-          {view === "assistant" && (
-            <div className="ns-assistant">
-              <div className="ns-assistant-head">
-                <div className="ns-row">
-                  <span className="ns-icon soft">
-                    <Sparkles size={21} />
-                  </span>
-                  <div>
-                    <h2>Your health assistant</h2>
-                    <small>
-                      {demo
-                        ? "Fictional demo"
-                        : model
-                          ? "AI + records tools"
-                          : "Records tools available · AI not connected"}
-                    </small>
-                  </div>
-                </div>
-                <button
-                  className="ns-text-button"
-                  onClick={() => setMessages([])}
-                  disabled={asking}
-                >
-                  Clear conversation
-                </button>
-              </div>
-              <div className="ns-messages" aria-live="polite">
-                {!messages.length && (
-                  <div className="ns-chat-welcome">
-                    <span className="ns-chat-emblem">
-                      <Sparkles size={32} />
-                    </span>
-                    <span className="ns-eyebrow">LET’S BRING SOME CLARITY</span>
-                    <h1>
-                      Your questions.
-                      <br />
-                      <em>A place to start.</em>
-                    </h1>
-                    <p>
-                      Explore your confirmed reports or get ready for a
-                      conversation with your doctor.
-                    </p>
-                    <div className="ns-starter-grid">
-                      {[
-                        ["Summarise my latest report", FileText],
-                        ["Prepare questions for my doctor", MessageCircle],
-                        ["Compare my results over time", Activity],
-                      ].map(([text, Icon]) => {
-                        const I = Icon as typeof FileText;
-                        return (
-                          <button
-                            key={String(text)}
-                            onClick={() => ask(String(text))}
-                          >
-                            <I size={20} />
-                            <span>{String(text)}</span>
-                            <ArrowUpRight size={16} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {messages.map((m, i) => (
-                  <article className={`ns-message ${m.role}`} key={i}>
-                    {m.role === "assistant" && (
-                      <span className="ns-icon soft">
-                        <Sparkles size={16} />
-                      </span>
-                    )}
-                    <div>
-                      {m.answer && (
-                        <span className={`ns-answer-mode ${m.answer.mode}`}>
-                          {m.answer.mode === "record-summary"
-                            ? "Records assistant · no AI inference"
-                            : m.answer.mode === "ai"
-                              ? "AI-generated · general information"
-                              : m.answer.mode === "escalation"
-                                ? "Seek human support"
-                                : "Service unavailable"}
-                        </span>
-                      )}
-                      <div className="ns-message-text">{m.text}</div>
-                      {m.answer?.sources.map((s) => (
-                        <a
-                          key={s.url}
-                          className="ns-evidence"
-                          href={s.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <FileText size={14} />
-                          {s.title}
-                          <ArrowUpRight size={13} />
-                        </a>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-                {asking && (
-                  <p className="ns-working">
-                    <LoaderCircle size={16} className="ns-spin" /> Checking your
-                    request…
-                  </p>
-                )}
-                <div ref={messagesEnd} />
-              </div>
-              <form
-                className="ns-composer"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void ask(question);
-                }}
-              >
-                <textarea
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  maxLength={3000}
-                  placeholder="Ask about your report or prepare for a visit…"
-                  aria-label="Message your health assistant"
-                  rows={2}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void ask(question);
-                    }
-                  }}
-                />
-                <div className="ns-row ns-between">
-                  <button
-                    type="button"
-                    className="ns-text-button"
-                    onClick={() => setUpload(true)}
-                  >
-                    <Plus size={16} /> Add report
-                  </button>
-                  <button
-                    className="ns-send"
-                    disabled={asking || !question.trim()}
-                    aria-label="Send message"
-                  >
-                    <ArrowRight size={21} />
-                  </button>
-                </div>
-              </form>
-              <p className="ns-assistant-disclaimer">
-                Not a doctor or emergency service. For urgent symptoms, seek
-                medical help now. Conversations are not saved. General AI
-                questions should not include personal identifiers.
-              </p>
-            </div>
+          {view === "trends" && (
+            <HealthTrends
+              workspace={workspace}
+              openReport={(id) =>
+                setSelected(workspace.reports.find((r) => r.id === id) ?? null)
+              }
+              addReport={() => setUpload(true)}
+            />
           )}
+          {view === "visit" && (
+            <VisitPreparation
+              workspace={workspace}
+              download={download}
+              demo={demo}
+            />
+          )}
+          <div hidden={view !== "assistant"}>
+            <HealthAgent
+              workspace={workspace}
+              demo={demo}
+              seed={agentSeed}
+              addReport={() => setUpload(true)}
+              navigate={navigate}
+              saveTask={saveAgentTask}
+            />
+          </div>
           {view === "care" && (
             <>
               <div className="ns-page-heading">
@@ -1385,7 +1264,7 @@ export default function HealthWorkspace() {
                   setSignedIn(false);
                   setDemo(false);
                   setWorkspace(blank);
-                  setMessages([]);
+                  setAgentSeed(null);
                 }, false)
               }
               onDelete={(password) =>
@@ -1394,7 +1273,7 @@ export default function HealthWorkspace() {
                   setSignedIn(false);
                   setDemo(false);
                   setWorkspace(blank);
-                  setMessages([]);
+                  setAgentSeed(null);
                 }, false)
               }
             />

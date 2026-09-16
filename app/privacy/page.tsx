@@ -4,7 +4,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 15 SEPTEMBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 16 SEPTEMBER 2026</span>
       <h1>
         Your records.
         <br />
@@ -27,13 +27,21 @@ export default function Page() {
       </p>
       <h2>Assistant processing</h2>
       <p>
-        Records summaries are assembled on the server from your confirmed
-        records. If an AI provider is enabled, the question you send and your
-        language preference are sent to that configured provider. The workspace
-        does not automatically send your reports or health profile to it.
-        Conversations are not saved by this workspace. Do not put identifying or
-        sensitive information in general AI questions. The operator must
-        validate provider terms before enabling that feature.
+        The health companion processes questions, reference notes and requested
+        record summaries in your browser. If you explicitly enable on-device
+        AI, model files are downloaded from Hugging Face and the WebLLM model
+        library on GitHub. Those hosts see network metadata such as your IP
+        address, but this workflow does not send them your chat or records.
+        The model uses device memory and caches model files in browser storage.
+        Turn it off to release memory; clear site data to remove cached files.
+        Conversations stay in this tab and disappear on refresh or sign-out.
+        Only follow-ups you confirm are saved to your account.
+      </p>
+      <p>
+        An optional server AI endpoint is available to operators only after
+        provider terms are approved. It receives the question and language,
+        not automatically your stored health profile or reports. The health
+        companion uses the browser workflow described above.
       </p>
       <h2>Sessions and security</h2>
       <p>

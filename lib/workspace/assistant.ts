@@ -5,7 +5,7 @@ import { LAB_SOURCE, recordAnswer } from "./record-tools";
 export const SOURCES = [LAB_SOURCE];
 export type AssistantAnswer = {
   text: string;
-  mode: "record-summary" | "ai" | "unavailable" | "escalation";
+  mode: "record-summary" | "ai" | "unavailable" | "escalation" | "reference";
   sources: { title: string; url: string }[];
 };
 export function modelConfigured() {
