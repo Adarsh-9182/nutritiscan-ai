@@ -81,4 +81,24 @@ describe("Hindi and Hinglish red flags escalate like their English forms", () =>
   ])("does not escalate ordinary notes: %s", (text) => {
     expect(mode(text)).toBeUndefined();
   });
+
+  it.each([
+    "crushing chest pain started 20 minutes ago",
+    "I took 30 sleeping pills an hour ago",
+    "I overdosed 2 hours ago",
+    "I cut my hand badly and the bleeding won't stop",
+    "there is severe bleeding from the wound",
+    "मैं 7 महीने की गर्भवती हूं और बहुत खून बह रहा है",
+    "pregnant hu aur bleeding ho rahi hai",
+  ])("eval-found gap now escalates: %s", (text) => {
+    expect(mode(text)).toBe("escalation");
+  });
+
+  it.each([
+    "I had chest pain 5 years ago",
+    "I took 2 tablets of paracetamol",
+    "my finger bled a little yesterday",
+  ])("still treats history and small events as non-urgent: %s", (text) => {
+    expect(verdict(text)).not.toBe("emergency");
+  });
 });

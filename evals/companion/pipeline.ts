@@ -1,21 +1,13 @@
 // ============================================================
-// C10 — the function under test.
+// C10: the function under test.
 //
-// Mirrors app/api/companion/route.ts for a signed-out guest, minus the
-// transport: triage first (deterministic, cannot be skipped), then the
-// model, then the output guard. The route checks the guard on every
-// streamed delta; checking the full text once is equivalent for scoring
-// because unsafeOutput only grows more true as text is appended.
-//
-// When lib/companion/turn.ts (C6) lands, this file should shrink to a thin
-// adapter over it so the eval scores the real pipeline, not a copy.
+// A thin adapter over the production turn pipeline (lib/companion/turn.ts)
+// for a signed-out guest, so the evals score the real triage, guard and
+// hold-back release rather than a copy of them.
 // ============================================================
 
-import { escalation } from "@/lib/workspace/escalation";
 import { speaksHinglish } from "@/lib/workspace/voice";
-import { ProfileSchema } from "@/lib/workspace/types";
-import { buildMessages } from "@/lib/companion/prompt";
-import { boundaryText, unsafeOutput } from "@/lib/companion/guard";
+import { runTurn } from "@/lib/companion/turn";
 
 export type Language = "en" | "hinglish" | "hi";
 export type TurnKind = "escalated" | "guarded" | "answered";
@@ -35,18 +27,31 @@ export async function answerTurn(
   text: string,
   opts: { generate: Generate },
 ): Promise<TurnResult> {
-  const guest = ProfileSchema.parse({ name: "Guest" });
   const language = detectLanguage(text);
-  // The route uses speaksHinglish, which is also true for Devanagari.
-  const hinglish = speaksHinglish(text, guest);
-
-  const urgent = escalation(text, guest);
-  if (urgent) return { kind: "escalated", text: urgent.text, language };
-
-  const output = await opts.generate(
-    buildMessages([{ role: "user", text }], null),
-  );
-  if (unsafeOutput(output))
-    return { kind: "guarded", text: boundaryText(hinglish), language };
-  return { kind: "answered", text: output, language };
+  // The model is asked once; its answer is streamed to the pipeline in
+  // small pieces, as a provider would.
+  const generate = async function* (
+    messages: { role: string; content: string }[],
+  ) {
+    const output = await opts.generate(messages);
+    for (let i = 0; i < output.length; i += 9) yield output.slice(i, i + 9);
+  };
+  let shown = "";
+  let kind: TurnKind = "answered";
+  for await (const event of runTurn({
+    messages: [{ role: "user", text }],
+    workspace: null,
+    route: false,
+    signal: new AbortController().signal,
+    generate,
+  })) {
+    if (event.t === "delta") shown += event.v;
+    else if (event.t === "replace") shown = event.v;
+    else if (event.t === "error") throw new Error(event.v);
+    else if (event.t === "done") {
+      if (event.outcome === "escalated") kind = "escalated";
+      else if (event.outcome === "guarded") kind = "guarded";
+    }
+  }
+  return { kind, text: shown, language };
 }

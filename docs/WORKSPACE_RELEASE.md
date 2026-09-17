@@ -151,6 +151,20 @@ Until the variables are set, the settings card says Telegram isn't switched on a
 - Without these variables the chat keeps working with the deterministic answers, and `/api/companion` returns 503. Choosing Private AI in the model menu keeps answers on the device instead.
 - Answers render a safe Markdown subset: headings, lists, bold and italic. No HTML is interpreted.
 
+## One turn pipeline, traces and AI evals — 17 September 2026
+
+See [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md). In brief:
+- Web and Telegram answers go through `lib/companion/turn.ts`, so Telegram now gets AI answers too.
+- Generated text is held back until it has passed the guard.
+- Every turn logs a content-free `[trace]` line.
+- `npm run eval` includes 45 companion cases; `npm run eval:companion` runs them live.
+- The evals found and fixed several safety gaps:
+  - recent-time phrases were read as history, so "20 minutes ago" emergencies did not escalate;
+  - English uncontrolled bleeding;
+  - counted overdoses;
+  - Hindi pregnancy bleeding;
+  - four kinds of unsafe output.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.

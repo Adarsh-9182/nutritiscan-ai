@@ -59,6 +59,7 @@ export async function* runTurn(input: {
   const last = messages[messages.length - 1];
   const profile = workspace?.profile ?? guest().profile;
   const hinglish = speaksHinglish(last.text, profile);
+  const known = `${profile.conditions}\n${profile.medicines}`;
   trace?.set({
     historyTurns: messages.length,
     signedIn: Boolean(workspace),
@@ -122,7 +123,7 @@ export async function* runTurn(input: {
         first = false;
       }
       text += delta;
-      const rule = guardRule(text);
+      const rule = guardRule(text, known);
       if (rule) {
         trace?.set({ guardRule: rule, outputChars: text.length });
         yield { t: "replace", v: boundaryText(hinglish) };

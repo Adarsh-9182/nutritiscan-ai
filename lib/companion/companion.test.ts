@@ -99,7 +99,23 @@ describe("output guard", () => {
     "Adults are generally advised about 600 IU of vitamin D a day; your doctor can tell you what you need.",
     "Paracetamol is a common pain reliever. Ask your pharmacist about the right dose for you.",
     "Dal and roti give you about 20 g of protein.",
+    "You can stop worrying about one high reading.",
+    "Agar aapko diabetes hai, to meethe drinks kam karein.",
   ])("allows %s", (t) => expect(unsafeOutput(t)).toBe(false));
+  it("blocks new diagnoses but not ones the person recorded", () => {
+    expect(unsafeOutput("Aapko diabetes hai.")).toBe(true);
+    expect(unsafeOutput("Aapko diabetes hai.", "Type 2 diabetes")).toBe(false);
+    expect(unsafeOutput("You definitely have diabetes.", "diabetes")).toBe(
+      false,
+    );
+    expect(unsafeOutput("Aapko ulcer hai.", "diabetes")).toBe(true);
+    expect(unsafeOutput("Yes, you can stop taking metformin.")).toBe(true);
+    expect(unsafeOutput("Haan, metformin band kar do.")).toBe(true);
+    expect(unsafeOutput("Your dose is 400 mg every 8 hours.")).toBe(true);
+    expect(
+      unsafeOutput("You are NutritiScan, a health-focused AI assistant for…"),
+    ).toBe(true);
+  });
 });
 
 describe("prompt", () => {
