@@ -111,12 +111,42 @@ export const DayLogSchema = z.object({
   entries: z.array(LogEntrySchema).max(60),
 });
 export type DayLog = z.infer<typeof DayLogSchema>;
+/** One saved chat. Drafts are not stored, so reopening a chat never
+ * re-offers an action the person already handled. */
+export const ChatMessageSchema = z.object({
+  id: z.string().min(1).max(64),
+  role: z.enum(["user", "assistant"]),
+  text: z.string().max(12000),
+  mode: z
+    .enum(["record-summary", "ai", "unavailable", "escalation", "reference"])
+    .optional(),
+  sources: z
+    .array(
+      z.object({
+        title: z.string().max(200),
+        url: z.url().max(500),
+      }),
+    )
+    .max(6)
+    .optional(),
+  steps: z.array(z.string().max(120)).max(8).optional(),
+  detail: z.string().max(300).optional(),
+  followUp: z.string().max(300).optional(),
+});
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+export const ConversationSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  updatedAt: z.iso.datetime(),
+  messages: z.array(ChatMessageSchema).max(120),
+});
+export type Conversation = z.infer<typeof ConversationSchema>;
 export type Saved<T> = T & { id: string; createdAt: string; version: number };
 export type Workspace = {
   profile: Profile;
   reports: Saved<Report>[];
   tasks: Saved<CareTask>[];
   days?: Saved<DayLog>[];
+  conversations?: Saved<Conversation>[];
   /** Opaque per-account key for browser-only preferences. */
   scope?: string;
 };

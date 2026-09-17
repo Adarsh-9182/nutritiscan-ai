@@ -117,6 +117,17 @@ Until the variables are set, the settings card says Telegram isn't switched on a
   - keeps a weight written after a food (“rice 200g”) and treats a sentence-ending full stop as a boundary.
 - Replies come in Hinglish when the profile language is Hindi / Hinglish, or when the message is in Hinglish or Devanagari. This covers log and reminder drafts, symptom intake, the dose boundary (now also triggered by “kitni goli”), “no reference” replies, log summaries, patterns and next steps, including in Telegram. Fixed escalation templates stay in English and still include the local emergency number.
 
+## Chat-first interface — 17 September 2026
+
+- The workspace now opens as a ChatGPT-style chat:
+  - a flush sidebar with New chat, chat search, the health tools and a chat history grouped by date (rename and delete from the list);
+  - a single centred conversation column with a rounded, auto-growing composer;
+  - user messages in bubbles and answers as plain text, revealed progressively;
+  - a copy button, and confirm actions for drafts;
+  - a model menu for switching to on-device private AI.
+- Signed-in chats are saved as encrypted `ns_records` rows of the existing `message` kind, so no migration is needed. They are versioned, capped at 200 per account and kept outside the report/task quota. Each save keeps the latest 120 messages under the API body limit. Drafts are never stored, so a reopened chat cannot re-offer an action already handled. Demo chats stay in memory.
+- The privacy notice now says chats are saved and can be deleted.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.

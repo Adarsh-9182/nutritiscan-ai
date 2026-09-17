@@ -14,6 +14,7 @@ import type {
   Report,
   CareTask,
   DayLog,
+  Conversation,
   Workspace,
 } from "./types";
 
@@ -154,9 +155,13 @@ export class WorkspaceService {
       `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT $2`,
       [id, allDays ? 400 : 120],
     );
+    const chatRows = await this.db.query<RecordRow>(
+      `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind='message' ORDER BY created_at DESC LIMIT 200`,
+      [id],
+    );
     const decoded = await Promise.all(
-      [...records, ...dayRows].map(async (r) => ({
-        ...(await unseal<Report | CareTask | DayLog>(r.payload, `${id}:${r.id}`)),
+      [...records, ...dayRows, ...chatRows].map(async (r) => ({
+        ...(await unseal<Report | CareTask | DayLog | Conversation>(r.payload, `${id}:${r.id}`)),
         id: r.id,
         createdAt: new Date(r.created_at).toISOString(),
         version: r.version,
@@ -168,6 +173,9 @@ export class WorkspaceService {
       reports: decoded.filter((r) => r.kind === "report") as Saved<Report>[],
       tasks: decoded.filter((r) => r.kind === "task") as Saved<CareTask>[],
       scope: digest(`scope:${id}`).slice(0, 24),
+      conversations: (
+        decoded.filter((r) => r.kind === "message") as Saved<Conversation>[]
+      ).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       days: (decoded.filter((r) => r.kind === "day") as Saved<DayLog>[]).sort(
         (a, b) => a.date.localeCompare(b.date),
       ),
@@ -181,8 +189,8 @@ export class WorkspaceService {
   }
   async save(
     id: string,
-    kind: "report" | "task" | "day",
-    value: Report | CareTask | DayLog,
+    kind: "report" | "task" | "day" | "message",
+    value: Report | CareTask | DayLog | Conversation,
     recordId: string = randomUUID(),
     version?: number,
   ) {
@@ -196,6 +204,20 @@ export class WorkspaceService {
         throw new ApiError(
           409,
           "This record changed or is no longer available. Refresh before editing.",
+        );
+    } else if (kind === "message") {
+      // Saved chats sit outside the report/task quota, capped separately.
+      const rows = await this.db.query<{ id: string }>(
+        `INSERT INTO ns_records (id,user_id,kind,payload)
+        SELECT $1,$2,'message',$3
+        WHERE (SELECT count(*) FROM ns_records WHERE user_id=$2 AND kind='message') < 200
+        RETURNING id`,
+        [recordId, id, payload],
+      );
+      if (!rows.length)
+        throw new ApiError(
+          409,
+          "You have 200 saved chats. Delete older chats to start new ones.",
         );
     } else if (kind === "day") {
       // One record per date, outside the report/task quota, capped separately.
@@ -238,7 +260,7 @@ export class WorkspaceService {
   async remove(id: string, recordId: string) {
     const rows = await this.db.query<{ id: string }>(
       `WITH removed AS (DELETE FROM ns_records WHERE id=$1 AND user_id=$2 RETURNING id,kind),
-      released AS (UPDATE ns_users SET record_count=GREATEST(0,record_count-1) WHERE id=$2 AND EXISTS (SELECT 1 FROM removed WHERE kind<>'day')) SELECT id FROM removed`,
+      released AS (UPDATE ns_users SET record_count=GREATEST(0,record_count-1) WHERE id=$2 AND EXISTS (SELECT 1 FROM removed WHERE kind NOT IN ('day','message'))) SELECT id FROM removed`,
       [recordId, id],
     );
     if (!rows.length) throw new ApiError(404, "Record not found.");
