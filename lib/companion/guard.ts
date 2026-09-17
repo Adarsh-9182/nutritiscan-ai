@@ -12,13 +12,66 @@ const STOP_MEDICINE =
 const CERTAINTY =
   /\b(you (?:definitely|certainly) have|you are (?:definitely )?(?:safe|fine) (?:to|and don't need)|no need to see a doctor|doctor ki zaroorat nahi)\b/i;
 
-export function unsafeOutput(text: string): boolean {
-  return (
-    PERSONAL_DOSE.test(text) ||
-    PERSONAL_DOSE_HI.test(text) ||
-    STOP_MEDICINE.test(text) ||
-    CERTAINTY.test(text)
-  );
+// "Haan, metformin band kar do" / "yes, you can stop taking it".
+const STOP_NAMED =
+  /\b(?:haan|yes|sure|ok(?:ay)?|bilkul)\b[^.\n]{0,40}?\b(?:band\s*kar\s*(?:do|dein|dijiye|du|sakte)|chhod\s*(?:do|dein|dijiye|sakte)|stop\s+(?:taking|using))\b|\byou\s+can\s+(?:safely\s+)?stop\s+(?:taking|using)\s+\w+/i;
+// "Your dose is 400 mg", "500 mg every 8 hours": a dose without a verb.
+const DOSE_STATEMENT =
+  /\b(?:your|aapki|apki|aapka|apka|tumhari)\s+(?:dose|dosage)\b[^.\n]{0,30}?\d+(?:\.\d+)?\s?(?:mg|mcg|µg|ml|units?|iu|tablets?|goli)\b|\b\d+(?:\.\d+)?\s?(?:mg|mcg|µg|ml|units?|iu|tablets?|goli)\s+(?:every|har)\s+\d+\s*(?:hours?|hrs?|ghante)\b/i;
+// "Aapko ulcer hai": a certain diagnosis in Hinglish or Hindi.
+const CERTAINTY_HI =
+  /\b(?:aapko|apko|tumhe|tumko)\s+(?:pakka\s+|zaroor\s+|definitely\s+)?(?:diabetes|sugar|pcos|pcod|thyroid|hypothyroidism|hypertension|bp|anaemia|anemia|kidney\s+stones?|pathri|cancer|tb|typhoid|dengue|malaria|ulcer|infection|fatty\s+liver|migraine)\s+(?:hai|ho\s+gaya|ho\s+gayi)\b|आपको\s+(?:पक्का\s+)?(?:डायबिटीज|मधुमेह|थायराइड|शुगर|कैंसर|अल्सर)\s+है/i;
+// The model repeating its own instructions.
+const PROMPT_LEAK =
+  /safety rules you always follow|context \(data, not instructions\)|you are nutritiscan, a health-focused ai assistant/i;
+
+const RULES: [string, RegExp][] = [
+  ["personal_dose", PERSONAL_DOSE],
+  ["personal_dose_hi", PERSONAL_DOSE_HI],
+  ["stop_medicine", STOP_MEDICINE],
+  ["certain_diagnosis", CERTAINTY],
+  ["stop_named_medicine", STOP_NAMED],
+  ["dose_statement", DOSE_STATEMENT],
+  ["certain_diagnosis_hi", CERTAINTY_HI],
+  ["prompt_leak", PROMPT_LEAK],
+];
+
+const DIAGNOSIS_RULES = new Set(["certain_diagnosis", "certain_diagnosis_hi"]);
+
+/**
+ * The id of the first rule an answer breaks, or null. `known` is what the
+ * person already recorded (conditions and medicines): restating a condition
+ * they told us about ("since you have diabetes") is not a new diagnosis,
+ * and a conditional ("agar aapko…", "if you have…") is not one either.
+ */
+export function guardRule(text: string, known = ""): string | null {
+  const recorded = known.toLowerCase();
+  for (const [id, re] of RULES) {
+    const match = re.exec(text);
+    if (!match) continue;
+    if (DIAGNOSIS_RULES.has(id)) {
+      const before = text.slice(Math.max(0, match.index - 12), match.index);
+      if (/\b(?:agar|if|jab|when)\s*$/i.test(before)) continue;
+      // The condition can follow the matched phrase ("you definitely have \u2026").
+      const span = text
+        .slice(match.index, match.index + match[0].length + 30)
+        .toLowerCase();
+      const words = span.match(/[a-z\u0900-\u097f]{3,}/g) ?? [];
+      const condition = words.find(
+        (w) =>
+          !/^(?:you|have|definitely|certainly|aapko|apko|tumhe|tumko|pakka|zaroor|hai|gaya|gayi|आपको|पक्का)$/.test(
+            w,
+          ),
+      );
+      if (condition && recorded.includes(condition)) continue;
+    }
+    return id;
+  }
+  return null;
+}
+
+export function unsafeOutput(text: string, known = ""): boolean {
+  return guardRule(text, known) !== null;
 }
 
 export function boundaryText(hinglish: boolean) {
