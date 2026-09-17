@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { LogEntry, Workspace } from "./types";
+import type { CareTask, LogEntry, Workspace } from "./types";
+import { proposeReminder, repeatText } from "./actions";
 import { describeEntry, proposeLog } from "./daily";
 import type { AssistantAnswer } from "./assistant";
 import { recordAnswer } from "./record-tools";
@@ -12,6 +13,8 @@ export type AgentReply = AssistantAnswer & {
   draftTask?: string;
   /** Entries proposed from a first-person note; saved only after confirmation. */
   draftLog?: LogEntry[];
+  /** A reminder drafted from a request; saved only after review. */
+  draftReminder?: CareTask;
   detail?: string;
 };
 export type Completion = (
@@ -89,6 +92,26 @@ export async function runHealthAgent(
         },
       ],
       steps: ["Treatment request boundary"],
+    };
+  const reminder = proposeReminder(question);
+  if (reminder)
+    return {
+      mode: "record-summary",
+      text: [
+        "Here’s the reminder I drafted:",
+        `• ${reminder.title}`,
+        `• ${reminder.date}${reminder.time ? ` at ${reminder.time}` : " (all day)"}${reminder.repeat && reminder.repeat !== "none" ? ` · ${repeatText[reminder.repeat].toLowerCase()}` : ""}`,
+        "",
+        "Review it and save. To get phone notifications, use “Add to calendar” in Care & reminders.",
+        ...(reminder.category === "medicine"
+          ? [
+              "Use the dose and timing your prescriber or pharmacist gave you — I don’t set or change medicine schedules.",
+            ]
+          : []),
+      ].join("\n"),
+      sources: [],
+      steps: ["Understood a reminder request", "Drafted a reminder"],
+      draftReminder: reminder,
     };
   const note = proposeLog(question);
   if (note)

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { localDate, recentDays } from "./daily";
 
 export const ProfileSchema = z.object({
   name: z.string().trim().min(1).max(70),
@@ -40,10 +41,24 @@ export const ReportSchema = z.object({
   assistantAccess: z.boolean().optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
+export const REPEATS = ["none", "daily", "weekly", "monthly"] as const;
+export const TASK_CATEGORIES = [
+  "medicine",
+  "test",
+  "appointment",
+  "other",
+] as const;
 export const TaskSchema = z.object({
   title: z.string().trim().min(1).max(180),
   date: z.iso.date(),
   done: z.boolean().default(false),
+  /** Local time of day for a reminder; absent means an all-day item. */
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .optional(),
+  repeat: z.enum(REPEATS).optional(),
+  category: z.enum(TASK_CATEGORIES).optional(),
 });
 export type CareTask = z.infer<typeof TaskSchema>;
 export const LOG_KINDS = [
@@ -175,9 +190,36 @@ export function summaryText(
           "What should I watch for before our next visit?",
         ]),
     "",
+    ...logSummary(workspace),
     "MY FOLLOW-UP LIST",
     ...workspace.tasks
       .filter((t) => !t.done)
-      .map((t) => `${t.date} — ${t.title}`),
+      .map(
+        (t) =>
+          `${t.date}${t.time ? ` ${t.time}` : ""} — ${t.title}${t.repeat && t.repeat !== "none" ? ` (${t.repeat})` : ""}`,
+      ),
   ].join("\n");
+}
+
+function logSummary(workspace: Workspace): string[] {
+  const week = recentDays(workspace.days, localDate()).filter((d) => d.entries);
+  if (!week.length) return [];
+  return [
+    "MY DAILY LOG · LAST 7 DAYS (self-recorded; nutrition is estimated)",
+    ...week.map((d) =>
+      [
+        d.date,
+        d.sleep !== null ? `sleep ${d.sleep} h` : "",
+        d.mood !== null ? `mood ${d.mood}/5` : "",
+        d.water ? `water ${d.water} glasses` : "",
+        d.meals.length ? `≈${d.protein} g protein` : "",
+        d.activityMinutes ? `activity ${d.activityMinutes} min` : "",
+        d.symptoms.length ? `symptoms: ${d.symptoms.join("; ")}` : "",
+        d.medicines.length ? `medicines: ${d.medicines.join("; ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+    "",
+  ];
 }

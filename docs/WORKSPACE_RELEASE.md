@@ -45,6 +45,20 @@ This release puts a health companion at the centre of the workspace, with accoun
 - “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
 - Migration: the `ns_records` kind check is widened to include `day`, and the quota recount excludes day logs. Run `node scripts/workspace-migrate.mjs` before deploying.
 
+## Reminders and suggestions — 17 September 2026
+
+- Care items can have a time, a repeat rule (daily, weekly, monthly) and a category (medicine, test, appointment, other). These are optional fields on the existing encrypted task record, so no migration is needed. Marking a repeating reminder done moves it to its next future date.
+- **Add to calendar** exports open items as an RFC 5545 `.ics` file, per item or all at once. It includes repeat rules and alarms: timed items alert at their time, all-day items at 09:00. The person's calendar delivers the notification. The app still sends no email or push, which keeps reminders free.
+- The companion drafts reminders from requests like “remind me to take vitamin D every day at 9am” or “roz raat 10 baje dawai lena yaad dilana”. The person reviews the title, date, time and repeat before saving. For medicine reminders it states that it does not set or change schedules.
+- **Your companion suggests** (Overview and Care) proposes next steps from the person's own data:
+  - a clinician question for each out-of-range result in the latest report the assistant may read;
+  - a routine check-up question when the latest report is over a year old;
+  - a daily reminder for each medicine in the profile, at an editable time and without a dose;
+  - a discussion item when symptoms were logged on 3 or more of the last 7 days.
+  Adding a suggestion is the person's explicit confirmation. Dismissals are remembered only in that browser.
+- “What should I do next?” / “aage kya karna hai” lists open items and suggestions without a model.
+- The visit summary now includes the last 7 days of the daily log and each reminder's time and repeat.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
