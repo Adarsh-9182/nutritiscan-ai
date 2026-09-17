@@ -36,6 +36,87 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Changing assistant access starts a fresh local conversation and cancels in-flight work, preventing an answer created from an older permission snapshot from appearing afterward. This control does not delete earlier answers a person may have copied or seen.
 - Source labels and file fingerprints are user-supplied provenance aids, not provider verification, clinical validation or proof that reviewed fields still match the original file. Hospital connections and automatic retrieval remain planned and unavailable.
 
+## Daily log — 17 September 2026
+
+- A new **Daily log** screen records meals, water, sleep, mood, symptoms, medicines and activity in a few taps. Each calendar day is one encrypted record (`kind = 'day'`, AES-256-GCM like other records), versioned so concurrent edits fail instead of overwriting. Day logs sit outside the 500 report/task quota and are capped at 400 days per account; the workspace loads the latest 120.
+- Meals are estimated with the existing Indian-first food table and portion vocabulary (roti, dal, katori…). Unrecognised meals are stored as notes and never given a guessed estimate.
+- The companion understands first-person notes (“had 2 idli for breakfast, slept 7 hours”, “2 glass paani piya”), shows the proposed entries and saves them only after the person confirms. Symptoms are logged only on explicit request (“log symptom: …”), and urgent-care escalation still runs first.
+- Questions about the log (“what did I eat today”, “how did I sleep this week”, “weekly summary”) are answered deterministically from the record. General education questions such as “how can I understand my sleep?” are not redirected to the log.
+- “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
+- Migration: the `ns_records` kind check is widened to include `day`, the quota recount excludes day logs, and a unique `day_key` (a hash of account and date) makes concurrent first writes for one date fail instead of duplicating it. Export returns all stored days (up to 400); the workspace shows the latest 120. A failed save keeps what the person typed. Run `node scripts/workspace-migrate.mjs` before deploying.
+
+## Reminders and suggestions — 17 September 2026
+
+- Care items can have a time, a repeat rule (daily, weekly, monthly) and a category (medicine, test, appointment, other). These are optional fields on the existing encrypted task record, so no migration is needed. Marking a repeating reminder done moves it to its next future date.
+- **Add to calendar** exports open items as an RFC 5545 `.ics` file, per item or all at once. It includes repeat rules and alarms: timed items alert at their time, all-day items at 09:00. The person's calendar delivers the notification. The app still sends no email or push, which keeps reminders free.
+- The companion drafts reminders from requests like “remind me to take vitamin D every day at 9am” or “roz raat 10 baje dawai lena yaad dilana”. The person reviews the title, date, time and repeat before saving. For medicine reminders it states that it does not set or change schedules.
+- **Your companion suggests** (Overview and Care) proposes next steps from the person's own data:
+  - a clinician question for each out-of-range result in the latest report the assistant may read;
+  - a routine check-up question when the latest report is over a year old;
+  - a daily reminder for each medicine in the profile, at an editable time and without a dose;
+  - a discussion item when symptoms were logged on 3 or more of the last 7 days.
+  Adding a suggestion is the person's explicit confirmation. Dismissals are remembered only in that browser.
+- Fixes from Codex review:
+  - Medicine suggestions never invent a schedule. Only a frequency or time written in the medicines list is pre-filled, and the person must choose both before adding.
+  - A decimal dose (“0.25 mg”) is never read as a clock time.
+  - Monthly reminders keep their original day (31 Jan → 28 Feb → 31 Mar).
+  - Dismissed suggestions are stored only as hashes under a per-account key, which is cleared on sign-out and account deletion.
+- “What should I do next?” / “aage kya karna hai” lists open items and suggestions without a model.
+- The visit summary now includes the last 7 days of the daily log and each reminder's time and repeat.
+
+## Telegram companion — 17 September 2026
+
+- Opt-in proactive messages on Telegram (free Bot API):
+  - due reminders in the person's own time zone;
+  - an 08:00 care list;
+  - a 21:00 check-in when nothing was logged that day.
+  Each message is sent at most once per item per day: a send key is recorded before sending, so overlapping runs never double-send. Reminders stay useful for up to 90 minutes after their time.
+- Reminder titles are **hidden by default** (“You have a reminder due at 09:00”). The person can switch titles on; with titles on, each reminder gets a Done button that completes it or schedules the next occurrence.
+- Replies in Telegram go through the same deterministic companion as the app, with no model call:
+  - meals, sleep, water and mood become draft log entries;
+  - “remind me …” becomes a draft reminder;
+  - `/today`, `/week`, `/help` and `/stop` are supported;
+  - emergencies are escalated first.
+  Drafts are sealed in `ns_pending` for 30 minutes and saved only when the person taps **Save**.
+- Linking uses a single-use code that lasts 15 minutes, opened as a `t.me` deep link. Each account has at most one chat, and each chat belongs to at most one account. The chat id is stored sealed; lookups use a SHA-256 hash. Only private chats are accepted. Deleting the account removes the channel.
+- `/api/telegram` accepts only requests carrying `X-Telegram-Bot-Api-Secret-Token` and always answers 200. `/api/cron/notify` requires `Authorization: Bearer $CRON_SECRET`. Neither route logs message content or chat ids.
+- Scheduling is free: `docs/companion-schedule.yml`, once copied to `.github/workflows/`, calls the cron route every 15 minutes (GitHub may delay runs) and skips if the `CRON_SECRET` repository secret is missing.
+- Fixes from Codex review:
+  - Emergency checks run on the message text before any command (`/today …`) and for chats that are not linked.
+  - Done buttons carry the task version, so a repeated or replayed tap cannot move a reminder forward twice.
+  - Reminders set for late evening are still delivered after midnight within the 90-minute window.
+- Messages pass through Telegram, which has its own privacy terms. The settings screen says so and says Telegram is not for emergencies.
+
+### Setting it up
+
+1. Create a bot with @BotFather.
+2. In Vercel production, set these environment variables:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_BOT_USERNAME`
+   - `TELEGRAM_WEBHOOK_SECRET` (16+ of `A-Z a-z 0-9 _ -`)
+   - `CRON_SECRET` (16+ characters)
+3. Run `node scripts/workspace-migrate.mjs`. It adds `ns_channels`, `ns_link_codes`, `ns_notify_log` and `ns_pending`.
+4. Deploy, then run `TELEGRAM_BOT_TOKEN=… TELEGRAM_WEBHOOK_SECRET=… APP_ORIGIN=https://www.nutritiscan.com node scripts/telegram-setup.mjs`.
+5. Copy `docs/companion-schedule.yml` to `.github/workflows/` (pushing it needs a token with the `workflow` scope) and add the same `CRON_SECRET` as a GitHub Actions repository secret.
+
+Until the variables are set, the settings card says Telegram isn't switched on and both routes refuse requests.
+
+## Indian food, Hindi quantities and Hinglish — 17 September 2026
+
+- **Safety fix:** Hindi (Devanagari) and romanised Hindi red flags now escalate. Before this change, “seene me tez dard hai aur saans nahi aa rahi”, “behosh ho gaya” and “marne ka mann kar raha hai” reached no escalation at all.
+  - `normalize()` in `lib/clinical/extract.ts` rewrites these phrases into English phrases the existing, reviewed concept lexicon already recognises. This covers chest pain, breathlessness, fainting, facial droop, one-sided weakness, speech trouble, sudden severe headache, seizure, airway swelling, uncontrolled bleeding, blood in vomit, cough or stool, self-harm, overdose and reduced fetal movement.
+  - It errs toward escalation: Hindi negation after the verb is not used to suppress a red flag.
+  - Translated phrases keep their severity and onset words (“bahut tez”, “achanak”), so “seene mein bahut tez dard” gets the same emergency verdict as “severe chest pain”. Devanagari stroke and airway phrases, “khoon nahi ruk raha” and “saans bilkul nahi aa rahi” are covered (from Codex re-review).
+  - This is a phrase list, not clinical validation. Hindi coverage still needs review by clinicians who speak the language.
+- The food table grows from 54 to 115 foods: common North and South Indian meals, snacks, sweets, drinks and fruit. Values are rounded public reference figures, and a test checks each food's calories against its macros (within 35%).
+- Meal parsing:
+  - understands Hindi quantities (ek, do, teen, aadha, dedh, dhai…) and portions (chammach, mutthi, dona, ladle), and splits on “aur” and “ke saath”;
+  - binds a count to the food it precedes and reads every food in a phrase (“2 idli sambar”);
+  - fixes “half a bowl” being read as one bowl and “1.5 roti” being split at the decimal point;
+  - no longer reads English “do” as two;
+  - keeps a weight written after a food (“rice 200g”) and treats a sentence-ending full stop as a boundary.
+- Replies come in Hinglish when the profile language is Hindi / Hinglish, or when the message is in Hinglish or Devanagari. This covers log and reminder drafts, symptom intake, the dose boundary (now also triggered by “kitni goli”), “no reference” replies, log summaries, patterns and next steps, including in Telegram. Fixed escalation templates stay in English and still include the local emergency number.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.

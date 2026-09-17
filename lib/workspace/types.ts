@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { localDate, recentDays } from "./daily";
 
 export const ProfileSchema = z.object({
   name: z.string().trim().min(1).max(70),
@@ -40,17 +41,84 @@ export const ReportSchema = z.object({
   assistantAccess: z.boolean().optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
+export const REPEATS = ["none", "daily", "weekly", "monthly"] as const;
+export const TASK_CATEGORIES = [
+  "medicine",
+  "test",
+  "appointment",
+  "other",
+] as const;
 export const TaskSchema = z.object({
   title: z.string().trim().min(1).max(180),
   date: z.iso.date(),
   done: z.boolean().default(false),
+  /** Local time of day for a reminder; absent means an all-day item. */
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .optional(),
+  repeat: z.enum(REPEATS).optional(),
+  /** Day of month for monthly reminders, kept when a short month clamps it. */
+  anchorDay: z.number().int().min(1).max(31).optional(),
+  category: z.enum(TASK_CATEGORIES).optional(),
 });
 export type CareTask = z.infer<typeof TaskSchema>;
+export const LOG_KINDS = [
+  "meal",
+  "water",
+  "sleep",
+  "mood",
+  "symptom",
+  "medicine",
+  "activity",
+] as const;
+export type LogKind = (typeof LOG_KINDS)[number];
+/** One thing a person noted about their day. `amount` means glasses (water),
+ * hours (sleep), 1–5 (mood) or minutes (activity); text-only kinds leave it null. */
+export const LogEntrySchema = z
+  .object({
+    kind: z.enum(LOG_KINDS),
+    text: z.string().trim().max(300).default(""),
+    amount: z.number().finite().min(0).max(1440).nullable().default(null),
+    time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .optional(),
+  })
+  .refine(
+    (e) =>
+      e.kind === "water" || e.kind === "sleep" || e.kind === "mood"
+        ? e.amount !== null
+        : e.text.length > 0,
+    { message: "Add a description or amount for this entry." },
+  )
+  .refine((e) => e.kind !== "sleep" || (e.amount ?? 0) <= 24, {
+    message: "Sleep must be 24 hours or less.",
+  })
+  .refine(
+    (e) =>
+      e.kind !== "mood" ||
+      (Number.isInteger(e.amount) && e.amount! >= 1 && e.amount! <= 5),
+    { message: "Mood is a whole number from 1 to 5." },
+  )
+  .refine((e) => e.kind !== "water" || (e.amount ?? 0) <= 30, {
+    message: "Water is recorded in glasses, up to 30.",
+  });
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+/** A single calendar day of entries, stored as one encrypted record. */
+export const DayLogSchema = z.object({
+  date: z.iso.date(),
+  entries: z.array(LogEntrySchema).max(60),
+});
+export type DayLog = z.infer<typeof DayLogSchema>;
 export type Saved<T> = T & { id: string; createdAt: string; version: number };
 export type Workspace = {
   profile: Profile;
   reports: Saved<Report>[];
   tasks: Saved<CareTask>[];
+  days?: Saved<DayLog>[];
+  /** Opaque per-account key for browser-only preferences. */
+  scope?: string;
 };
 
 export function rangeStatus(
@@ -126,9 +194,36 @@ export function summaryText(
           "What should I watch for before our next visit?",
         ]),
     "",
+    ...logSummary(workspace),
     "MY FOLLOW-UP LIST",
     ...workspace.tasks
       .filter((t) => !t.done)
-      .map((t) => `${t.date} — ${t.title}`),
+      .map(
+        (t) =>
+          `${t.date}${t.time ? ` ${t.time}` : ""} — ${t.title}${t.repeat && t.repeat !== "none" ? ` (${t.repeat})` : ""}`,
+      ),
   ].join("\n");
+}
+
+function logSummary(workspace: Workspace): string[] {
+  const week = recentDays(workspace.days, localDate()).filter((d) => d.entries);
+  if (!week.length) return [];
+  return [
+    "MY DAILY LOG · LAST 7 DAYS (self-recorded; nutrition is estimated)",
+    ...week.map((d) =>
+      [
+        d.date,
+        d.sleep !== null ? `sleep ${d.sleep} h` : "",
+        d.mood !== null ? `mood ${d.mood}/5` : "",
+        d.water ? `water ${d.water} glasses` : "",
+        d.meals.length ? `≈${d.protein} g protein` : "",
+        d.activityMinutes ? `activity ${d.activityMinutes} min` : "",
+        d.symptoms.length ? `symptoms: ${d.symptoms.join("; ")}` : "",
+        d.medicines.length ? `medicines: ${d.medicines.join("; ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+    "",
+  ];
 }
