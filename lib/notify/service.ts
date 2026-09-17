@@ -6,6 +6,7 @@ import { runHealthAgent } from "@/lib/workspace/health-agent";
 import { completeTask } from "@/lib/workspace/actions";
 import { escalation } from "@/lib/workspace/escalation";
 import { recentDays } from "@/lib/workspace/daily";
+import { say, speaksHinglish } from "@/lib/workspace/voice";
 import {
   DayLogSchema,
   ProfileSchema,
@@ -256,16 +257,21 @@ export class NotifyService {
           ? { kind: "log", date: local.date, entries: reply.draftLog }
           : { kind: "reminder", task: reply.draftReminder! },
       );
-      body = body
-        .replace("Check it and confirm below.", "Tap Save to keep it.")
-        .replace(
-          /Review it and save\.[^\n]*/,
+      // The app's closing hint is the last paragraph; Telegram confirms with
+      // a button instead.
+      const hi = speaksHinglish(text, workspace.profile);
+      body = [
+        body.slice(0, body.lastIndexOf("\n\n")),
+        say(
+          hi,
           "Tap Save to keep it. You can edit it later in the app.",
-        );
+          "Rakhna hai to Save dabayein. Baad me app me badal sakte hain.",
+        ),
+      ].join("\n\n");
       return this.messenger.send(chat, body, [
         [
           { text: "✓ Save", data: `c:${id}` },
-          { text: "Cancel", data: `x:${id}` },
+          { text: hi ? "Rehne do" : "Cancel", data: `x:${id}` },
         ],
       ]);
     }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CareTask, LogEntry, Workspace } from "./types";
 import { proposeReminder, repeatText } from "./actions";
+import { say, speaksHinglish } from "./voice";
 import { describeEntry, proposeLog } from "./daily";
 import type { AssistantAnswer } from "./assistant";
 import { recordAnswer } from "./record-tools";
@@ -16,6 +17,22 @@ export type AgentReply = AssistantAnswer & {
   /** A reminder drafted from a request; saved only after review. */
   draftReminder?: CareTask;
   detail?: string;
+};
+/** Closing line of a draft reply; channels that confirm differently swap it. */
+export const DRAFT_HINT = {
+  log: "Check it and confirm below. Nutrition figures are estimates from typical portions.",
+  logHi:
+    "Check karke neeche confirm karein. Nutrition ke numbers aam portion ke hisaab se andaaza hain.",
+  reminder:
+    "Review it and save. To get phone notifications, use “Add to calendar” in Care & reminders.",
+  reminderHi:
+    "Dekh kar save karein. Phone par notification ke liye Care & reminders me “Add to calendar” dabayein.",
+};
+const REPEAT_HI = {
+  none: "",
+  daily: "roz",
+  weekly: "har hafte",
+  monthly: "har mahine",
 };
 export type Completion = (
   system: string,
@@ -73,6 +90,7 @@ export async function runHealthAgent(
   } = {},
 ): Promise<AgentReply> {
   const signal = options.signal ?? new AbortController().signal;
+  const hi = speaksHinglish(question, workspace.profile);
   abortIfNeeded(signal);
   const urgent = escalation(
     [...(options.history ?? []).slice(-3), question].join("\n"),
@@ -80,13 +98,17 @@ export async function runHealthAgent(
   );
   if (urgent) return { ...urgent, steps: ["Urgent-care guidance"] };
   if (
-    /\b(dose|dosage|prescribe|how many (pills|tablets)|stop taking|start taking|diagnose me)\b|कितनी गोली/i.test(
+    /\b(dose|dosage|prescribe|how many (pills|tablets)|stop taking|start taking|diagnose me)\b|कितनी गोली|kitni goli|kitni tablet|dose kitni|kitna dose|dawai band kar|dawai chhod/i.test(
       question,
     )
   )
     return {
       mode: "reference",
-      text: "I can help you understand health information and prepare questions, but cannot choose a dose, prescribe or change treatment. Ask your pharmacist or prescribing clinician about your specific medicine and circumstances.",
+      text: say(
+        hi,
+        "I can help you understand health information and prepare questions, but cannot choose a dose, prescribe or change treatment. Ask your pharmacist or prescribing clinician about your specific medicine and circumstances.",
+        "Main health jaankari samajhne aur doctor ke liye sawal taiyaar karne me madad kar sakta hoon, lekin dawai ki dose tay karna, dawai likhna ya ilaaj badalna mera kaam nahi hai. Apni dawai ke baare me apne pharmacist ya dawai likhne wale doctor se poochhein.",
+      ),
       sources: [
         {
           title: "Understanding medicines",
@@ -100,16 +122,25 @@ export async function runHealthAgent(
     return {
       mode: "record-summary",
       text: [
-        "Here’s the reminder I drafted:",
+        say(
+          hi,
+          "Here’s the reminder I drafted:",
+          "Maine ye reminder banaya hai:",
+        ),
         `• ${reminder.title}`,
-        `• ${reminder.date}${reminder.time ? ` at ${reminder.time}` : " (all day)"}${reminder.repeat && reminder.repeat !== "none" ? ` · ${repeatText[reminder.repeat].toLowerCase()}` : ""}`,
-        "",
-        "Review it and save. To get phone notifications, use “Add to calendar” in Care & reminders.",
+        `• ${reminder.date}${reminder.time ? ` ${say(hi, "at", "–")} ${reminder.time}` : say(hi, " (all day)", " (poora din)")}${reminder.repeat && reminder.repeat !== "none" ? ` · ${say(hi, repeatText[reminder.repeat].toLowerCase(), REPEAT_HI[reminder.repeat])}` : ""}`,
         ...(reminder.category === "medicine"
           ? [
-              "Use the dose and timing your prescriber or pharmacist gave you — I don’t set or change medicine schedules.",
+              "",
+              say(
+                hi,
+                "Use the dose and timing your prescriber or pharmacist gave you — I don’t set or change medicine schedules.",
+                "Dose aur timing wahi rakhein jo doctor ya pharmacist ne batayi hai — main dawai ka schedule set ya change nahi karta.",
+              ),
             ]
           : []),
+        "",
+        say(hi, DRAFT_HINT.reminder, DRAFT_HINT.reminderHi),
       ].join("\n"),
       sources: [],
       steps: ["Understood a reminder request", "Drafted a reminder"],
@@ -120,10 +151,14 @@ export async function runHealthAgent(
     return {
       mode: "record-summary",
       text: [
-        "I can add this to today’s log:",
+        say(
+          hi,
+          "I can add this to today’s log:",
+          "Aaj ke log me ye add kar sakta hoon:",
+        ),
         ...note.map((e) => `• ${describeEntry(e)}`),
         "",
-        "Check it and confirm below. Nutrition figures are estimates from typical portions.",
+        say(hi, DRAFT_HINT.log, DRAFT_HINT.logHi),
       ].join("\n"),
       sources: [],
       steps: ["Understood a daily note", "Drafted log entries"],
@@ -158,16 +193,28 @@ export async function runHealthAgent(
   if (symptoms)
     return {
       mode: "reference",
-      text: "Let’s organise what you’re experiencing for a clinician. Tell me where the symptom is, when it started, whether it is getting worse and how it affects you. Include any medicines and relevant conditions. I cannot determine the cause or rule out an emergency here. If symptoms are severe, sudden or rapidly worsening, seek medical care now.",
+      text: say(
+        hi,
+        "Let’s organise what you’re experiencing for a clinician. Tell me where the symptom is, when it started, whether it is getting worse and how it affects you. Include any medicines and relevant conditions. I cannot determine the cause or rule out an emergency here. If symptoms are severe, sudden or rapidly worsening, seek medical care now.",
+        "Chaliye, jo aap mehsoos kar rahe hain use doctor ke liye saaf-saaf likh lete hain. Batayein takleef kahan hai, kab shuru hui, badh rahi hai ya nahi, aur roz ke kaam par kaisa asar hai. Jo dawai le rahe hain aur jo bimari pehle se hai, woh bhi batayein. Main wajah tay nahi kar sakta aur emergency ko rule out nahi kar sakta. Agar takleef tez, achanak ya tezi se badh rahi hai, to abhi doctor ya emergency (112) se sampark karein.",
+      ),
       sources: [],
       steps: ["Started symptom intake"],
-      followUp: "Where is the symptom, and when did it begin?",
+      followUp: say(
+        hi,
+        "Where is the symptom, and when did it begin?",
+        "Takleef kahan hai, aur kab shuru hui?",
+      ),
       draftTask: "Discuss my symptoms with a clinician",
     };
   if (!refs.length)
     return {
       mode: "unavailable",
-      text: "I don’t have a suitable reference for that question yet. I can help with nutrition, sleep, medicines, mental wellbeing, preventive care, women’s health, diabetes education and your records. Tell me the specific topic or term you want to understand. Coverage is limited, and I won’t invent a medical answer.",
+      text: say(
+        hi,
+        "I don’t have a suitable reference for that question yet. I can help with nutrition, sleep, medicines, mental wellbeing, preventive care, women’s health, diabetes education and your records. Tell me the specific topic or term you want to understand. Coverage is limited, and I won’t invent a medical answer.",
+        "Is sawal ke liye abhi mere paas bharosemand jaankari nahi hai. Main khana-peena, neend, dawaiyon, mann ki sehat, bachav, mahilaon ki sehat, diabetes aur aapke records me madad kar sakta hoon. Jis topic ya shabd ko samajhna hai, woh batayein. Main apni taraf se medical jawab nahi banaunga.",
+      ),
       sources: [],
       steps,
     };
