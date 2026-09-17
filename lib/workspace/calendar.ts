@@ -1,4 +1,5 @@
 import { shiftDate } from "./daily";
+import { anchorDay } from "./actions";
 import type { CareTask, Saved } from "./types";
 
 // RFC 5545 text escaping and 75-octet line folding.
@@ -21,6 +22,17 @@ function fold(line: string) {
 }
 const compact = (date: string) => date.replaceAll("-", "");
 const RRULE = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
+
+/**
+ * Monthly rules that match the app's month-end fallback: a reminder on the
+ * 31st lands on the last day of shorter months instead of being skipped.
+ */
+function monthlyRule(task: CareTask) {
+  const anchor = anchorDay(task);
+  if (anchor <= 28) return `RRULE:FREQ=MONTHLY;BYMONTHDAY=${anchor}`;
+  const days = Array.from({ length: anchor - 27 }, (_, i) => 28 + i);
+  return `RRULE:FREQ=MONTHLY;BYMONTHDAY=${days.join(",")};BYSETPOS=-1`;
+}
 
 /** An .ics calendar of open care items. Timed items alert at their time using
  * the device's local time zone; all-day items alert at 09:00 that day. Phone
@@ -45,7 +57,11 @@ export function toICS(tasks: Saved<CareTask>[], now = new Date()): string {
         `SUMMARY:${escape(t.title)}`,
         "DESCRIPTION:From your NutritiScan care list. Not medical advice.",
         ...(t.repeat && t.repeat !== "none"
-          ? [`RRULE:FREQ=${RRULE[t.repeat]}`]
+          ? [
+              t.repeat === "monthly"
+                ? monthlyRule(t)
+                : `RRULE:FREQ=${RRULE[t.repeat]}`,
+            ]
           : []),
         "BEGIN:VALARM",
         "ACTION:DISPLAY",
