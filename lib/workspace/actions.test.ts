@@ -269,6 +269,9 @@ describe("companion actions", () => {
     expect(answer?.text).toContain("Today 09:00 — Take vitamin D (every day)");
     expect(answer?.text).toContain("Ask my clinician about Vitamin D");
     expect(recordAnswer("aage kya karna hai", base)?.text).toContain(
+      "care list khaali hai",
+    );
+    expect(recordAnswer("what should I do next", base)?.text).toContain(
       "care list is empty",
     );
     expect(nextStepsAnswer("what is vitamin D", base)).toBeUndefined();

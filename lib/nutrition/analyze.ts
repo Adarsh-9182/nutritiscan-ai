@@ -9,7 +9,7 @@
 // plate; this file decides what it means for the person eating it.
 // ============================================================
 
-import { foodById, matchFood, PORTIONS, type Allergen, type Food } from "./foods";
+import { foodById, matchFood, matchFoods, PORTIONS, type Allergen, type Food } from "./foods";
 import { type HealthProfile } from "../memory/profile";
 
 export type ScanItem = {
@@ -91,14 +91,25 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 // 1. Parsing free text into portions
 // ------------------------------------------------------------
 
-const NUM_WORDS: Record<string, number> = {
-  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, half: 0.5,
-};
+/**
+ * Quantity words in English and Hindi. Order matters: fractions and longer
+ * words are checked before "a"/"an"/"ek", so "half a bowl" is half, not one.
+ */
+const NUM_WORDS: [string, number][] = [
+  ["dedh", 1.5], ["dhai", 2.5], ["dhaai", 2.5], ["sawa", 1.25],
+  ["half", 0.5], ["aadha", 0.5], ["aadhi", 0.5], ["adha", 0.5], ["adhi", 0.5], ["quarter", 0.25],
+  ["two", 2], ["three", 3], ["four", 4], ["five", 5], ["six", 6], ["seven", 7], ["eight", 8], ["nine", 9], ["ten", 10],
+  ["teen", 3], ["char", 4], ["chaar", 4], ["paanch", 5], ["panch", 5], ["chhe", 6], ["saat", 7], ["aath", 8], ["nau", 9], ["das", 10],
+  ["do", 2], ["one", 1], ["ek", 1], ["a", 1], ["an", 1],
+];
+// English "do" ("I do eat…") is not the Hindi number two.
+const ENGLISH_DO = /\b(?:i|you|we|they|to|what|how|dont)\s+do\b|\bdo\s+(?:not|you|we|they|i)\b/;
 
 /** Split "2 rotis, dal and a bowl of curd" into segments. */
 function segments(text: string): string[] {
   return text
-    .split(/,|\band\b|\bwith\b|\bplus\b|\n|\+|&|;/i)
+    .replace(/\bone and a half\b/gi, "1.5")
+    .split(/,|\band\b|\bwith\b|\bplus\b|\baur\b|\bke saa?th\b|\bsaa?th me\b|\n|\+|&|;/i)
     .map((s) => s.trim())
     .filter((s) => s.length > 1);
 }
@@ -113,8 +124,10 @@ function gramsFor(segment: string, food: Food): number {
 
   // leading count — "2 rotis", "three eggs", "half a bowl"
   const numMatch = t.match(/(\d+(?:\.\d+)?)/);
-  const wordMatch = Object.keys(NUM_WORDS).find((w) => new RegExp(`\\b${w}\\b`).test(t));
-  const count = numMatch ? parseFloat(numMatch[1]) : wordMatch ? NUM_WORDS[wordMatch] : null;
+  const wordMatch = NUM_WORDS.find(
+    ([w]) => new RegExp(`\\b${w}\\b`).test(t) && !(w === "do" && ENGLISH_DO.test(t)),
+  );
+  const count = numMatch ? parseFloat(numMatch[1]) : wordMatch ? wordMatch[1] : null;
 
   // a named portion — "bowl", "katori", "scoop", "2 slices"
   const portionKey = Object.keys(PORTIONS).find((p) => new RegExp(`\\b${p}s?\\b`).test(t));
@@ -133,10 +146,17 @@ export function parseMeal(text: string): ScanItem[] {
   const seen = new Set<string>();
 
   for (const seg of segments(text)) {
-    const food = matchFood(seg);
-    if (!food || seen.has(food.id)) continue;
-    seen.add(food.id);
-    items.push(toItem(food, gramsFor(seg, food)));
+    // A segment can name several foods ("2 idli sambar"); each takes the words
+    // since the previous food, so a quantity binds to the food it precedes.
+    const clean = seg.toLowerCase().replace(/[^a-z0-9\s.]/g, " ").replace(/\s+/g, " ").trim();
+    let from = 0;
+    for (const { food, end } of matchFoods(clean)) {
+      const part = clean.slice(from, end);
+      from = end;
+      if (seen.has(food.id)) continue;
+      seen.add(food.id);
+      items.push(toItem(food, gramsFor(part, food)));
+    }
   }
 
   // Nothing segmented cleanly? Sweep the whole string for any known food.

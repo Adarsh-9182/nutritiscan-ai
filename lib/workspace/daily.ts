@@ -1,6 +1,7 @@
 import { parseMeal, type ScanItem } from "@/lib/nutrition/analyze";
 import type { AssistantAnswer } from "./assistant";
 import type { DayLog, LogEntry, Workspace } from "./types";
+import { say, speaksHinglish } from "./voice";
 
 /** Local calendar date, YYYY-MM-DD. */
 export const localDate = (d = new Date()) => d.toLocaleDateString("en-CA");
@@ -78,7 +79,7 @@ export type Pattern = { title: string; detail: string };
 
 /** Observations drawn only from what the person logged. Each states its sample
  * size and never implies a cause or a diagnosis. */
-export function patterns(week: DayTotals[]): Pattern[] {
+export function patterns(week: DayTotals[], hi = false): Pattern[] {
   const found: Pattern[] = [];
   const logged = week.filter((d) => d.entries > 0);
   if (!logged.length) return found;
@@ -86,8 +87,16 @@ export function patterns(week: DayTotals[]): Pattern[] {
   const sleepAvg = average(nights.map((d) => d.sleep!));
   if (nights.length >= 3 && sleepAvg !== null && sleepAvg < 7)
     found.push({
-      title: `Sleep averaged ${sleepAvg} h`,
-      detail: `Across ${nights.length} logged nights. Most adults are advised to get at least 7 hours; if tiredness or poor sleep continues, it is worth raising with a clinician.`,
+      title: say(
+        hi,
+        `Sleep averaged ${sleepAvg} h`,
+        `Neend ausatan ${sleepAvg} ghante`,
+      ),
+      detail: say(
+        hi,
+        `Across ${nights.length} logged nights. Most adults are advised to get at least 7 hours; if tiredness or poor sleep continues, it is worth raising with a clinician.`,
+        `${nights.length} raaton ke log se. Zyadatar badon ko kam se kam 7 ghante ki neend ki salah di jaati hai; agar thakaan ya kharab neend bani rahe to doctor se baat karein.`,
+      ),
     });
   const short = logged.filter(
     (d) => d.sleep !== null && d.sleep < 6 && d.mood !== null,
@@ -100,28 +109,59 @@ export function patterns(week: DayTotals[]): Pattern[] {
     const b = average(rested.map((d) => d.mood!))!;
     if (b - a >= 1)
       found.push({
-        title: "Mood was lower after short nights",
-        detail: `Average mood ${a}/5 on ${short.length} days after under 6 h of sleep, versus ${b}/5 on ${rested.length} other days. A pattern in your notes, not proof of a cause.`,
+        title: say(
+          hi,
+          "Mood was lower after short nights",
+          "Kam neend ke baad mood kam raha",
+        ),
+        detail: say(
+          hi,
+          `Average mood ${a}/5 on ${short.length} days after under 6 h of sleep, versus ${b}/5 on ${rested.length} other days. A pattern in your notes, not proof of a cause.`,
+          `6 ghante se kam neend wale ${short.length} dinon me mood ausatan ${a}/5, baaki ${rested.length} dinon me ${b}/5. Ye aapke notes ka pattern hai, wajah ka saboot nahi.`,
+        ),
       });
   }
   const symptomDays = logged.filter((d) => d.symptoms.length);
   if (symptomDays.length >= 3)
     found.push({
-      title: `Symptoms noted on ${symptomDays.length} days`,
-      detail:
+      title: say(
+        hi,
+        `Symptoms noted on ${symptomDays.length} days`,
+        `${symptomDays.length} din takleef note hui`,
+      ),
+      detail: say(
+        hi,
         "Repeated symptoms are worth discussing with a clinician. Your log can go into a visit summary so you don’t have to remember the dates.",
+        "Baar-baar hone wali takleef ke baare me doctor se baat karein. Aapka log visit summary me jaa sakta hai, taaki tareekhein yaad na rakhni padein.",
+      ),
     });
   const mealDays = logged.filter((d) => d.meals.length && !d.unrecognisedMeals);
   const protein = average(mealDays.map((d) => d.protein));
   if (mealDays.length >= 3 && protein !== null)
     found.push({
-      title: `About ${Math.round(protein)} g protein a day`,
-      detail: `Estimated from ${mealDays.length} days of recognised meals using typical portions. Needs vary with body weight, age and health; a dietitian can set a target for you.`,
+      title: say(
+        hi,
+        `About ${Math.round(protein)} g protein a day`,
+        `Roz lagbhag ${Math.round(protein)} g protein`,
+      ),
+      detail: say(
+        hi,
+        `Estimated from ${mealDays.length} days of recognised meals using typical portions. Needs vary with body weight, age and health; a dietitian can set a target for you.`,
+        `${mealDays.length} din ke pehchane gaye khane se, aam portion ke hisaab se andaaza. Zaroorat vazan, umar aur sehat par nirbhar hai; dietitian aapka target tay kar sakte hain.`,
+      ),
     });
   if (logged.length >= 5)
     found.push({
-      title: `${logged.length} of 7 days logged`,
-      detail: "Consistent notes make patterns and visit summaries more useful.",
+      title: say(
+        hi,
+        `${logged.length} of 7 days logged`,
+        `7 me se ${logged.length} din log kiye`,
+      ),
+      detail: say(
+        hi,
+        "Consistent notes make patterns and visit summaries more useful.",
+        "Roz ke notes se pattern aur visit summary zyada kaam ke bante hain.",
+      ),
     });
   return found;
 }
@@ -210,7 +250,7 @@ export function proposeLog(message: string): LogEntry[] | null {
     // Keep only the clauses that name food, so “had idli, slept 7 hours”
     // stores “had idli” as the meal and the sleep separately.
     const clauses = body
-      .split(/\s*[,;.]\s*|\s+(?:but|then|aur phir)\s+/i)
+      .split(/\s*(?:[,;]|\.(?!\d))\s*|\s+(?:but|then|aur phir|phir)\s+/i)
       .filter((c) => c && parseMeal(c).length);
     if (clauses.length)
       entries.push({
@@ -283,29 +323,34 @@ export function logAnswer(
   // Only questions about what was recorded — “how can I improve my sleep” is
   // an education question, not a request to read the log.
   const aboutLog =
-    (/\b(did i|have i|i've|maine|this week|last week|past week|last (?:7|seven) days|today|aaj|hafte|my (?:daily )?log|so far)\b/i.test(
+    (/\b(did i|have i|i've|maine|kaisi rahi|kaisa raha|kitna|kitni|this week|last week|past week|last (?:7|seven) days|today|aaj|hafte|my (?:daily )?log|so far)\b/i.test(
       question,
     ) &&
-      /\b(sleep|slept|neend|water|paani|ate|eat|eaten|drank|khaya|food|meals?|protein|calories|mood|week|hafte|log|habits?|activity|exercise)\b/i.test(
+      /\b(sleep|slept|neend|water|paani|ate|eat|eaten|drank|khaya|khayi|piya|soya|khana|food|meals?|protein|calories|mood|week|hafte|log|habits?|activity|exercise)\b/i.test(
         question,
       )) ||
     /\b(weekly|week(?:'s)?) (summary|review|report)\b/i.test(question);
   if (!aboutLog || proposeLog(question)) return;
+  const hi = speaksHinglish(question, workspace.profile);
   const week = recentDays(workspace.days, today);
   const logged = week.filter((d) => d.entries);
   if (!logged.length)
     return {
       mode: "record-summary",
       sources: [],
-      text: "You haven’t logged anything in the last 7 days. Tell me what you ate, how you slept or how you feel — for example “had 2 rotis and dal for lunch” or “slept 6 hours” — and I’ll add it to your daily log after you confirm.",
+      text: say(
+        hi,
+        "You haven’t logged anything in the last 7 days. Tell me what you ate, how you slept or how you feel — for example “had 2 rotis and dal for lunch” or “slept 6 hours” — and I’ll add it to your daily log after you confirm.",
+        "Pichhle 7 din me kuch log nahi hua. Batayein kya khaya, kitna soye ya kaisa mehsoos kar rahe hain — jaise “do roti aur dal khayi” ya “6 ghante soya” — aapke confirm karne ke baad main log me add kar dunga.",
+      ),
     };
   const todayTotals = week[week.length - 1];
   const wantsToday =
     /\b(today|aaj)\b/i.test(question) && !/\bweek|hafte/i.test(question);
-  const found = patterns(week);
+  const found = patterns(week, hi);
   const text = wantsToday
     ? [
-        "Today, from your log",
+        say(hi, "Today, from your log", "Aaj ka log"),
         "",
         dayText(todayTotals),
         ...todayTotals.meals.flatMap((m) =>
@@ -315,24 +360,38 @@ export function logAnswer(
                   .map((i) => `${i.name} ${i.grams} g`)
                   .join(", ")}`,
               ]
-            : [`• ${m.text}: no foods recognised, so no estimate`],
+            : [
+                `• ${m.text}: ${say(hi, "no foods recognised, so no estimate", "koi khana pehchana nahi gaya, isliye andaaza nahi")}`,
+              ],
         ),
         "",
-        "Nutrition figures are estimates from typical portions, not measurements.",
+        say(
+          hi,
+          "Nutrition figures are estimates from typical portions, not measurements.",
+          "Nutrition ke numbers aam portion ke andaaze hain, naap nahi.",
+        ),
       ]
     : [
-        `Your last 7 days (${logged.length} logged)`,
+        say(
+          hi,
+          `Your last 7 days (${logged.length} logged)`,
+          `Aapke pichhle 7 din (${logged.length} din log hue)`,
+        ),
         "",
         ...week.filter((d) => d.entries).map((d) => `${d.date}: ${dayText(d)}`),
         ...(found.length
           ? [
               "",
-              "What stands out",
+              say(hi, "What stands out", "Kya dikh raha hai"),
               ...found.map((p) => `• ${p.title}. ${p.detail}`),
             ]
           : []),
         "",
-        "These are summaries of what you logged, not a health assessment.",
+        say(
+          hi,
+          "These are summaries of what you logged, not a health assessment.",
+          "Ye aapke log ka saar hai, sehat ki jaanch nahi.",
+        ),
       ];
   return { mode: "record-summary", sources: [], text: text.join("\n") };
 }

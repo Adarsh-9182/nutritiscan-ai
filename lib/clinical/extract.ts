@@ -67,8 +67,58 @@ const MISSPELLINGS: [RegExp, string][] = [
   [/\bshouldnt\b/g, "should not"],
 ];
 
+/**
+ * Hindi and romanised Hindi (Hinglish) red-flag phrases, rewritten into the
+ * English phrases the reviewed concept lexicon below already recognises.
+ * Translating into existing patterns keeps one set of clinical rules instead
+ * of a second, unreviewed Hindi rulebook.
+ *
+ * Deliberately errs toward escalation. Hindi negation follows the verb
+ * ("dard nahi hai"), which the English negation window cannot see, so a
+ * denied red flag in Hindi may still escalate. That is the safe failure.
+ * The replacement is padded with ". " so an unrelated English negation
+ * earlier in the sentence cannot suppress it.
+ */
+const ME = "(?:me|mein|main|mai|men)";
+const HINDI_RED_FLAGS: [RegExp, string][] = [
+  // Cardiac
+  [new RegExp(`(?:seen[ae]|sine|chh?aa?ti)\\s*${ME}?\\s*(?:\\S+\\s+){0,2}(?:dard|dukh|pain|jakdan|jakad)`, "g"), "chest pain"],
+  [new RegExp(`(?:seen[ae]|sine|chh?aa?ti)\\s*(?:par|pe|${ME})\\s*(?:\\S+\\s+){0,2}(?:dabav|dabaav|dabaw|bojh|bhaar|bhari)`, "g"), "pressure on my chest"],
+  [/(?:सीने|छाती)\s*(?:में|पर)?\s*(?:\S+\s+){0,2}(?:दर्द|दबाव|भारीपन|जकड़न)/g, "chest pain"],
+  [/(?:bayen|baayen|left)\s*haath\s*(?:me|mein)?\s*(?:\S+\s+){0,2}(?:dard|sunn)/g, "pain down my left arm"],
+  // Breathing
+  [new RegExp(`saa?ns\\s*(?:nahi|nahin|nhi|na)\\s*(?:aa|le\\s*pa)`, "g"), "difficulty breathing"],
+  [new RegExp(`saa?ns\\s*(?:lene\\s*)?${ME}?\\s*(?:bahut\\s*)?(?:dikkat|diqqat|takleef|taklif|pareshani|problem)`, "g"), "difficulty breathing"],
+  [/saa?ns\s*(?:phool|ful|fool|ruk|atak)/g, "difficulty breathing"],
+  [/(?:सांस|साँस)\s*(?:नहीं|लेने में|फूल|रुक)/g, "difficulty breathing"],
+  [/(?:hont|honth)\s*(?:\S+\s+)?neel[ea]/g, "blue lips"],
+  // Neurological
+  [/(?:behosh|be hosh|beho?sh)|hosh\s*(?:nahi|nahin|kho)|बेहोश/g, "fainted"],
+  [/(?:chehr[ae]|muh|munh|मुंह|चेहरा)\s*(?:\S+\s+){0,2}(?:tedha|terha|tircha|latak|laTak|टेढ़ा|लटक)/g, "facial droop"],
+  [/(?:ek\s*taraf|ek\s*side|aadh[ae]\s*(?:sharir|shareer|body))\s*(?:\S+\s+){0,3}(?:sunn|kamzor|kaam\s*nahi)|(?:haath|pair|baazu|bazu)\s*(?:\S+\s+){0,2}(?:sunn|kamzor|nahi\s*hil|uth\s*nahi)/g, "left side is weak"],
+  [/(?:bolne|bol)\s*(?:me|mein|nahi)?\s*(?:\S+\s+)?(?:dikkat|taklif|takleef|pa\s*raha\s*nahi|nahi\s*pa)|(?:zubaan|jubaan|awaaz)\s*(?:\S+\s+)?(?:ladkhad|latak|atak)/g, "trouble speaking"],
+  [/(?:achanak|ekdum|ek\s*dam|अचानक)\s*(?:\S+\s+){0,4}(?:sir|sar|सिर)\s*(?:\S+\s+){0,3}(?:dard|दर्द)|(?:sir|sar)\s*(?:me|mein)?\s*(?:\S+\s+){0,4}dard\s*(?:\S+\s+){0,2}(?:achanak|ekdum)|zindagi\s*ka\s*sabse\s*(?:tez|bura)\s*sir\s*dard/g, "sudden severe headache"],
+  [/(?:daura|dora)\s*(?:pad|pa?da|aa)|mirgi|jhatk[ae]\s*(?:aa|lag)|दौरा|मिर्गी/g, "seizure"],
+  [/(?:hosh\s*me\s*nahi|bahki\s*bahki|kisi\s*ko\s*pehchan\s*nahi)/g, "suddenly confused"],
+  [/(?:aankh|ankh)\s*(?:\S+\s+){0,2}(?:dikhna\s*band|andhera\s*chha|roshni\s*chali)/g, "sudden vision loss"],
+  // Allergy / airway
+  [/(?:gala|gale)\s*(?:\S+\s+){0,2}(?:band|sujh|sooj|swell)|(?:jeebh|jibh|hont|honth)\s*(?:\S+\s+)?(?:sujh|sooj|phool)/g, "throat swelling"],
+  // Bleeding
+  [/khoon\s*(?:\S+\s+){0,2}(?:ruk\s*nahi|band\s*nahi|bahut\s*beh|ruk\s*hi\s*nahi)|खून\s*(?:नहीं\s*रुक|बंद\s*नहीं)/g, "will not stop bleeding"],
+  [/khoon\s*(?:ki|wali)\s*ulti|ulti\s*(?:me|mein)\s*khoon|खून\s*की\s*उल्टी/g, "vomiting blood"],
+  [/khansi\s*(?:me|mein)\s*khoon|khoon\s*(?:ki|wali)\s*khansi/g, "coughing up blood"],
+  [/(?:potty|latrine|toilet|mal|stool)\s*(?:me|mein)\s*khoon|kaal[ai]\s*(?:potty|latrine|stool)/g, "blood in stool"],
+  // Mental health
+  [/(?:marne|mar\s*jaane|mar\s*jane)\s*(?:ka|ki|ke)\s*(?:mann|man|iccha|ichha|khayal|khyal|soch|vichar)|khudkushi|khud\s*kushi|aatmahatya|atmahatya|jeena\s*nahi\s*chaht[aie]|jeene\s*ka\s*(?:mann|man)\s*nahi|zindagi\s*khatam\s*kar|khud\s*ko\s*(?:khatam|nuksan|nuksaan|chot)|आत्महत्या|मरने\s*का\s*मन|जीना\s*नहीं\s*चाह/g, "kill myself"],
+  // Poisoning
+  [/zeh[ae]r\s*(?:\S+\s+)?(?:kha|pee|pi)\s*li|(?:bahut|saari|poori|puri)\s*(?:\S+\s+)?(?:goliyan|goli|tablet\w*)\s*(?:\S+\s+)?(?:kha|le)\s*li|ज़हर|जहर\s*खा/g, "overdose"],
+  // Pregnancy
+  [/(?:bachcha|baccha|bacha)\s*(?:\S+\s+){0,2}(?:hil|hilna)\s*(?:nahi|band)/g, "baby stopped moving"],
+];
+
 export function normalize(raw: string): string {
   let t = raw.toLowerCase().normalize("NFKC");
+  for (const [re, to] of HINDI_RED_FLAGS) t = t.replace(re, `. ${to} . `);
   for (const [re, to] of CONTRACTIONS) t = t.replace(re, to);
   for (const [re, to] of MISSPELLINGS) t = t.replace(re, to);
   return t.replace(/\s+/g, " ").trim();
