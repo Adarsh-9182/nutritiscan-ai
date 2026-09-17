@@ -3546,3 +3546,44 @@ dialog.ha-draft::backdrop { background:#232b2370; }
   .ha-starters { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .ha-starters button { min-height:122px; }
 }
+
+/* Floating navigation shell with the conversation as the primary surface. */
+.ns-companion-app { padding:14px 14px 14px 0; background:#eeeee9; }
+.ns-companion-app .ns-sidebar { inset:14px auto 14px 14px; width:222px; height:auto; padding:24px 13px 14px; border:1px solid #d9dbd3; border-radius:22px; box-shadow:0 18px 55px #26312712,0 3px 12px #2631270a; overflow-y:auto; scrollbar-width:none; }
+.ns-companion-app .ns-sidebar::-webkit-scrollbar { display:none; }
+.ns-companion-app .ns-sidebar-brand { margin-bottom:31px; }
+.ns-companion-app .ns-sidebar nav { gap:5px; }
+.ns-companion-app .ns-sidebar nav button { padding:11px 12px; }
+.ns-companion-app .ns-sidebar-note { margin-bottom:18px; padding-top:24px; }
+.ns-companion-app .ns-user { padding-top:15px; margin-top:10px; }
+.ns-companion-app .ns-app-body { margin-left:250px; min-width:0; border:1px solid #dddeda; border-radius:22px; overflow:hidden; background:#f7f6f2; box-shadow:0 12px 45px #2631270b; }
+.ns-companion-app .ns-app-top { margin:0; height:64px; padding:0 30px; flex:none; }
+.ns-companion-app .ns-demo-bar { padding:8px 30px; flex:none; }
+.ns-companion-app .ns-main.assistant-view { width:100%; max-width:none; margin:0; background:#efeee9; }
+.ns-companion-app .ns-app-footer { padding-left:30px; padding-right:30px; }
+.ha-layout { grid-template-columns:minmax(0,1fr) 238px; gap:12px; padding:12px; min-height:calc(100svh - 133px); }
+.ha-layout:not(.ha-has-messages) .ha-conversation,.ha-has-messages .ha-conversation { border:1px solid #dedfd8; border-radius:18px; background:#fbfaf7; }
+.ha-conversation { padding:20px 42px 26px; }
+.ha-context { border:1px solid #dadcd3; border-radius:18px; padding:27px 17px; background:#f5f5ef; }
+.ha-context h2 { font-size:26px; }
+.ha-context-row { padding:13px 11px; }
+.ha-visit-note { padding:20px 13px; }
+.ha-welcome { max-width:850px; }
+.ha-composer,.ha-start-label,.ha-starters,.ha-disclaimer { max-width:800px; }
+.ha-transcript,.ha-device { max-width:800px; }
+@media(max-width:1280px) {
+  .ha-context { display:none; }
+  .ha-layout { grid-template-columns:minmax(0,1fr); }
+  .ha-toolbar { max-width:800px; }
+}
+@media(max-width:850px) {
+  .ns-companion-app { padding:0; }
+  .ns-companion-app .ns-sidebar { inset:10px auto 10px 10px; width:min(292px,calc(100vw - 20px)); transform:translateX(calc(-100% - 20px)); border-radius:20px; }
+  .ns-companion-app .ns-sidebar.open { transform:translateX(0); }
+  .ns-companion-app .ns-app-body { margin-left:0; border:0; border-radius:0; box-shadow:none; }
+  .ns-companion-app .ns-app-top { margin:8px 8px 0; border:1px solid #dedfd8; border-radius:15px; padding:0 16px; }
+  .ns-companion-app .ns-demo-bar { margin:8px; border:1px solid #dcddd4; border-radius:12px; padding:8px 12px; }
+  .ns-companion-app .ns-main.assistant-view { padding:0; }
+  .ha-layout { padding:8px; min-height:auto; }
+  .ha-conversation { padding:18px 14px 24px; }
+}
