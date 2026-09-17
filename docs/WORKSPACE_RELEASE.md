@@ -43,7 +43,7 @@ This release puts a health companion at the centre of the workspace, with accoun
 - The companion understands first-person notes (“had 2 idli for breakfast, slept 7 hours”, “2 glass paani piya”), shows the proposed entries and saves them only after the person confirms. Symptoms are logged only on explicit request (“log symptom: …”), and urgent-care escalation still runs first.
 - Questions about the log (“what did I eat today”, “how did I sleep this week”, “weekly summary”) are answered deterministically from the record. General education questions such as “how can I understand my sleep?” are not redirected to the log.
 - “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
-- Migration: the `ns_records` kind check is widened to include `day`, and the quota recount excludes day logs. Run `node scripts/workspace-migrate.mjs` before deploying.
+- Migration: the `ns_records` kind check is widened to include `day`, the quota recount excludes day logs, and a unique `day_key` (a hash of account and date) makes concurrent first writes for one date fail instead of duplicating it. Export returns all stored days (up to 400); the workspace shows the latest 120. A failed save keeps what the person typed. Run `node scripts/workspace-migrate.mjs` before deploying.
 
 ## Reminders and suggestions — 17 September 2026
 
@@ -56,6 +56,11 @@ This release puts a health companion at the centre of the workspace, with accoun
   - a daily reminder for each medicine in the profile, at an editable time and without a dose;
   - a discussion item when symptoms were logged on 3 or more of the last 7 days.
   Adding a suggestion is the person's explicit confirmation. Dismissals are remembered only in that browser.
+- Fixes from Codex review:
+  - Medicine suggestions never invent a schedule. Only a frequency or time written in the medicines list is pre-filled, and the person must choose both before adding.
+  - A decimal dose (“0.25 mg”) is never read as a clock time.
+  - Monthly reminders keep their original day (31 Jan → 28 Feb → 31 Mar).
+  - Dismissed suggestions are stored only as hashes under a per-account key, which is cleared on sign-out and account deletion.
 - “What should I do next?” / “aage kya karna hai” lists open items and suggestions without a model.
 - The visit summary now includes the last 7 days of the daily log and each reminder's time and repeat.
 
@@ -76,6 +81,10 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Linking uses a single-use code that lasts 15 minutes, opened as a `t.me` deep link. Each account has at most one chat, and each chat belongs to at most one account. The chat id is stored sealed; lookups use a SHA-256 hash. Only private chats are accepted. Deleting the account removes the channel.
 - `/api/telegram` accepts only requests carrying `X-Telegram-Bot-Api-Secret-Token` and always answers 200. `/api/cron/notify` requires `Authorization: Bearer $CRON_SECRET`. Neither route logs message content or chat ids.
 - Scheduling is free: `docs/companion-schedule.yml`, once copied to `.github/workflows/`, calls the cron route every 15 minutes (GitHub may delay runs) and skips if the `CRON_SECRET` repository secret is missing.
+- Fixes from Codex review:
+  - Emergency checks run on the message text before any command (`/today …`) and for chats that are not linked.
+  - Done buttons carry the task version, so a repeated or replayed tap cannot move a reminder forward twice.
+  - Reminders set for late evening are still delivered after midnight within the 90-minute window.
 - Messages pass through Telegram, which has its own privacy terms. The settings screen says so and says Telegram is not for emergencies.
 
 ### Setting it up

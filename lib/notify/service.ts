@@ -3,11 +3,13 @@ import type { Database } from "@/lib/workspace/database";
 import { digest, seal, token, unseal } from "@/lib/workspace/crypto";
 import { ApiError, WorkspaceService } from "@/lib/workspace/service";
 import { runHealthAgent } from "@/lib/workspace/health-agent";
-import { nextOccurrence } from "@/lib/workspace/actions";
+import { completeTask } from "@/lib/workspace/actions";
+import { escalation } from "@/lib/workspace/escalation";
 import { recentDays } from "@/lib/workspace/daily";
 import { say, speaksHinglish } from "@/lib/workspace/voice";
 import {
   DayLogSchema,
+  ProfileSchema,
   TaskSchema,
   type CareTask,
   type LogEntry,
@@ -210,9 +212,17 @@ export class NotifyService {
     const chat = String(message.chat.id);
     const text = message.text.trim().slice(0, 1000);
     await this.workspaces.rate(`telegram:${chatHash(chat)}`, 20);
+    const channel = await this.channelFor(chat);
+    // Emergencies come first, whatever command the words follow and whether
+    // or not the chat is linked.
+    const words = text.replace(/^\/\w+(?:@\w+)?\s*/, "");
+    const profile = channel
+      ? (await this.workspaces.workspace(channel.user_id)).profile
+      : ProfileSchema.parse({ name: "Telegram" });
+    const urgent = words ? escalation(words, profile) : undefined;
+    if (urgent) return this.messenger.send(chat, urgent.text);
     const start = text.match(/^\/start(?:\s+([A-Za-z0-9_-]{20,64}))?$/);
     if (start?.[1]) return this.link(chat, start[1]);
-    const channel = await this.channelFor(chat);
     if (!channel)
       return this.messenger.send(
         chat,
@@ -280,27 +290,31 @@ export class NotifyService {
     now: Date,
   ) {
     const channel = await this.channelFor(chat);
-    const match = data.match(/^([cxd]):([0-9a-f-]{36})$/);
+    // Done buttons carry the task version they were sent for, so a replayed
+    // or repeated tap cannot move a reminder forward twice.
+    const match = data.match(/^([cxd]):([0-9a-f-]{36})(?::(\d{1,9}))?$/);
     if (!channel || !match)
       return this.messenger.acknowledge(
         callbackId,
         "This action is no longer available.",
       );
     const userId = channel.user_id;
-    const [, action, id] = match;
+    const [, action, id, sentVersion] = match;
     if (action === "d") {
       const local = localNow(channel.time_zone, now);
       const workspace = await this.workspaces.workspace(userId);
       const task = workspace.tasks.find((t) => t.id === id);
-      if (!task || task.done)
-        return this.messenger.acknowledge(callbackId, "Already done.");
+      if (!task || task.done || String(task.version) !== sentVersion)
+        return this.messenger.acknowledge(callbackId, "Already updated.");
       const repeating = task.repeat && task.repeat !== "none";
-      const next = TaskSchema.parse(
-        repeating
-          ? { ...task, date: nextOccurrence(task, local.date) }
-          : { ...task, done: true },
-      );
-      await this.workspaces.save(userId, "task", next, task.id, task.version);
+      const next = TaskSchema.parse(completeTask(task, local.date));
+      try {
+        await this.workspaces.save(userId, "task", next, task.id, task.version);
+      } catch (error) {
+        if (error instanceof ApiError)
+          return this.messenger.acknowledge(callbackId, "Already updated.");
+        throw error;
+      }
       await this.messenger.acknowledge(callbackId, "Done ✓");
       return this.messenger.send(
         chat,
@@ -388,8 +402,8 @@ export class NotifyService {
     const workspace = await this.workspaces.workspace(userId);
     let sent = 0;
     const due = [];
-    for (const task of dueReminders(workspace.tasks, local))
-      if (await this.claim(userId, `r:${task.id}:${local.date}:${task.time}`))
+    for (const { task, date } of dueReminders(workspace.tasks, local))
+      if (await this.claim(userId, `r:${task.id}:${date}:${task.time}`))
         due.push(task);
     if (due.length) {
       await this.messenger.send(
@@ -397,7 +411,10 @@ export class NotifyService {
         reminderText(due, settings),
         settings.titles
           ? due.map((t) => [
-              { text: `✓ Done: ${t.title.slice(0, 40)}`, data: `d:${t.id}` },
+              {
+                text: `✓ Done: ${t.title.slice(0, 40)}`,
+                data: `d:${t.id}:${t.version}`,
+              },
             ])
           : undefined,
       );

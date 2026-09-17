@@ -58,6 +58,8 @@ export const TaskSchema = z.object({
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
     .optional(),
   repeat: z.enum(REPEATS).optional(),
+  /** Day of month for monthly reminders, kept when a short month clamps it. */
+  anchorDay: z.number().int().min(1).max(31).optional(),
   category: z.enum(TASK_CATEGORIES).optional(),
 });
 export type CareTask = z.infer<typeof TaskSchema>;
@@ -115,6 +117,8 @@ export type Workspace = {
   reports: Saved<Report>[];
   tasks: Saved<CareTask>[];
   days?: Saved<DayLog>[];
+  /** Opaque per-account key for browser-only preferences. */
+  scope?: string;
 };
 
 export function rangeStatus(

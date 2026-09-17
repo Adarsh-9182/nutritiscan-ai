@@ -62,7 +62,7 @@ export function occursOn(task: CareTask, date: string): boolean {
     case "weekly":
       return days(task.date, date) % 7 === 0;
     case "monthly": {
-      const want = Number(task.date.slice(8));
+      const want = task.anchorDay ?? Number(task.date.slice(8));
       const day = Number(date.slice(8));
       // The 31st falls back to the last day of shorter months.
       const last = new Date(
@@ -76,20 +76,35 @@ export function occursOn(task: CareTask, date: string): boolean {
 const toMinutes = (time: string) =>
   Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 
-/** Timed items whose time has passed within the lateness window. */
+const previousDay = (date: string) => {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * Timed occurrences whose time passed within the lateness window, including
+ * ones from late yesterday: a 23:55 reminder is still due at 00:05. Each
+ * result carries the date of the occurrence it belongs to.
+ */
 export function dueReminders<T extends Saved<CareTask>>(
   tasks: T[],
   local: Local,
-): T[] {
-  return tasks
-    .filter(
-      (t) =>
-        t.time &&
-        occursOn(t, local.date) &&
-        toMinutes(t.time) <= local.minutes &&
-        local.minutes - toMinutes(t.time) < LATE_MINUTES,
-    )
-    .sort((a, b) => a.time!.localeCompare(b.time!));
+): { task: T; date: string }[] {
+  const yesterday = previousDay(local.date);
+  const due: { task: T; date: string; late: number }[] = [];
+  for (const task of tasks) {
+    if (!task.time) continue;
+    const at = toMinutes(task.time);
+    if (occursOn(task, local.date) && at <= local.minutes)
+      due.push({ task, date: local.date, late: local.minutes - at });
+    else if (occursOn(task, yesterday))
+      due.push({ task, date: yesterday, late: local.minutes + 1440 - at });
+  }
+  return due
+    .filter((d) => d.late < LATE_MINUTES)
+    .sort((a, b) => b.late - a.late)
+    .map(({ task, date }) => ({ task, date }));
 }
 
 export function reminderText(

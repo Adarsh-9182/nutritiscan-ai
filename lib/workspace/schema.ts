@@ -22,6 +22,10 @@ UPDATE ns_users SET record_count=(SELECT count(*) FROM ns_records WHERE user_id=
 -- Daily logs ('day') are one record per calendar date; the kind list is widened idempotently.
 ALTER TABLE ns_records DROP CONSTRAINT IF EXISTS ns_records_kind_check;
 ALTER TABLE ns_records ADD CONSTRAINT ns_records_kind_check CHECK (kind IN ('report','task','message','day'));
+-- One day log per account and date, enforced by the database. The key is a
+-- hash of account and date, so the date itself is not stored in clear.
+ALTER TABLE ns_records ADD COLUMN IF NOT EXISTS day_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS ns_records_day_key ON ns_records(day_key) WHERE day_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ns_records_owner ON ns_records(user_id, kind, created_at);
 CREATE TABLE IF NOT EXISTS ns_rate_limits (
   key text PRIMARY KEY, count integer NOT NULL, expires_at timestamptz NOT NULL
