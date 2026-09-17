@@ -30,4 +30,26 @@ CREATE INDEX IF NOT EXISTS ns_records_owner ON ns_records(user_id, kind, created
 CREATE TABLE IF NOT EXISTS ns_rate_limits (
   key text PRIMARY KEY, count integer NOT NULL, expires_at timestamptz NOT NULL
 );
+-- Proactive companion: one messaging channel per account. The chat id is sealed.
+CREATE TABLE IF NOT EXISTS ns_channels (
+  user_id text PRIMARY KEY REFERENCES ns_users(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('telegram')),
+  chat_hash text NOT NULL UNIQUE, chat text NOT NULL,
+  time_zone text NOT NULL DEFAULT 'Asia/Kolkata',
+  settings text NOT NULL DEFAULT '{}',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ns_link_codes (
+  code_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  time_zone text NOT NULL, expires_at timestamptz NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ns_notify_log (
+  user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  key text NOT NULL, sent_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
+);
+CREATE TABLE IF NOT EXISTS ns_pending (
+  id text PRIMARY KEY, user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  payload text NOT NULL, expires_at timestamptz NOT NULL
+);
 `;

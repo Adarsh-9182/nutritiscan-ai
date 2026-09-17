@@ -1,5 +1,6 @@
 import type { AssistantAnswer } from "./assistant";
 import { recentDays, shiftDate, localDate } from "./daily";
+import { say, speaksHinglish } from "./voice";
 import {
   rangeStatus,
   type CareTask,
@@ -367,6 +368,7 @@ export function nextStepsAnswer(
     )
   )
     return;
+  const hi = speaksHinglish(question, workspace.profile);
   const open = workspace.tasks
     .filter((t) => !t.done)
     .sort(
@@ -378,24 +380,34 @@ export function nextStepsAnswer(
     (s) => !s.id.startsWith("overdue:"),
   );
   const line = (t: CareTask) =>
-    `• ${t.date === today ? "Today" : t.date}${t.time ? ` ${t.time}` : ""} — ${t.title}${t.repeat && t.repeat !== "none" ? ` (${repeatText[t.repeat].toLowerCase()})` : ""}${!t.repeat || t.repeat === "none" ? (t.date < today ? " · past due" : "") : ""}`;
+    `• ${t.date === today ? say(hi, "Today", "Aaj") : t.date}${t.time ? ` ${t.time}` : ""} — ${t.title}${t.repeat && t.repeat !== "none" ? ` (${repeatText[t.repeat].toLowerCase()})` : ""}${!t.repeat || t.repeat === "none" ? (t.date < today ? say(hi, " · past due", " · tareekh nikal gayi") : "") : ""}`;
   return {
     mode: "record-summary",
     sources: [],
     text: [
-      open.length ? "On your list" : "Your care list is empty.",
+      open.length
+        ? say(hi, "On your list", "Aapki list me")
+        : say(hi, "Your care list is empty.", "Aapki care list khaali hai."),
       ...open.slice(0, 8).map(line),
       ...(ideas.length
         ? [
             "",
-            "Suggested from your records",
+            say(hi, "Suggested from your records", "Aapke records se sujhav"),
             ...ideas.map((s) => `• ${s.title} — ${s.why}`),
             "",
-            "Open Care & reminders to add any of these. Suggestions organise questions for your clinician; they are not treatment advice.",
+            say(
+              hi,
+              "Open Care & reminders to add any of these. Suggestions organise questions for your clinician; they are not treatment advice.",
+              "Inme se koi bhi jodne ke liye Care & reminders kholein. Ye doctor se poochhne ke sawal hain, ilaaj ki salah nahi.",
+            ),
           ]
         : []),
       "",
-      "Tip: say “remind me to take vitamin D every day at 9am” and I’ll draft it for you.",
+      say(
+        hi,
+        "Tip: say “remind me to take vitamin D every day at 9am” and I’ll draft it for you.",
+        "Tip: bolein “roz subah 9 baje vitamin D lena yaad dilana” aur main reminder bana dunga.",
+      ),
     ].join("\n"),
   };
 }
