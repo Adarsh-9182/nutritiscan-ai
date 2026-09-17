@@ -197,7 +197,7 @@ async function handle(
     if (route === "export" && req.method === "GET") {
       const response = json({
         exportedAt: new Date().toISOString(),
-        ...(await service.workspace(id)),
+        ...(await service.workspace(id, true)),
       });
       response.headers.set(
         "Content-Disposition",

@@ -4,13 +4,32 @@ import { Bell, Check, Sparkles, X } from "lucide-react";
 import { suggestions } from "@/lib/workspace/actions";
 import type { CareTask, Workspace } from "@/lib/workspace/types";
 
-const KEY = "ns-dismissed-suggestions";
-function readDismissed(): string[] {
+const keyFor = (scope: string) => `ns-dismissed:${scope}`;
+function readDismissed(scope: string): string[] {
   try {
-    const value = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    const value = JSON.parse(localStorage.getItem(keyFor(scope)) ?? "[]");
     return Array.isArray(value) ? value.slice(-200) : [];
   } catch {
     return [];
+  }
+}
+/** Suggestion ids contain health details; only an opaque hash is stored. */
+async function opaque(id: string) {
+  const bytes = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(id),
+  );
+  return [...new Uint8Array(bytes).slice(0, 12)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+/** Called on sign-out and account deletion. */
+export function clearDismissals(scope?: string) {
+  if (!scope) return;
+  try {
+    localStorage.removeItem(keyFor(scope));
+  } catch {
+    // Nothing stored.
   }
 }
 
@@ -27,29 +46,44 @@ export default function AgentSuggestions({
   add: (task: CareTask) => Promise<void>;
   compact?: boolean;
 }) {
+  const scope = workspace.scope ?? "demo";
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [hashes, setHashes] = useState<Record<string, string>>({});
   const [times, setTimes] = useState<Record<string, string>>({});
+  const [repeats, setRepeats] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [added, setAdded] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const all = useMemo(
+    () => suggestions(workspace).filter((s) => !s.id.startsWith("overdue:")),
+    [workspace],
+  );
+  const ids = all.map((s) => s.id).join("\n");
   useEffect(() => {
-    // Browser storage is unavailable during server rendering.
-    queueMicrotask(() => setDismissed(readDismissed()));
-  }, []);
-  const list = useMemo(
-    () =>
-      suggestions(workspace).filter(
-        (s) => !dismissed.includes(s.id) && !s.id.startsWith("overdue:"),
-      ),
-    [workspace, dismissed],
+    // Browser storage and hashing are unavailable during server rendering.
+    let alive = true;
+    const pending = ids ? ids.split("\n") : [];
+    Promise.all(pending.map(async (id) => [id, await opaque(id)] as const))
+      .then((pairs) => {
+        if (!alive) return;
+        setHashes(Object.fromEntries(pairs));
+        setDismissed(readDismissed(scope));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [ids, scope]);
+  const list = all.filter(
+    (s) => hashes[s.id] && !dismissed.includes(hashes[s.id]),
   );
   if (!list.length && !added.length) return null;
 
   function dismiss(id: string) {
-    const next = [...dismissed, id];
+    const next = [...dismissed, hashes[id]];
     setDismissed(next);
     try {
-      localStorage.setItem(KEY, JSON.stringify(next.slice(-200)));
+      localStorage.setItem(keyFor(scope), JSON.stringify(next.slice(-200)));
     } catch {
       // Dismissal still applies for this visit.
     }
@@ -85,12 +119,33 @@ export default function AgentSuggestions({
               <p>{s.why}</p>
             </div>
             <div className="as-actions">
-              {s.task.time && (
+              {s.needsSchedule && (
+                <label>
+                  <span className="sr-only">How often</span>
+                  <select
+                    required
+                    value={repeats[s.id] ?? s.task.repeat ?? ""}
+                    onChange={(e) =>
+                      setRepeats({ ...repeats, [s.id]: e.target.value })
+                    }
+                  >
+                    <option value="" disabled>
+                      How often?
+                    </option>
+                    <option value="daily">Every day</option>
+                    <option value="weekly">Every week</option>
+                    <option value="monthly">Every month</option>
+                    <option value="none">Once</option>
+                  </select>
+                </label>
+              )}
+              {(s.task.time || s.needsSchedule) && (
                 <label>
                   <span className="sr-only">Reminder time</span>
                   <input
                     type="time"
-                    value={times[s.id] ?? s.task.time}
+                    required={s.needsSchedule}
+                    value={times[s.id] ?? s.task.time ?? ""}
                     onChange={(e) =>
                       setTimes({ ...times, [s.id]: e.target.value })
                     }
@@ -99,16 +154,24 @@ export default function AgentSuggestions({
               )}
               <button
                 className="ns-button ns-dark"
-                disabled={disabled || busy === s.id}
+                disabled={
+                  disabled ||
+                  busy === s.id ||
+                  (s.needsSchedule &&
+                    (!(times[s.id] ?? s.task.time) ||
+                      !(repeats[s.id] ?? s.task.repeat)))
+                }
                 onClick={async () => {
                   setBusy(s.id);
                   setError("");
                   try {
+                    const time = times[s.id] || s.task.time;
+                    const repeat = (repeats[s.id] ||
+                      s.task.repeat) as CareTask["repeat"];
                     await add({
                       ...s.task,
-                      ...(s.task.time
-                        ? { time: times[s.id] || s.task.time }
-                        : {}),
+                      ...(time ? { time } : {}),
+                      ...(repeat ? { repeat } : {}),
                     });
                     setAdded((a) => [...a, s.title]);
                   } catch {
@@ -118,7 +181,7 @@ export default function AgentSuggestions({
                   }
                 }}
               >
-                {s.task.repeat && s.task.repeat !== "none" ? (
+                {s.task.category === "medicine" ? (
                   <Bell size={14} />
                 ) : (
                   <Check size={14} />

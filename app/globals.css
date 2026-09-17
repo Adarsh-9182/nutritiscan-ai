@@ -3690,3 +3690,5 @@ dialog.ha-draft::backdrop { background:#232b2370; }
 .tg-toggles .ns-check { display:flex; gap:9px; align-items:flex-start; line-height:1.6; }
 .tg-link { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
 .tg-card .ns-button { width:auto; }
+.as-actions select { border:1px solid var(--ns-line); border-radius:8px; padding:7px 8px; font:inherit; font-size:13px; background:#fff; }
+.as-actions { flex-wrap:wrap; justify-content:flex-end; }
