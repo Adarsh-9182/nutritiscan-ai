@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { escalation } from "@/lib/workspace/escalation";
+import { assessTurn } from "@/lib/safety/triage";
+import { blankProfile } from "@/lib/memory/profile";
+
+const verdict = (text: string) =>
+  assessTurn({
+    text,
+    profile: blankProfile,
+    consultationId: "test",
+    turn: 1,
+  }).triage.verdict;
 
 const profile = {
   name: "x",
@@ -27,6 +37,28 @@ describe("Hindi and Hinglish red flags escalate like their English forms", () =>
     "bachcha pet me hil nahi raha",
   ])("%s", (text) => {
     expect(mode(text)).toBe("escalation");
+  });
+
+  it.each([
+    "मेरा हाथ सुन्न हो गया है",
+    "बोलने में दिक्कत हो रही है",
+    "गला बंद हो रहा है",
+    "saans bilkul nahi aa rahi",
+    "सांस बिल्कुल नहीं आ रही",
+    "khoon nahi ruk raha",
+    "khoon ruk hi nahi raha",
+    "खून रुक नहीं रहा",
+  ])("Codex re-review: escalates %s", (text) => {
+    expect(mode(text)).toBe("escalation");
+  });
+
+  it.each([
+    ["seene me severe chest pain ho raha hai", "severe chest pain"],
+    ["seene mein bahut tez dard hai", "severe chest pain"],
+    ["सीने में बहुत तेज दर्द है", "severe chest pain"],
+  ])("keeps severity: %s is as urgent as %s", (hindi, english) => {
+    expect(verdict(english)).toBe("emergency");
+    expect(verdict(hindi)).toBe(verdict(english));
   });
 
   it.each([

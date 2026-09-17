@@ -106,13 +106,15 @@ Until the variables are set, the settings card says Telegram isn't switched on a
 - **Safety fix:** Hindi (Devanagari) and romanised Hindi red flags now escalate. Before this change, “seene me tez dard hai aur saans nahi aa rahi”, “behosh ho gaya” and “marne ka mann kar raha hai” reached no escalation at all.
   - `normalize()` in `lib/clinical/extract.ts` rewrites these phrases into English phrases the existing, reviewed concept lexicon already recognises. This covers chest pain, breathlessness, fainting, facial droop, one-sided weakness, speech trouble, sudden severe headache, seizure, airway swelling, uncontrolled bleeding, blood in vomit, cough or stool, self-harm, overdose and reduced fetal movement.
   - It errs toward escalation: Hindi negation after the verb is not used to suppress a red flag.
+  - Translated phrases keep their severity and onset words (“bahut tez”, “achanak”), so “seene mein bahut tez dard” gets the same emergency verdict as “severe chest pain”. Devanagari stroke and airway phrases, “khoon nahi ruk raha” and “saans bilkul nahi aa rahi” are covered (from Codex re-review).
   - This is a phrase list, not clinical validation. Hindi coverage still needs review by clinicians who speak the language.
 - The food table grows from 54 to 115 foods: common North and South Indian meals, snacks, sweets, drinks and fruit. Values are rounded public reference figures, and a test checks each food's calories against its macros (within 35%).
 - Meal parsing:
   - understands Hindi quantities (ek, do, teen, aadha, dedh, dhai…) and portions (chammach, mutthi, dona, ladle), and splits on “aur” and “ke saath”;
   - binds a count to the food it precedes and reads every food in a phrase (“2 idli sambar”);
   - fixes “half a bowl” being read as one bowl and “1.5 roti” being split at the decimal point;
-  - no longer reads English “do” as two.
+  - no longer reads English “do” as two;
+  - keeps a weight written after a food (“rice 200g”) and treats a sentence-ending full stop as a boundary.
 - Replies come in Hinglish when the profile language is Hindi / Hinglish, or when the message is in Hinglish or Devanagari. This covers log and reminder drafts, symptom intake, the dose boundary (now also triggered by “kitni goli”), “no reference” replies, log summaries, patterns and next steps, including in Telegram. Fixed escalation templates stay in English and still include the local emergency number.
 
 ### Validation and limits

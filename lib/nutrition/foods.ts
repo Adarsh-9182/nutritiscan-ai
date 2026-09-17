@@ -214,7 +214,13 @@ export function matchFood(text: string): Food | null {
  * first, so "brown rice" never also yields "rice".
  */
 export function matchFoods(text: string): { food: Food; start: number; end: number }[] {
-  const t = ` ${text.toLowerCase().replace(/[^a-z0-9\s.]/g, " ").replace(/\s+/g, " ").trim()} `;
+  // Keep decimal points ("1.5") but treat sentence full stops as spaces.
+  const t = ` ${text
+    .toLowerCase()
+    .replace(/(?<!\d)\.|\.(?!\d)/g, " ")
+    .replace(/[^a-z0-9\s.]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()} `;
   const taken: { food: Food; start: number; end: number }[] = [];
   for (const { alias, food } of INDEX) {
     let from = 0;

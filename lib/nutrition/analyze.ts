@@ -146,17 +146,32 @@ export function parseMeal(text: string): ScanItem[] {
   const seen = new Set<string>();
 
   for (const seg of segments(text)) {
-    // A segment can name several foods ("2 idli sambar"); each takes the words
-    // since the previous food, so a quantity binds to the food it precedes.
-    const clean = seg.toLowerCase().replace(/[^a-z0-9\s.]/g, " ").replace(/\s+/g, " ").trim();
+    // A segment can name several foods ("2 idli sambar"). Each food takes the
+    // words since the previous one, plus a weight written straight after its
+    // own name ("rice 200g"), so every quantity binds to the right food.
+    const clean = seg
+      .toLowerCase()
+      .replace(/(?<!\d)\.|\.(?!\d)/g, " ")
+      .replace(/[^a-z0-9\s.]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const found = matchFoods(clean);
     let from = 0;
-    for (const { food, end } of matchFoods(clean)) {
-      const part = clean.slice(from, end);
-      from = end;
-      if (seen.has(food.id)) continue;
+    found.forEach(({ food, end }, i) => {
+      const last = i === found.length - 1;
+      const rest = clean.slice(end, last ? clean.length : found[i + 1].start);
+      const trailing = rest.match(
+        last
+          ? /^\s*(?:x\s*)?\d+(?:\.\d+)?\s*(?:g|gm|gms|grams?|ml|pcs?|pieces?)?\s*(?=$|\s)|^\s*(?:x\s*)?\d+(?:\.\d+)?\s*(?:g|gm|gms|grams?|ml)\b/
+          : /^\s*(?:x\s*)?\d+(?:\.\d+)?\s*(?:g|gm|gms|grams?|ml)\b/,
+      );
+      const stop = end + (trailing?.[0].length ?? 0);
+      const part = clean.slice(from, stop);
+      from = stop;
+      if (seen.has(food.id)) return;
       seen.add(food.id);
       items.push(toItem(food, gramsFor(part, food)));
-    }
+    });
   }
 
   // Nothing segmented cleanly? Sweep the whole string for any known food.

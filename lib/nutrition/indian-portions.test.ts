@@ -27,6 +27,17 @@ describe("Indian meals and Hindi quantities", () => {
     expect(grams("2 idli sambar ke saath")).toEqual({ Idli: 80, Dal: 150 });
     expect(grams("brown rice")).toEqual({ "Brown rice": 180 });
   });
+  it("keeps weights written after the food and survives full stops", () => {
+    expect(grams("rice 200g")).toEqual({ "Cooked rice": 200 });
+    expect(grams("dal 100g rice 200g")).toEqual({
+      Dal: 100,
+      "Cooked rice": 200,
+    });
+    expect(grams("2 rotis and dal.")).toEqual({ Roti: 80, Dal: 150 });
+    expect(grams("3 eggs.")).toEqual({ Egg: 150 });
+    expect(grams("eggs 3")).toEqual({ Egg: 150 });
+    expect(grams("idli at 9 in the morning")).toEqual({ Idli: 80 });
+  });
   it("does not read English 'do' as two", () => {
     expect(grams("I do love rajma")).toEqual({ Rajma: 150 });
   });
