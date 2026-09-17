@@ -8,6 +8,7 @@ import {
   unseal,
   token,
 } from "./crypto";
+import { ProfileSchema } from "./types";
 import type {
   Profile,
   Saved,
@@ -94,6 +95,56 @@ export class WorkspaceService {
     if (!user || !matches)
       throw new ApiError(401, "Username or password is incorrect.");
     return { id: user.id, session: await this.session(user.id) };
+  }
+
+  /**
+   * Signs in with an external identity, creating an account on first use
+   * only when `allowCreate` (the person has agreed to the terms and is 18+).
+   * Returns null when there is no account and creation is not allowed.
+   */
+  async signInWithProvider(
+    provider: "google",
+    subject: string,
+    name: string,
+    allowCreate: boolean,
+  ): Promise<{ id: string; session: string; created: boolean } | null> {
+    const key = digest(`${provider}:${subject}`);
+    const found = await this.db.query<{ user_id: string }>(
+      "SELECT user_id FROM ns_identities WHERE subject_hash=$1",
+      [key],
+    );
+    if (found[0])
+      return {
+        id: found[0].user_id,
+        session: await this.session(found[0].user_id),
+        created: false,
+      };
+    if (!allowCreate) return null;
+    const id = randomUUID();
+    // Provider accounts have no usable password or recovery key: both are
+    // random values nobody is shown.
+    await this.db.query(
+      `INSERT INTO ns_users (id,username,password_hash,recovery_hash,profile)
+      VALUES ($1,$2,$3,$4,$5)`,
+      [
+        id,
+        `${provider}_${token().slice(0, 16).toLowerCase().replace(/[^a-z0-9]/g, "x")}`,
+        await hashPassword(token()),
+        digest(token()),
+        await seal(ProfileSchema.parse({ name: name || "Friend" }), id),
+      ],
+    );
+    const linked = await this.db.query<{ user_id: string }>(
+      `INSERT INTO ns_identities (subject_hash,user_id,provider) VALUES ($1,$2,$3)
+      ON CONFLICT (subject_hash) DO NOTHING RETURNING user_id`,
+      [key, id, provider],
+    );
+    if (!linked.length) {
+      // A parallel first sign-in won the race: use that account instead.
+      await this.db.query("DELETE FROM ns_users WHERE id=$1", [id]);
+      return this.signInWithProvider(provider, subject, name, false);
+    }
+    return { id, session: await this.session(id), created: true };
   }
 
   async session(id: string) {

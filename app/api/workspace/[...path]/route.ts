@@ -16,6 +16,7 @@ import {
 import { readJsonCapped } from "@/lib/http/guard";
 import { sameOrigin } from "@/lib/workspace/http";
 import { answer, modelConfigured } from "@/lib/workspace/assistant";
+import { googleConfigured } from "@/lib/auth/google";
 import { NotifyService } from "@/lib/notify/service";
 import { telegram, telegramConfigured } from "@/lib/notify/telegram";
 
@@ -61,6 +62,7 @@ async function handle(
     if (route === "status" && req.method === "GET")
       return json({
         model: modelConfigured(),
+        google: googleConfigured(),
         accounts:
           Boolean(
             process.env.DATABASE_URL &&

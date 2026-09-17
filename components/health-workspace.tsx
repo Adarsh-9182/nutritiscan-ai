@@ -208,17 +208,42 @@ function Empty({
   );
 }
 
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"
+      />
+      <path
+        fill="#FF3D00"
+        d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"
+      />
+    </svg>
+  );
+}
+
 function AccountGate({
   onReady,
   demo,
   guest,
   available,
+  google,
   initialError,
 }: {
   onReady: (recovery?: string) => void;
   demo: () => void;
   guest: () => void;
   available: boolean;
+  google: boolean;
   initialError: string;
 }) {
   const [mode, setMode] = useState<"register" | "login" | "recover">(() =>
@@ -231,12 +256,17 @@ function AccountGate({
   const [error, setError] = useState("");
   const [recovery, setRecovery] = useState("");
   const [show, setShow] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
     const f = new FormData(e.currentTarget);
-    const agreed = f.get("agree") === "on";
+    if (mode === "register" && !agreed) {
+      setBusy(false);
+      setError("Please tick the box to confirm you’re 18+ and agree.");
+      return;
+    }
     try {
       const result = await api<{ recovery?: string }>(mode, "POST", {
         username: f.get("username"),
@@ -298,6 +328,46 @@ function AccountGate({
             without an account.
           </p>
         )}
+        {google && mode !== "recover" && (
+          <>
+            {mode === "register" && (
+              <label className="au-check au-google-consent">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                <span>
+                  I’m 18 or older and agree to the{" "}
+                  <Link href="/terms" target="_blank">
+                    Terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank">
+                    Privacy notice
+                  </Link>
+                  , including storing the records I add.
+                </span>
+              </label>
+            )}
+            <a
+              className={`au-google ${mode === "register" && !agreed ? "disabled" : ""}`}
+              aria-disabled={mode === "register" && !agreed}
+              href={`/api/auth/google${mode === "register" ? "?consent=1" : ""}`}
+              onClick={(e) => {
+                if (mode === "register" && !agreed) {
+                  e.preventDefault();
+                  setError("Please tick the box above first.");
+                }
+              }}
+            >
+              <GoogleIcon /> Continue with Google
+            </a>
+            <div className="au-or">
+              <span>or use a username</span>
+            </div>
+          </>
+        )}
         <form onSubmit={submit} className="au-form">
           {mode === "register" && (
             <label>
@@ -355,9 +425,15 @@ function AccountGate({
               </button>
             </div>
           </label>
-          {mode === "register" && (
+          {mode === "register" && !google && (
             <label className="au-check">
-              <input type="checkbox" name="agree" required />
+              <input
+                type="checkbox"
+                name="agree"
+                required
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
               <span>
                 I’m 18 or older and agree to the{" "}
                 <Link href="/terms" target="_blank">
@@ -449,6 +525,7 @@ export default function HealthWorkspace() {
   const [agentAccessVersion, setAgentAccessVersion] = useState(0);
   const accessLock = useRef(false);
   const [accounts, setAccounts] = useState(true);
+  const [google, setGoogle] = useState(false);
   const [agentSeed, setAgentSeed] = useState<{
     text: string;
     id: number;
@@ -522,11 +599,27 @@ export default function HealthWorkspace() {
     }
     Promise.allSettled([
       api<Workspace>("state"),
-      api<{ model: boolean; accounts: boolean }>("status"),
+      api<{ model: boolean; accounts: boolean; google?: boolean }>("status"),
     ]).then(([w, s]) => {
       if (!alive) return;
+      const google = params.get("google");
+      if (google)
+        setError(
+          google === "consent"
+            ? "There’s no NutritiScan account for that Google account yet. Tick the box below and continue with Google to create one."
+            : google === "cancelled"
+              ? "Google sign-in was cancelled."
+              : google === "off"
+                ? "Google sign-in isn’t available yet. Use a username and password."
+                : "Google sign-in didn’t work. Please try again.",
+        );
+      if (params.has("welcome"))
+        setNotice("Welcome to NutritiScan. Your account is ready.");
+      if (google || params.has("welcome"))
+        history.replaceState(null, "", "/workspace");
       if (s.status === "fulfilled") {
         setAccounts(s.value.accounts);
+        setGoogle(Boolean(s.value.google));
       } else {
         setAccounts(false);
       }
@@ -818,6 +911,7 @@ export default function HealthWorkspace() {
         demo={openDemo}
         guest={() => openGuest()}
         available={accounts}
+        google={google}
         initialError={error}
       />
     );
