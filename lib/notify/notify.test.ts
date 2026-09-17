@@ -239,6 +239,9 @@ describe("companion over Telegram", () => {
     expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
     // The help text also mentions 112, so check it was not sent instead.
     expect(bot.last().text).not.toContain("I’m your NutritiScan companion");
+    await say("/today seene me tez dard aur saans nahi aa rahi");
+    expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
+    expect(bot.last().text).not.toContain("care list");
     await notify.handleUpdate({
       message: {
         text: "I have crushing chest pain and cannot breathe",
@@ -247,7 +250,7 @@ describe("companion over Telegram", () => {
     });
     expect(bot.last().chat).toBe("4242");
     expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
-    expect(bot.sent.length).toBe(plain + 3);
+    expect(bot.sent.length).toBe(plain + 4);
   });
 
   it("sends due reminders once, with Done buttons when titles are shown", async () => {
