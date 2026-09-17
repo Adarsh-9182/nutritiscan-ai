@@ -115,7 +115,9 @@ const HINDI_RED_FLAGS: [RegExp, string][] = [
   [/(?:marne|mar\s*jaane|mar\s*jane)\s*(?:ka|ki|ke)\s*(?:mann|man|iccha|ichha|khayal|khyal|soch|vichar)|khudkushi|khud\s*kushi|aatmahatya|atmahatya|jeena\s*nahi\s*chaht[aie]|jeene\s*ka\s*(?:mann|man)\s*nahi|zindagi\s*khatam\s*kar|khud\s*ko\s*(?:khatam|nuksan|nuksaan|chot)|आत्महत्या|मरने\s*का\s*मन|जीना\s*नहीं\s*चाह/g, "kill myself"],
   // Poisoning
   [/zeh[ae]r\s*(?:\S+\s+)?(?:kha|pee|pi)\s*li|(?:bahut|saari|poori|puri)\s*(?:\S+\s+)?(?:goliyan|goli|tablet\w*)\s*(?:\S+\s+)?(?:kha|le)\s*li|ज़हर|जहर\s*खा/g, "overdose"],
-  // Pregnancy
+  // Pregnancy and bleeding (heavy bleeding escalates on its own)
+  [/garbh?[wv]at[iy]|गर्भवती/g, "pregnant"],
+  [/(?:khoon|khun)\s*(?:\S+\s+)?(?:beh|bah)\s*(?:raha|rahi|gaya)|bleeding\s*(?:bahut\s*)?ho\s*(?:rahi|raha)|खून\s*(?:\S+\s+)?(?:बह|निकल)\s*रह/g, "bleeding heavily"],
   [/(?:bachcha|baccha|bacha)\s*(?:\S+\s+){0,2}(?:hil|hilna)\s*(?:nahi|band)/g, "baby stopped moving"],
 ];
 
@@ -300,6 +302,8 @@ const CONCEPTS: ConceptSpec[] = [
     label: "Uncontrolled bleeding",
     patterns: [
       "bleeding (heavily|badly|a lot)", "(will|would) not stop bleeding", "can not stop the bleeding",
+      "bleeding (will|would|does|is|has) not stop", "(severe|heavy|major|uncontrolled|profuse) bleeding",
+      "not stop(ping)? bleeding",
       "losing a lot of blood", "soaked through", "gushing blood", "pouring blood",
     ],
   },
@@ -407,7 +411,8 @@ const CONCEPTS: ConceptSpec[] = [
     label: "Poisoning or overdose",
     patterns: [
       "overdose", "took too many", "swallow\\w*.{0,20}(pills|tablets|bleach|chemical)",
-      "took (a )?(whole|entire) (bottle|packet|strip)", "poisoned", "drank.{0,15}(bleach|chemical|detergent)",
+      "took (a )?(whole|entire) (bottle|packet|strip)",
+      "(took|taken|swallowed|had) ([1-9][0-9]|[0-9]{3,}) [a-z]{0,15} ?(pills|tablets|capsules)", "poisoned", "drank.{0,15}(bleach|chemical|detergent)",
     ],
   },
 
@@ -514,7 +519,11 @@ const HISTORY_BEFORE = /\b(history of|used to|previously|in the past|years back)
  * "since last week" describes something ONGOING, and misreading that as
  * resolved history would silently suppress a live red flag.
  */
-const HISTORY_AFTER = /^\s*(\w+\s+){0,3}(ago\b|as a child\b|when i was\b|back in\b|in (19|20)\d{2}\b)/;
+// "Ago" marks history only at the scale of weeks or more: "20 minutes ago"
+// or "an hour ago" describes something happening now, and reading it as
+// history suppressed live red flags such as an overdose or chest pain.
+const HISTORY_AFTER =
+  /^\s*(\w+\s+){0,3}?((\d+|a|an|one|two|three|few|several|many|couple of)\s+(weeks?|months?|years?|yrs?)\s+ago\b|long ago\b|years ago\b|as a child\b|when i was\b|back in\b|in (19|20)\d{2}\b)/;
 /** "since"/"for" mark a symptom that started then and continues. */
 const ONGOING_BEFORE = /\b(since|for the (past|last))\s*$/;
 

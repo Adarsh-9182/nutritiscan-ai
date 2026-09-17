@@ -117,4 +117,65 @@ describe("companion interactions", () => {
     });
     expect(persist.mock.calls[1][1]).toHaveLength(4);
   });
+  it("streams an AI answer for open questions and renders it as text", async () => {
+    const encoder = new TextEncoder();
+    const lines = [
+      { t: "delta", v: "## Kidney stones\n" },
+      { t: "delta", v: "- Drink **water**\n" },
+      { t: "done" },
+    ];
+    const fetchMock = vi.fn<
+      (url: string, init?: RequestInit) => Promise<Response>
+    >((url) =>
+      Promise.resolve(
+        url.includes("status")
+          ? new Response(JSON.stringify({ model: true }))
+          : new Response(
+              new ReadableStream({
+                start(c) {
+                  for (const l of lines)
+                    c.enqueue(encoder.encode(`${JSON.stringify(l)}\n`));
+                  c.close();
+                },
+              }),
+            ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const persist = vi.fn().mockResolvedValue({
+        id: "c",
+        version: 1,
+        title: "t",
+        createdAt: "2026-09-17T00:00:00Z",
+      });
+      render(<HealthAgent {...props()} persist={persist} />);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/workspace/status",
+          expect.anything(),
+        ),
+      );
+      await new Promise((r) => setTimeout(r, 0));
+      fireEvent.change(screen.getByLabelText("Message your health assistant"), {
+        target: { value: "What are kidney stones?" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+      expect(
+        await screen.findByRole("heading", { name: "Kidney stones" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("water").tagName).toBe("STRONG");
+      expect(screen.getByText("NutritiScan AI")).toBeInTheDocument();
+      await waitFor(() => expect(persist).toHaveBeenCalled());
+      const stored = persist.mock.calls[0][1];
+      expect(stored[1]).toMatchObject({ role: "assistant", mode: "ai" });
+      const body = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+      expect(body.messages.at(-1)).toEqual({
+        role: "user",
+        text: "What are kidney stones?",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

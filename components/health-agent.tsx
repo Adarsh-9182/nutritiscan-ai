@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { runHealthAgent, type AgentReply } from "@/lib/workspace/health-agent";
 import { type DeviceModel } from "@/lib/workspace/device-model";
+import { streamCompanion } from "@/lib/companion/client";
 import {
   TaskSchema,
   type CareTask,
@@ -49,6 +50,8 @@ type Message = {
   answer?: AgentReply;
   /** Newly arrived replies are revealed progressively. */
   fresh?: boolean;
+  /** An AI answer still arriving. */
+  streaming?: boolean;
 };
 
 const starters = [
@@ -67,7 +70,7 @@ const starters = [
 ] as const;
 
 const modeText = {
-  ai: "On-device AI · experimental",
+  ai: "NutritiScan AI",
   reference: "From health reference notes",
   "record-summary": "From your own records",
   escalation: "Safety first",
@@ -154,34 +157,83 @@ function Reveal({ text, onDone }: { text: string; onDone: () => void }) {
   );
 }
 
+/** **bold** and whole-line _italic_; everything else stays plain text
+ * (no HTML is parsed). */
+function Inline({ text }: { text: string }) {
+  const italic = text.match(/^_(.+)_$/);
+  if (italic)
+    return (
+      <em>
+        <Inline text={italic[1]} />
+      </em>
+    );
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^\*\*[^*]+\*\*$/.test(part) ? (
+          <strong key={i}>{part.slice(2, -2)}</strong>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+/** A small, safe subset of Markdown for answers: headings, bullet and
+ * numbered lists, bold. Short lines before a blank line in the app's own
+ * replies also read as headings. */
 function Body({ text }: { text: string }) {
-  // Plain text with light structure: short lines followed by a blank line
-  // read as headings, "• " lines as bullets.
   const lines = text.split("\n");
   return (
     <>
-      {lines.map((line, i) => {
+      {lines.map((raw, i) => {
+        const line = raw.trimEnd();
+        if (!line.trim()) return <div key={i} className="cg-gap" />;
+        const md = line.match(/^#{1,4}\s+(.*)$/);
+        if (md)
+          return (
+            <h3 key={i} className="cg-h">
+              <Inline text={md[1].replace(/\*\*/g, "")} />
+            </h3>
+          );
+        const bullet = line.match(/^\s*(?:[-*•])\s+(.*)$/);
+        if (bullet)
+          return (
+            <p
+              key={i}
+              className={`cg-li ${/^\s{2,}/.test(line) ? "nested" : ""}`}
+            >
+              <Inline text={bullet[1]} />
+            </p>
+          );
+        const numbered = line.match(/^\s*(\d{1,2})[.)]\s+(.*)$/);
+        if (numbered)
+          return (
+            <p key={i} className="cg-ol" data-n={`${numbered[1]}.`}>
+              <Inline text={numbered[2]} />
+            </p>
+          );
+        if (/^-{3,}$/.test(line.trim()))
+          return <hr key={i} className="cg-hr" />;
         const heading =
-          line.length > 0 &&
           line.length < 60 &&
-          !/[.:,]$/.test(line) &&
-          !line.startsWith("•") &&
+          !/[.:,?]$/.test(line) &&
           lines[i + 1] === "" &&
-          i < lines.length - 2;
-        if (!line) return <div key={i} className="cg-gap" />;
+          i < lines.length - 2 &&
+          !line.includes("**");
         if (heading)
           return (
             <h3 key={i} className="cg-h">
               {line}
             </h3>
           );
-        if (line.startsWith("• "))
-          return (
-            <p key={i} className="cg-li">
-              {line.slice(2)}
-            </p>
-          );
-        return <p key={i}>{line}</p>;
+        return (
+          <p key={i}>
+            <Inline text={line} />
+          </p>
+        );
       })}
     </>
   );
@@ -238,6 +290,8 @@ export default function HealthAgent({
   const [saveError, setSaveError] = useState("");
   const [copied, setCopied] = useState("");
   const [persistError, setPersistError] = useState("");
+  /** Whether this deployment has cloud AI answers switched on. */
+  const [cloud, setCloud] = useState(false);
   const chatMeta = useRef<ChatMeta | null>(
     conversation
       ? {
@@ -268,6 +322,16 @@ export default function HealthAgent({
       loadController.current?.abort();
       turnController.current?.abort();
       model.current?.dispose();
+    };
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/workspace/status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => alive && setCloud(Boolean(s?.model)))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
     };
   }, []);
   useEffect(() => {
@@ -308,6 +372,94 @@ export default function HealthAgent({
     });
   }
 
+  function patch(id: string, change: (m: Message) => Message) {
+    setMessages((current) => current.map((m) => (m.id === id ? change(m) : m)));
+  }
+
+  /** Streams an AI answer into a placeholder message. Returns the final
+   * message, or null when the AI could not start (the caller falls back). */
+  async function streamAnswer(
+    history: Message[],
+    base: AgentReply,
+    signal: AbortSignal,
+  ): Promise<Message | null> {
+    const id = crypto.randomUUID();
+    let current: Message = {
+      id,
+      role: "assistant",
+      text: "",
+      streaming: true,
+      answer: {
+        ...base,
+        mode: "ai",
+        text: "",
+        steps: [
+          "Checked for urgent warning signs",
+          "Read your context",
+          "Wrote an answer",
+        ],
+        detail: undefined,
+        followUp: undefined,
+      },
+    };
+    let started = false;
+    let failure = "";
+    const update = (next: Message) => {
+      current = next;
+      if (!started) {
+        started = true;
+        setMessages((all) => [...all, next]);
+      } else patch(id, () => next);
+    };
+    try {
+      await streamCompanion(
+        history.map((m) => ({ role: m.role, text: m.text })),
+        (event) => {
+          if (event.t === "delta")
+            update({ ...current, text: current.text + event.v });
+          else if (event.t === "replace")
+            update({
+              ...current,
+              text: event.v,
+              answer: {
+                ...current.answer!,
+                mode: event.mode === "escalation" ? "escalation" : "ai",
+                steps:
+                  event.mode === "escalation"
+                    ? ["Urgent-care guidance"]
+                    : current.answer!.steps,
+                draftTask: undefined,
+              },
+            });
+          else if (event.t === "error") failure = event.v;
+        },
+        signal,
+      );
+    } catch (error) {
+      if (signal.aborted && started)
+        return {
+          ...current,
+          streaming: false,
+          answer: { ...current.answer!, detail: "Stopped." },
+        };
+      if (!started) {
+        if ((error as { status?: number }).status === 503) setCloud(false);
+        return null;
+      }
+      failure = "The answer was cut off. Please try again.";
+    }
+    if (!started) return null;
+    return {
+      ...current,
+      streaming: false,
+      answer: {
+        ...current.answer!,
+        text: current.text,
+        ...(failure ? { detail: failure } : {}),
+      },
+    };
+  }
+
   async function ask(text: string) {
     if (!text.trim() || active.current) return;
     active.current = true;
@@ -333,7 +485,21 @@ export default function HealthAgent({
           .slice(-3)
           .map((m) => m.text),
       });
-      reply = {
+      // Records, drafts and escalations stay deterministic. Open questions
+      // go to the AI when it is available and private AI is not chosen.
+      const open =
+        (answer.mode === "reference" || answer.mode === "unavailable") &&
+        !answer.draftLog &&
+        !answer.draftReminder;
+      const streamed =
+        open && cloud && !model.current
+          ? await streamAnswer(
+              [...before, userMessage],
+              answer,
+              controller.signal,
+            )
+          : null;
+      reply = streamed ?? {
         id: crypto.randomUUID(),
         role: "assistant",
         text: answer.text,
@@ -537,7 +703,9 @@ export default function HealthAgent({
                 <span>
                   <b>NutritiScan Health</b>
                   <small>
-                    Your records, daily log and curated health references
+                    {cloud
+                      ? "AI answers with your records and daily log as context. Runs on an open model via Groq, which doesn’t train on your messages."
+                      : "Your records, daily log and curated health references"}
                   </small>
                 </span>
                 {device !== "ready" && <Check size={15} />}
@@ -660,7 +828,12 @@ export default function HealthAgent({
                       </div>
                     )}
                     <div className="cg-text">
-                      {message.fresh ? (
+                      {message.streaming ? (
+                        <>
+                          <Body text={message.text} />
+                          <span className="cg-caret" />
+                        </>
+                      ) : message.fresh ? (
                         <p className="cg-stream">
                           <Reveal
                             text={message.text}
@@ -671,7 +844,7 @@ export default function HealthAgent({
                         <Body text={message.text} />
                       )}
                     </div>
-                    {!message.fresh && (
+                    {!message.fresh && !message.streaming && (
                       <>
                         {message.answer?.detail && (
                           <p className="cg-note">{message.answer.detail}</p>
@@ -807,7 +980,7 @@ export default function HealthAgent({
                 </article>
               ),
             )}
-            {busy && (
+            {busy && !messages.some((m) => m.streaming) && (
               <article className="cg-msg assistant" role="status">
                 <span className="cg-avatar" aria-hidden="true">
                   n.

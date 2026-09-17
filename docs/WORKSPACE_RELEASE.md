@@ -128,6 +128,43 @@ Until the variables are set, the settings card says Telegram isn't switched on a
 - Signed-in chats are saved as encrypted `ns_records` rows of the existing `message` kind, so no migration is needed. They are versioned, capped at 200 per account and kept outside the report/task quota. Each save keeps the latest 120 messages under the API body limit. Drafts are never stored, so a reopened chat cannot re-offer an action already handled. Demo chats stay in memory.
 - The privacy notice now says chats are saved and can be deleted.
 
+## Real AI answers — 17 September 2026
+
+- Open questions (anything that is not a record summary, a log/reminder draft or an escalation) are answered by an open model through Groq's OpenAI-compatible API. Answers stream token by token into the chat.
+- `/api/companion` works like this:
+  - It requires same-origin requests and checks the emergency rules on the server first, using the last three user turns, including the Hindi/Hinglish red flags. On a red flag it sends the fixed escalation text and never calls the model.
+  - Signed-in people get context: profile, reports allowed in Sources & access, the last 7 days of the log and open reminders. Guests get general answers only.
+  - Rate limits: 15 per minute and 300 per day per account; 8 per minute and 60 per day per network for guests.
+  - An output guard stops and replaces an answer that turns into a personal dose instruction, a stop-your-medicine instruction or a certain diagnosis. English and Hindi word order are both covered.
+  - Prompts, answers and health context are never logged.
+- Provider terms: Groq says it does not train on API inputs or outputs, on any plan. It may retain them for up to 30 days for abuse or reliability checks unless Zero Data Retention is enabled in the Groq console, which we recommend. Sources: [Your data in GroqCloud](https://console.groq.com/docs/your-data), [Services agreement](https://console.groq.com/docs/legal/services-agreement). The privacy notice describes this.
+- Configuration (Vercel production):
+
+| Variable | Value |
+| --- | --- |
+| `HEALTH_MODEL_BASE_URL` | `https://api.groq.com/openai/v1` |
+| `HEALTH_MODEL_NAME` | `openai/gpt-oss-120b` (free tier: 30 requests/min, 1,000/day, 200K tokens/day) |
+| `HEALTH_MODEL_FALLBACK` | `openai/gpt-oss-20b` |
+| `HEALTH_MODEL_API_KEY` | key from console.groq.com |
+| `HEALTH_MODEL_APPROVED` | `true` |
+
+- Without these variables the chat keeps working with the deterministic answers, and `/api/companion` returns 503. Choosing Private AI in the model menu keeps answers on the device instead.
+- Answers render a safe Markdown subset: headings, lists, bold and italic. No HTML is interpreted.
+
+## One turn pipeline, traces and AI evals — 17 September 2026
+
+See [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md). In brief:
+- Web and Telegram answers go through `lib/companion/turn.ts`, so Telegram now gets AI answers too.
+- Generated text is held back until it has passed the guard.
+- Every turn logs a content-free `[trace]` line.
+- `npm run eval` includes 45 companion cases; `npm run eval:companion` runs them live.
+- The evals found and fixed several safety gaps:
+  - recent-time phrases were read as history, so "20 minutes ago" emergencies did not escalate;
+  - English uncontrolled bleeding;
+  - counted overdoses;
+  - Hindi pregnancy bleeding;
+  - four kinds of unsafe output.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.

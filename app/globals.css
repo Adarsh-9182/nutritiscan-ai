@@ -3858,3 +3858,8 @@ button.cg-menu-item:hover, .cg-menu-item:hover { background:#f5f5f1; }
 .ns-companion-app .cg-side nav.cg-side-chats .cg-chat-title { flex:1; width:auto; padding:8px 10px; font-size:14px; color:var(--cg-ink); justify-content:flex-start; background:transparent; }
 .ns-companion-app .cg-side nav.cg-side-chats .cg-chat-tool { flex:none; width:26px; height:26px; padding:0; }
 .ns-companion-app .cg-side nav.cg-side-chats .cg-chat-tool:hover { background:#dcdcd5; }
+.cg-ol { position:relative; padding-left:24px; }
+.cg-ol::before { content:attr(data-n); position:absolute; left:0; color:var(--cg-muted); font-variant-numeric:tabular-nums; }
+.cg-li.nested { margin-left:18px; }
+.cg-hr { border:0; border-top:1px solid var(--cg-line); margin:12px 0; }
+.cg-text strong { font-weight:600; }

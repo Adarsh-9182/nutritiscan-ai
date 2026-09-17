@@ -10,6 +10,7 @@
     "test": "node scripts/test-runner.mjs run",
     "test:watch": "node scripts/test-runner.mjs",
     "eval": "node scripts/test-runner.mjs run --config vitest.eval.config.ts",
+    "eval:companion": "node --experimental-strip-types evals/companion/live.ts",
     "eval:gate": "EVAL_GATE_ONLY=1 node scripts/test-runner.mjs run --config vitest.eval.config.ts",
     "verify": "npm run lint && tsc --noEmit && npm test && npm run test:ui && npm run eval:gate && npm run build",
     "migrate": "node --experimental-strip-types scripts/migrate.ts",
