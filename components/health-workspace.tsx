@@ -43,6 +43,7 @@ import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
 import DailyLog from "./daily-log";
 import AgentSuggestions from "./agent-suggestions";
+import TelegramSettings from "./telegram-settings";
 import {
   categorise,
   nextOccurrence,
@@ -1953,6 +1954,7 @@ function SettingsPanel({
           <p>Your context, your records, your choices.</p>
         </div>
       </div>
+      <TelegramSettings demo={demo} />
       <div className="ns-settings-grid">
         <section className="ns-card">
           <h2 className="ns-card-title">Your health context</h2>

@@ -68,6 +68,8 @@ export async function runHealthAgent(
     complete?: Completion;
     signal?: AbortSignal;
     history?: string[];
+    /** The person's local date; defaults to this device's date. */
+    today?: string;
   } = {},
 ): Promise<AgentReply> {
   const signal = options.signal ?? new AbortController().signal;
@@ -93,7 +95,7 @@ export async function runHealthAgent(
       ],
       steps: ["Treatment request boundary"],
     };
-  const reminder = proposeReminder(question);
+  const reminder = proposeReminder(question, options.today);
   if (reminder)
     return {
       mode: "record-summary",
@@ -127,7 +129,7 @@ export async function runHealthAgent(
       steps: ["Understood a daily note", "Drafted log entries"],
       draftLog: note,
     };
-  const direct = recordAnswer(question, workspace);
+  const direct = recordAnswer(question, workspace, options.today);
   if (direct)
     return {
       ...direct,

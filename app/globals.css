@@ -3679,3 +3679,14 @@ dialog.ha-draft::backdrop { background:#232b2370; }
 .as-dismiss:hover { background:#f1efe9; }
 .as-added { display:flex; align-items:center; gap:6px; margin-top:10px; font-size:12px; color:#4f6444; }
 @media (max-width:640px) { .as-panel li { flex-direction:column; align-items:stretch; } .as-actions { justify-content:flex-end; } }
+
+/* Telegram companion settings */
+.tg-card { margin-bottom:22px; }
+.tg-head { display:flex; gap:12px; align-items:flex-start; margin-bottom:14px; }
+.tg-head .ns-card-title { margin-bottom:4px; }
+.tg-icon { flex:none; display:grid; place-items:center; width:34px; height:34px; border-radius:10px; background:#e5f0f7; color:#2a7ab0; }
+.tg-connected { display:flex; align-items:center; gap:6px; font-size:13px; color:#3f6a3a; margin:4px 0 12px; }
+.tg-toggles { display:flex; flex-direction:column; gap:10px; margin:6px 0 14px; font-size:13px; }
+.tg-toggles .ns-check { display:flex; gap:9px; align-items:flex-start; line-height:1.6; }
+.tg-link { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+.tg-card .ns-button { width:auto; }

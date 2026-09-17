@@ -59,6 +59,39 @@ This release puts a health companion at the centre of the workspace, with accoun
 - “What should I do next?” / “aage kya karna hai” lists open items and suggestions without a model.
 - The visit summary now includes the last 7 days of the daily log and each reminder's time and repeat.
 
+## Telegram companion — 17 September 2026
+
+- Opt-in proactive messages on Telegram (free Bot API):
+  - due reminders in the person's own time zone;
+  - an 08:00 care list;
+  - a 21:00 check-in when nothing was logged that day.
+  Each message is sent at most once per item per day: a send key is recorded before sending, so overlapping runs never double-send. Reminders stay useful for up to 90 minutes after their time.
+- Reminder titles are **hidden by default** (“You have a reminder due at 09:00”). The person can switch titles on; with titles on, each reminder gets a Done button that completes it or schedules the next occurrence.
+- Replies in Telegram go through the same deterministic companion as the app, with no model call:
+  - meals, sleep, water and mood become draft log entries;
+  - “remind me …” becomes a draft reminder;
+  - `/today`, `/week`, `/help` and `/stop` are supported;
+  - emergencies are escalated first.
+  Drafts are sealed in `ns_pending` for 30 minutes and saved only when the person taps **Save**.
+- Linking uses a single-use code that lasts 15 minutes, opened as a `t.me` deep link. Each account has at most one chat, and each chat belongs to at most one account. The chat id is stored sealed; lookups use a SHA-256 hash. Only private chats are accepted. Deleting the account removes the channel.
+- `/api/telegram` accepts only requests carrying `X-Telegram-Bot-Api-Secret-Token` and always answers 200. `/api/cron/notify` requires `Authorization: Bearer $CRON_SECRET`. Neither route logs message content or chat ids.
+- Scheduling is free: `docs/companion-schedule.yml`, once copied to `.github/workflows/`, calls the cron route every 15 minutes (GitHub may delay runs) and skips if the `CRON_SECRET` repository secret is missing.
+- Messages pass through Telegram, which has its own privacy terms. The settings screen says so and says Telegram is not for emergencies.
+
+### Setting it up
+
+1. Create a bot with @BotFather.
+2. In Vercel production, set these environment variables:
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_BOT_USERNAME`
+   - `TELEGRAM_WEBHOOK_SECRET` (16+ of `A-Z a-z 0-9 _ -`)
+   - `CRON_SECRET` (16+ characters)
+3. Run `node scripts/workspace-migrate.mjs`. It adds `ns_channels`, `ns_link_codes`, `ns_notify_log` and `ns_pending`.
+4. Deploy, then run `TELEGRAM_BOT_TOKEN=… TELEGRAM_WEBHOOK_SECRET=… APP_ORIGIN=https://www.nutritiscan.com node scripts/telegram-setup.mjs`.
+5. Copy `docs/companion-schedule.yml` to `.github/workflows/` (pushing it needs a token with the `workflow` scope) and add the same `CRON_SECRET` as a GitHub Actions repository secret.
+
+Until the variables are set, the settings card says Telegram isn't switched on and both routes refuse requests.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
