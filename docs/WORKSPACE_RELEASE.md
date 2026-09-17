@@ -43,7 +43,7 @@ This release puts a health companion at the centre of the workspace, with accoun
 - The companion understands first-person notes (“had 2 idli for breakfast, slept 7 hours”, “2 glass paani piya”), shows the proposed entries and saves them only after the person confirms. Symptoms are logged only on explicit request (“log symptom: …”), and urgent-care escalation still runs first.
 - Questions about the log (“what did I eat today”, “how did I sleep this week”, “weekly summary”) are answered deterministically from the record. General education questions such as “how can I understand my sleep?” are not redirected to the log.
 - “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
-- Migration: the `ns_records` kind check is widened to include `day`, and the quota recount excludes day logs. Run `node scripts/workspace-migrate.mjs` before deploying.
+- Migration: the `ns_records` kind check is widened to include `day`, the quota recount excludes day logs, and a unique `day_key` (a hash of account and date) makes concurrent first writes for one date fail instead of duplicating it. Export returns all stored days (up to 400); the workspace shows the latest 120. A failed save keeps what the person typed. Run `node scripts/workspace-migrate.mjs` before deploying.
 
 ## Reminders and suggestions — 17 September 2026
 

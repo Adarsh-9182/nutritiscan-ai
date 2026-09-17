@@ -137,7 +137,8 @@ export class WorkspaceService {
       throw new ApiError(401, "Username or recovery key is incorrect.");
     return { recovery: nextRecovery };
   }
-  async workspace(id: string): Promise<Workspace> {
+  /** `allDays` returns every stored day log, for export. */
+  async workspace(id: string, allDays = false): Promise<Workspace> {
     const users = await this.db.query<UserRow>(
       "SELECT * FROM ns_users WHERE id=$1",
       [id],
@@ -150,8 +151,8 @@ export class WorkspaceService {
     // Daily logs are loaded separately and bounded by recency, so a long
     // history never crowds reports and tasks out of the workspace.
     const dayRows = await this.db.query<RecordRow>(
-      `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT 120`,
-      [id],
+      `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT $2`,
+      [id, allDays ? 400 : 120],
     );
     const decoded = await Promise.all(
       [...records, ...dayRows].map(async (r) => ({
@@ -197,28 +198,27 @@ export class WorkspaceService {
         );
     } else if (kind === "day") {
       // One record per date, outside the report/task quota, capped separately.
-      const date = (value as DayLog).date;
-      const existing = await this.db.query<{ id: string; payload: string }>(
-        "SELECT id,payload FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT 400",
-        [id],
+      // The unique day_key index makes concurrent first writes for the same
+      // date fail instead of creating two records.
+      const rows = await this.db.query<{ id: string }>(
+        `INSERT INTO ns_records (id,user_id,kind,payload,day_key)
+        SELECT $1,$2,'day',$3,$4
+        WHERE (SELECT count(*) FROM ns_records WHERE user_id=$2 AND kind='day') < 400
+        ON CONFLICT (day_key) WHERE day_key IS NOT NULL DO NOTHING RETURNING id`,
+        [recordId, id, payload, digest(`${id}:day:${(value as DayLog).date}`)],
       );
-      for (const row of existing) {
-        const day = await unseal<DayLog>(row.payload, `${id}:${row.id}`);
-        if (day.date === date)
-          throw new ApiError(
-            409,
-            "This day already has a log. Refresh and try again.",
-          );
-      }
-      if (existing.length >= 400)
+      if (!rows.length) {
+        const count = await this.db.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM ns_records WHERE user_id=$1 AND kind='day'",
+          [id],
+        );
         throw new ApiError(
           409,
-          "Daily log limit reached. Export and remove older days first.",
+          count[0].n >= 400
+            ? "Daily log limit reached. Export and remove older days first."
+            : "This day already has a log. Refresh and try again.",
         );
-      await this.db.query(
-        "INSERT INTO ns_records (id,user_id,kind,payload) VALUES ($1,$2,'day',$3)",
-        [recordId, id, payload],
-      );
+      }
     } else {
       // Reserve quota with a conditional row update, atomic under concurrent inserts.
       const rows = await this.db.query<{ id: string }>(
