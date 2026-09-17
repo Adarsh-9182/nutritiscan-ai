@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS ns_records (
   payload text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
   version integer NOT NULL DEFAULT 1
 );
-UPDATE ns_users SET record_count=(SELECT count(*) FROM ns_records WHERE user_id=ns_users.id AND kind<>'day');
+UPDATE ns_users SET record_count=(SELECT count(*) FROM ns_records WHERE user_id=ns_users.id AND kind NOT IN ('day','message'));
 -- Daily logs ('day') are one record per calendar date; the kind list is widened idempotently.
 ALTER TABLE ns_records DROP CONSTRAINT IF EXISTS ns_records_kind_check;
 ALTER TABLE ns_records ADD CONSTRAINT ns_records_kind_check CHECK (kind IN ('report','task','message','day'));

@@ -26,7 +26,6 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  MessageCircle,
   Plus,
   Search,
   Settings2,
@@ -38,17 +37,15 @@ import {
   LoaderCircle,
   NotebookPen,
   Repeat,
+  SquarePen,
+  Pencil,
 } from "lucide-react";
 import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
 import DailyLog from "./daily-log";
 import AgentSuggestions, { clearDismissals } from "./agent-suggestions";
 import TelegramSettings from "./telegram-settings";
-import {
-  categorise,
-  completeTask,
-  repeatText,
-} from "@/lib/workspace/actions";
+import { categorise, completeTask, repeatText } from "@/lib/workspace/actions";
 import { toICS } from "@/lib/workspace/calendar";
 import { localDate } from "@/lib/workspace/daily";
 import RecordSources from "./record-sources";
@@ -65,6 +62,9 @@ import {
   type Report,
   type Saved,
   type LogEntry,
+  type ChatMessage,
+  type Conversation,
+  ConversationSchema,
   type Observation,
   type CareTask,
   type Profile,
@@ -89,7 +89,6 @@ const dateText = (date: string) =>
     year: "numeric",
   });
 const NAV = [
-  ["assistant", "Health companion", MessageCircle],
   ["today", "Overview", LayoutDashboard],
   ["log", "Daily log", NotebookPen],
   ["records", "My records", FileText],
@@ -98,7 +97,27 @@ const NAV = [
   ["care", "Care & reminders", Heart],
   ["sources", "Sources & access", ShieldCheck],
 ] as const;
-type View = (typeof NAV)[number][0] | "settings";
+type View = (typeof NAV)[number][0] | "settings" | "assistant";
+
+/** Chat history groups, newest first, like other assistants. */
+type ChatMeta = Pick<
+  Saved<Conversation>,
+  "id" | "version" | "title" | "createdAt"
+>;
+
+function chatGroup(iso: string) {
+  const day = (d: Date) => d.toLocaleDateString("en-CA");
+  const now = new Date();
+  const then = new Date(iso);
+  if (day(then) === day(now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (day(then) === day(yesterday)) return "Yesterday";
+  if (now.getTime() - then.getTime() < 7 * 86_400_000) return "Previous 7 days";
+  if (now.getTime() - then.getTime() < 30 * 86_400_000)
+    return "Previous 30 days";
+  return "Older";
+}
 async function api<T>(
   path: string,
   method = "GET",
@@ -439,6 +458,13 @@ export default function HealthWorkspace() {
     text: string;
     id: number;
   } | null>(null);
+  const [chatKey, setChatKey] = useState(0);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [chatQuery, setChatQuery] = useState("");
+  const [renaming, setRenaming] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   function openDemo() {
     setDemo(true);
     setSignedIn(false);
@@ -545,8 +571,92 @@ export default function HealthWorkspace() {
     );
   }
   function ask(text: string) {
+    // A question from elsewhere in the workspace starts a fresh chat.
+    setActiveChat(null);
+    setChatKey((k) => k + 1);
     setAgentSeed({ text, id: Date.now() });
     setView("assistant");
+    setMobile(false);
+  }
+  function newChat() {
+    setActiveChat(null);
+    setAgentSeed(null);
+    setChatKey((k) => k + 1);
+    navigate("assistant");
+  }
+  function openChat(id: string) {
+    setActiveChat(id);
+    setAgentSeed(null);
+    setChatKey((k) => k + 1);
+    navigate("assistant");
+  }
+  function upsertChat(chat: Saved<Conversation>) {
+    setWorkspace((w) => ({
+      ...w,
+      conversations: [
+        chat,
+        ...(w.conversations ?? []).filter((c) => c.id !== chat.id),
+      ],
+    }));
+  }
+  /** Saves a chat (encrypted, per account) and returns what was saved. The
+   * caller passes the version it last saw, so concurrent edits fail cleanly. */
+  async function persistChat(
+    meta: ChatMeta | null,
+    messages: ChatMessage[],
+    title?: string,
+    keepTime?: string,
+  ): Promise<ChatMeta> {
+    // Keep the request under the API body limit by dropping the oldest turns.
+    let kept = messages.slice(-120);
+    while (kept.length > 2 && JSON.stringify(kept).length > 150_000)
+      kept = kept.slice(2);
+    const first = messages.find((m) => m.role === "user")?.text ?? "New chat";
+    const data = ConversationSchema.parse({
+      title:
+        (title ?? meta?.title ?? first.replace(/\s+/g, " "))
+          .trim()
+          .slice(0, 60) || "New chat",
+      // Renaming keeps a chat's place in the history.
+      updatedAt: keepTime ?? new Date().toISOString(),
+      messages: kept,
+    });
+    const id = demo
+      ? (meta?.id ?? crypto.randomUUID())
+      : (
+          await api<{ id: string }>("records", "POST", {
+            kind: "message",
+            data,
+            ...(meta ? { id: meta.id, version: meta.version } : {}),
+          })
+        ).id;
+    const saved = {
+      ...data,
+      id,
+      version: meta ? meta.version + 1 : 1,
+      createdAt: meta?.createdAt ?? new Date().toISOString(),
+    };
+    upsertChat(saved);
+    setActiveChat(id);
+    return saved;
+  }
+  async function deleteChat(id: string) {
+    await mutate(async () => {
+      if (!demo) await api("records", "DELETE", { id });
+      setWorkspace((w) => ({
+        ...w,
+        conversations: (w.conversations ?? []).filter((c) => c.id !== id),
+      }));
+      if (activeChat === id) newChat();
+    }, false);
+  }
+  async function renameChat(chat: Saved<Conversation>, title: string) {
+    if (!title.trim() || title.trim() === chat.title) return;
+    await mutate(async () => {
+      await persistChat(chat, chat.messages, title, chat.updatedAt);
+      // An open chat reloads so it continues from the renamed version.
+      if (activeChat === chat.id) setChatKey((k) => k + 1);
+    }, false);
   }
   async function changeReportAccess(
     report: Saved<Report>,
@@ -692,6 +802,18 @@ export default function HealthWorkspace() {
   );
   const latest = reports[0];
   const observations = latest?.observations.slice(0, 4) ?? [];
+  const chatSearch = chatQuery.trim().toLowerCase();
+  const visibleChats = (workspace.conversations ?? []).filter(
+    (c) =>
+      !chatSearch ||
+      c.title.toLowerCase().includes(chatSearch) ||
+      c.messages.some((m) => m.text.toLowerCase().includes(chatSearch)),
+  );
+  const chatGroups = new Map<string, Saved<Conversation>[]>();
+  for (const c of visibleChats) {
+    const g = chatGroup(c.updatedAt);
+    chatGroups.set(g, [...(chatGroups.get(g) ?? []), c]);
+  }
   const openTasks = workspace.tasks
     .filter((t) => !t.done)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -707,20 +829,44 @@ export default function HealthWorkspace() {
           onClick={() => setMobile(false)}
         />
       )}
-      <aside className={`ns-sidebar ${mobile ? "open" : ""}`}>
-        <Link className="ns-sidebar-brand" href="/?home">
-          <Brand />
-        </Link>
-        <div className="ns-space-label">PERSONAL WORKSPACE</div>
-        <nav aria-label="Workspace">
+      <aside className={`ns-sidebar cg-side ${mobile ? "open" : ""}`}>
+        <div className="cg-side-head">
+          <Link className="ns-sidebar-brand" href="/?home">
+            <Brand />
+          </Link>
+          <button
+            className="cg-icon cg-mobile-only"
+            aria-label="Close navigation"
+            onClick={() => setMobile(false)}
+          >
+            <X size={19} />
+          </button>
+        </div>
+        <button
+          className={`cg-side-item cg-new ${view === "assistant" && !activeChat ? "active" : ""}`}
+          onClick={newChat}
+        >
+          <SquarePen size={17} /> New chat
+        </button>
+        <label className="cg-side-search">
+          <Search size={15} />
+          <input
+            aria-label="Search chats"
+            placeholder="Search chats"
+            value={chatQuery}
+            onChange={(e) => setChatQuery(e.target.value)}
+          />
+        </label>
+        <nav aria-label="Workspace" className="cg-side-nav">
+          <span className="cg-side-label">Your health</span>
           {NAV.map(([key, label, Icon]) => (
             <button
               key={key}
               onClick={() => navigate(key)}
-              className={view === key ? "active" : ""}
+              className={`cg-side-item ${view === key ? "active" : ""}`}
               aria-current={view === key ? "page" : undefined}
             >
-              <Icon size={19} />
+              <Icon size={16} />
               {label}
               {key === "records" && (
                 <span className="ns-nav-count">{reports.length}</span>
@@ -728,14 +874,81 @@ export default function HealthWorkspace() {
             </button>
           ))}
         </nav>
-        <div className="ns-sidebar-note">
-          <LockKeyhole size={15} />
-          <p>
-            A private space.
-            <br />
-            <span>For a healthier everyday.</span>
-          </p>
-        </div>
+        <nav aria-label="Chats" className="cg-side-chats">
+          {!visibleChats.length ? (
+            <p className="cg-side-empty">
+              {chatSearch
+                ? "No chats match."
+                : demo
+                  ? "Demo chats appear here until you refresh."
+                  : "Your chats will appear here."}
+            </p>
+          ) : (
+            [...chatGroups].map(([group, list]) => (
+              <div key={group} className="cg-side-group">
+                <span className="cg-side-label">{group}</span>
+                {list.map((c) =>
+                  renaming?.id === c.id ? (
+                    <form
+                      key={c.id}
+                      className="cg-chat editing"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const title = renaming.title;
+                        setRenaming(null);
+                        void renameChat(c, title);
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        aria-label="Chat name"
+                        value={renaming.title}
+                        maxLength={60}
+                        onChange={(e) =>
+                          setRenaming({ id: c.id, title: e.target.value })
+                        }
+                        onBlur={() => setRenaming(null)}
+                        onKeyDown={(e) =>
+                          e.key === "Escape" && setRenaming(null)
+                        }
+                      />
+                    </form>
+                  ) : (
+                    <div
+                      key={c.id}
+                      className={`cg-chat ${view === "assistant" && activeChat === c.id ? "active" : ""}`}
+                    >
+                      <button
+                        className="cg-chat-title"
+                        onClick={() => openChat(c.id)}
+                        title={c.title}
+                      >
+                        {c.title}
+                      </button>
+                      <button
+                        className="cg-chat-tool"
+                        aria-label={`Rename ${c.title}`}
+                        onClick={() =>
+                          setRenaming({ id: c.id, title: c.title })
+                        }
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        className="cg-chat-tool"
+                        aria-label={`Delete ${c.title}`}
+                        disabled={pending}
+                        onClick={() => void deleteChat(c.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ),
+                )}
+              </div>
+            ))
+          )}
+        </nav>
         <div className="ns-sidebar-bottom">
           <button
             className={view === "settings" ? "active" : ""}
@@ -760,8 +973,8 @@ export default function HealthWorkspace() {
           </button>
         </div>
       </aside>
-      <div className="ns-app-body">
-        <header className="ns-app-top">
+      <div className={`ns-app-body ${view === "assistant" ? "cg-body" : ""}`}>
+        <header className="ns-app-top" hidden={view === "assistant"}>
           <div className="ns-row">
             <button
               className="ns-icon-button ns-mobile-toggle"
@@ -1197,9 +1410,9 @@ export default function HealthWorkspace() {
               demo={demo}
             />
           )}
-          <div hidden={view !== "assistant"}>
+          <div hidden={view !== "assistant"} className="cg-host">
             <HealthAgent
-              key={agentAccessVersion}
+              key={`${agentAccessVersion}:${chatKey}`}
               workspace={workspace}
               demo={demo}
               seed={agentSeed}
@@ -1207,6 +1420,16 @@ export default function HealthWorkspace() {
               navigate={navigate}
               saveTask={saveAgentTask}
               saveLog={saveAgentLog}
+              conversation={
+                activeChat
+                  ? (workspace.conversations?.find(
+                      (c) => c.id === activeChat,
+                    ) ?? null)
+                  : null
+              }
+              persist={(meta, messages) => persistChat(meta, messages)}
+              openMenu={() => setMobile(true)}
+              newChat={newChat}
             />
           </div>
           {view === "sources" && (

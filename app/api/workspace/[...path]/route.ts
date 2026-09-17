@@ -7,6 +7,7 @@ import {
   SESSION_SECONDS,
 } from "@/lib/workspace/service";
 import {
+  ConversationSchema,
   DayLogSchema,
   ProfileSchema,
   ReportSchema,
@@ -130,7 +131,7 @@ async function handle(
     if (route === "records" && req.method === "POST") {
       const entry = z
         .object({
-          kind: z.enum(["report", "task", "day"]),
+          kind: z.enum(["report", "task", "day", "message"]),
           data: z.unknown(),
           id: z.uuid().optional(),
           version: z.number().int().positive().optional(),
@@ -143,7 +144,9 @@ async function handle(
           ? ReportSchema.parse(entry.data)
           : entry.kind === "day"
             ? DayLogSchema.parse(entry.data)
-            : TaskSchema.parse(entry.data);
+            : entry.kind === "message"
+              ? ConversationSchema.parse(entry.data)
+              : TaskSchema.parse(entry.data);
       const savedId = await service.save(
         id,
         entry.kind,

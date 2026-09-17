@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   ArrowUpRight,
@@ -7,81 +7,185 @@ import {
   X,
   Check,
   FileText,
-  Activity,
   Pill,
   Moon,
   Leaf,
   Heart,
   Stethoscope,
   ChevronDown,
-  LoaderCircle,
   Cpu,
   Square,
-  ShieldCheck,
   CalendarDays,
   ArrowRight,
   Bell,
+  Copy,
+  NotebookPen,
+  Sparkles,
+  Menu,
+  SquarePen,
 } from "lucide-react";
 import { runHealthAgent, type AgentReply } from "@/lib/workspace/health-agent";
 import { type DeviceModel } from "@/lib/workspace/device-model";
 import {
   TaskSchema,
   type CareTask,
+  type ChatMessage,
   type LogEntry,
   type Workspace,
 } from "@/lib/workspace/types";
+
+type ChatMeta = {
+  id: string;
+  version: number;
+  title: string;
+  createdAt: string;
+};
+type ChatMetaWithMessages = ChatMeta & { messages: ChatMessage[] };
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   text: string;
   answer?: AgentReply;
+  /** Newly arrived replies are revealed progressively. */
+  fresh?: boolean;
 };
+
 const starters = [
-  [
-    "Something feels off",
-    "Help me organise my symptoms",
-    Stethoscope,
-    "Make sense of what you’re feeling",
-  ],
-  [
-    "Food & nutrition",
-    "Help me understand a balanced vegetarian diet",
-    Leaf,
-    "Everyday eating, a little clearer",
-  ],
-  [
-    "Medicines",
-    "What should I know about medicine interactions?",
-    Pill,
-    "Understand the questions to ask",
-  ],
-  [
-    "Sleep & energy",
-    "Help me understand my sleep and energy",
-    Moon,
-    "Find a healthier daily rhythm",
-  ],
+  ["Something feels off", "Help me organise my symptoms", Stethoscope],
+  ["Food & nutrition", "Help me understand a balanced vegetarian diet", Leaf],
+  ["Medicines", "What should I know about medicine interactions?", Pill],
+  ["Sleep & energy", "Help me understand my sleep and energy", Moon],
   [
     "Mental wellbeing",
     "I want to talk about stress and mental wellbeing",
     Heart,
-    "A space to talk about your mind",
   ],
-  [
-    "My health records",
-    "Summarise my latest report",
-    FileText,
-    "Put your results into perspective",
-  ],
+  ["My health records", "Summarise my latest report", FileText],
+  ["Log my meal", "Had 2 roti, dal and sabzi for lunch", NotebookPen],
+  ["What's next", "What should I do next?", CalendarDays],
 ] as const;
+
 const modeText = {
   ai: "On-device AI · experimental",
-  reference: "Health reference notes · no AI inference",
-  "record-summary": "Your confirmed records · no AI inference",
-  escalation: "Human support comes first",
-  unavailable: "Coverage limit",
+  reference: "From health reference notes",
+  "record-summary": "From your own records",
+  escalation: "Safety first",
+  unavailable: "Outside what I can answer yet",
 };
+
+/** Stored form of a message: drafts are dropped so nothing is re-offered. */
+export function toStored(m: Message): ChatMessage {
+  const a = m.answer;
+  return {
+    id: m.id,
+    role: m.role,
+    text: m.text.slice(0, 12000),
+    ...(a
+      ? {
+          mode: a.mode,
+          sources: a.sources.slice(0, 6),
+          steps: a.steps?.slice(0, 8).map((s) => s.slice(0, 120)),
+          ...(a.detail ? { detail: a.detail.slice(0, 300) } : {}),
+          ...(a.followUp ? { followUp: a.followUp.slice(0, 300) } : {}),
+        }
+      : {}),
+  };
+}
+function fromStored(m: ChatMessage): Message {
+  return {
+    id: m.id,
+    role: m.role,
+    text: m.text,
+    ...(m.role === "assistant" && m.mode
+      ? {
+          answer: {
+            mode: m.mode,
+            text: m.text,
+            sources: m.sources ?? [],
+            steps: m.steps,
+            detail: m.detail,
+            followUp: m.followUp,
+          },
+        }
+      : {}),
+  };
+}
+
+/** Reveals a reply a few words at a time, like a streamed answer. */
+function Reveal({ text, onDone }: { text: string; onDone: () => void }) {
+  const [shown, setShown] = useState(0);
+  const words = useMemo(() => text.split(/(\s+)/), [text]);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  }, [onDone]);
+  useEffect(() => {
+    const reduce =
+      process.env.NODE_ENV === "test" ||
+      (typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+    const total = words.length;
+    if (reduce || total < 4) {
+      const now = setTimeout(() => {
+        setShown(total);
+        done.current();
+      }, 0);
+      return () => clearTimeout(now);
+    }
+    // Long answers finish in about two seconds.
+    const step = Math.max(2, Math.ceil(total / 90));
+    let at = 0;
+    const timer = setInterval(() => {
+      at = Math.min(total, at + step);
+      setShown(at);
+      if (at >= total) {
+        clearInterval(timer);
+        done.current();
+      }
+    }, 22);
+    return () => clearInterval(timer);
+  }, [words]);
+  return (
+    <>
+      {words.slice(0, shown).join("")}
+      {shown < words.length && <span className="cg-caret" />}
+    </>
+  );
+}
+
+function Body({ text }: { text: string }) {
+  // Plain text with light structure: short lines followed by a blank line
+  // read as headings, "• " lines as bullets.
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, i) => {
+        const heading =
+          line.length > 0 &&
+          line.length < 60 &&
+          !/[.:,]$/.test(line) &&
+          !line.startsWith("•") &&
+          lines[i + 1] === "" &&
+          i < lines.length - 2;
+        if (!line) return <div key={i} className="cg-gap" />;
+        if (heading)
+          return (
+            <h3 key={i} className="cg-h">
+              {line}
+            </h3>
+          );
+        if (line.startsWith("• "))
+          return (
+            <p key={i} className="cg-li">
+              {line.slice(2)}
+            </p>
+          );
+        return <p key={i}>{line}</p>;
+      })}
+    </>
+  );
+}
 
 export default function HealthAgent({
   workspace,
@@ -91,6 +195,10 @@ export default function HealthAgent({
   navigate,
   saveTask,
   saveLog,
+  conversation,
+  persist,
+  openMenu,
+  newChat,
 }: {
   workspace: Workspace;
   demo: boolean;
@@ -101,8 +209,19 @@ export default function HealthAgent({
   ) => void;
   saveTask: (task: CareTask) => Promise<void>;
   saveLog?: (entries: LogEntry[]) => Promise<void>;
+  /** A saved chat to continue, or null for a new one. */
+  conversation?: ChatMetaWithMessages | null;
+  /** Saves the chat and returns what was stored. */
+  persist?: (
+    meta: ChatMeta | null,
+    messages: ChatMessage[],
+  ) => Promise<ChatMeta>;
+  openMenu?: () => void;
+  newChat?: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(
+    () => conversation?.messages.map(fromStored) ?? [],
+  );
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -117,15 +236,31 @@ export default function HealthAgent({
   const [logged, setLogged] = useState<string[]>([]);
   const [logError, setLogError] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [copied, setCopied] = useState("");
+  const [persistError, setPersistError] = useState("");
+  const chatMeta = useRef<ChatMeta | null>(
+    conversation
+      ? {
+          id: conversation.id,
+          version: conversation.version,
+          title: conversation.title,
+          createdAt: conversation.createdAt,
+        }
+      : null,
+  );
+  const persistQueue = useRef<Promise<void>>(Promise.resolve());
   const model = useRef<DeviceModel | null>(null);
   const loadController = useRef<AbortController | null>(null);
   const turnController = useRef<AbortController | null>(null);
   const active = useRef(false);
   const mounted = useRef(true);
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const draftDialog = useRef<HTMLDialogElement>(null);
   const savingLock = useRef(false);
   const seenSeed = useRef<number | undefined>(undefined);
+  const firstName = workspace.profile.name.split(" ")[0];
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -136,13 +271,43 @@ export default function HealthAgent({
     };
   }, []);
   useEffect(() => {
-    if (messages.length) end.current?.scrollIntoView({ block: "nearest" });
+    if (messages.length) end.current?.scrollIntoView({ block: "end" });
   }, [messages, busy]);
+  useEffect(() => {
+    // Grow the composer with its content, up to a limit.
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+  }, [question]);
   const hasDraft = Boolean(draft);
   useEffect(() => {
     if (hasDraft) draftDialog.current?.showModal();
     else draftDialog.current?.close();
   }, [hasDraft]);
+
+  function save(all: Message[]) {
+    if (!persist) return;
+    // One save at a time, in order, so versions never race.
+    persistQueue.current = persistQueue.current.then(async () => {
+      try {
+        const saved = await persist(chatMeta.current, all.map(toStored));
+        chatMeta.current = {
+          id: saved.id,
+          version: saved.version,
+          title: saved.title,
+          createdAt: saved.createdAt,
+        };
+        if (mounted.current) setPersistError("");
+      } catch {
+        if (mounted.current)
+          setPersistError(
+            "This chat couldn’t be saved to your history. It stays here until you leave.",
+          );
+      }
+    });
+  }
+
   async function ask(text: string) {
     if (!text.trim() || active.current) return;
     active.current = true;
@@ -156,48 +321,47 @@ export default function HealthAgent({
       role: "user",
       text: text.trim().slice(0, 3000),
     };
-    setMessages((current) => [...current, userMessage]);
+    const before = messages;
+    setMessages([...before, userMessage]);
+    let reply: Message;
     try {
       const answer = await runHealthAgent(userMessage.text, workspace, {
         complete: model.current?.complete,
         signal: controller.signal,
-        history: messages
+        history: before
           .filter((m) => m.role === "user")
           .slice(-3)
           .map((m) => m.text),
       });
-      if (mounted.current && !controller.signal.aborted)
-        setMessages((current) => [
-          ...current,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: answer.text,
-            answer,
-          },
-        ]);
+      reply = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text: answer.text,
+        answer,
+        fresh: true,
+      };
     } catch {
       if (controller.signal.aborted && model.current) {
         model.current.dispose();
         model.current = null;
         setDevice("off");
       }
-      if (mounted.current)
-        setMessages((current) => [
-          ...current,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            text: controller.signal.aborted
-              ? "Response stopped. No action was saved. You can keep using references or reload on-device AI."
-              : "I couldn’t complete that request. Please try again. No action was saved.",
-          },
-        ]);
+      reply = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text: controller.signal.aborted
+          ? "Response stopped. No action was saved."
+          : "I couldn’t complete that request. Please try again. No action was saved.",
+      };
     } finally {
       clearTimeout(timeout);
-      active.current = false;
-      if (mounted.current) setBusy(false);
     }
+    active.current = false;
+    if (!mounted.current) return;
+    const all = [...before, userMessage, reply];
+    setMessages(all);
+    setBusy(false);
+    save(all);
   }
   useEffect(() => {
     if (seed && seed.id !== seenSeed.current) {
@@ -207,6 +371,7 @@ export default function HealthAgent({
     // A seed is an explicit navigation request, not a workspace refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed]);
+
   async function enableDevice() {
     setDevice("loading");
     setModelError("");
@@ -266,452 +431,416 @@ export default function HealthAgent({
       setSaving(false);
     }
   }
+  function settle(id: string) {
+    setMessages((current) =>
+      current.map((m) => (m.id === id ? { ...m, fresh: false } : m)),
+    );
+  }
+
+  const composer = (
+    <form
+      className="cg-composer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void ask(question);
+      }}
+    >
+      <textarea
+        ref={input}
+        aria-label="Message your health assistant"
+        placeholder="Ask anything about your health"
+        value={question}
+        maxLength={3000}
+        rows={1}
+        onChange={(event) => setQuestion(event.target.value)}
+        onKeyDown={(event) => {
+          if (
+            event.key === "Enter" &&
+            !event.shiftKey &&
+            !event.nativeEvent.isComposing
+          ) {
+            event.preventDefault();
+            void ask(question);
+          }
+        }}
+      />
+      <div className="cg-composer-row">
+        <button
+          type="button"
+          className="cg-round"
+          aria-label="Add a report"
+          title="Add a report"
+          onClick={addReport}
+        >
+          <Plus size={18} />
+        </button>
+        <span className="cg-composer-hint">
+          {device === "ready" ? "Private AI · on this device" : ""}
+        </span>
+        {busy ? (
+          <button
+            type="button"
+            className="cg-send"
+            aria-label="Stop response"
+            onClick={() => turnController.current?.abort()}
+          >
+            <Square size={13} fill="currentColor" />
+          </button>
+        ) : (
+          <button
+            className="cg-send"
+            disabled={!question.trim() || device === "loading"}
+            aria-label="Send message"
+          >
+            <ArrowUp size={18} strokeWidth={2.4} />
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
   return (
-    <div className={`ha-layout ${messages.length ? "ha-has-messages" : ""}`}>
-      <section className="ha-conversation" aria-label="Health conversation">
-        <header className="ha-toolbar">
-          <span>
-            <span className="ha-status-dot" /> Your health companion
-          </span>
-          <div>
-            <button
-              className="ha-mode-button"
-              onClick={() => setSettings(!settings)}
-              aria-expanded={settings}
-            >
-              <Cpu size={14} />
-              {device === "ready" ? "On-device AI" : "Enable private AI"}
-              <ChevronDown size={13} />
-            </button>
-            {!!messages.length && (
+    <div className={`cg ${messages.length ? "cg-has-messages" : ""}`}>
+      <header className="cg-top">
+        {openMenu && (
+          <button
+            className="cg-icon cg-mobile-only"
+            aria-label="Open navigation"
+            onClick={openMenu}
+          >
+            <Menu size={20} />
+          </button>
+        )}
+        <div className="cg-model">
+          <button
+            className="cg-model-button"
+            onClick={() => setSettings(!settings)}
+            aria-expanded={settings}
+            aria-label="Choose model"
+          >
+            NutritiScan <span>{device === "ready" ? "Private" : "Health"}</span>
+            <ChevronDown size={15} />
+          </button>
+          {settings && (
+            <section className="cg-menu" aria-label="Model settings">
               <button
-                className="ha-new"
-                disabled={busy}
-                onClick={() => {
-                  setMessages([]);
-                  setDraft(null);
-                  setSaved([]);
-                }}
-              >
-                New chat <Plus size={14} />
-              </button>
-            )}
-          </div>
-        </header>
-        {settings && (
-          <section className="ha-device" aria-label="On-device AI settings">
-            <div>
-              <Cpu size={20} />
-              <h2>AI that runs on your device.</h2>
-              <button
-                aria-label="Close AI settings"
-                onClick={() => setSettings(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p>
-              Qwen 2.5 · open model · no API charges. An initial download of
-              roughly 1 GB uses your connection and browser storage. A
-              WebGPU-capable browser and sufficient memory are required. Your
-              chat stays in this tab.
-            </p>
-            <small>
-              Experimental general-purpose model, not clinically validated. It
-              can make mistakes. Medical decisions belong with your clinician.
-            </small>
-            {device === "loading" ? (
-              <>
-                <progress value={progress} max={1} />
-                <div role="status">
-                  Loading model · {Math.round(progress * 100)}%{" "}
-                  <button onClick={() => loadController.current?.abort()}>
-                    Cancel download
-                  </button>
-                </div>
-              </>
-            ) : device === "ready" ? (
-              <button
-                className="ns-button ns-light"
-                disabled={busy}
+                className={`cg-menu-item ${device !== "ready" ? "on" : ""}`}
+                disabled={busy || device === "loading"}
                 onClick={() => {
                   model.current?.dispose();
                   model.current = null;
                   setDevice("off");
+                  setSettings(false);
                 }}
               >
-                Turn off on-device AI
+                <Sparkles size={16} />
+                <span>
+                  <b>NutritiScan Health</b>
+                  <small>
+                    Your records, daily log and curated health references
+                  </small>
+                </span>
+                {device !== "ready" && <Check size={15} />}
               </button>
-            ) : (
-              <button
-                className="ns-button ns-dark"
-                disabled={busy}
-                onClick={() => void enableDevice()}
-              >
-                Download & enable <ArrowRight size={15} />
-              </button>
-            )}
-            {modelError && (
-              <p className="ns-error" role="alert">
-                {modelError}
-              </p>
-            )}
-          </section>
-        )}
-        {!messages.length && (
-          <div className="ha-proof-strip" aria-label="Companion principles">
-            <span>
-              <Check size={12} /> Published references
-            </span>
-            <span>
-              <FileText size={12} /> Your chosen records
-            </span>
-            <span>
-              <Cpu size={12} /> Optional private AI
-            </span>
-          </div>
-        )}
-        {!messages.length && (
-          <div className="ha-welcome">
-            <div className="ha-kicker">
-              HELLO,{" "}
-              {workspace.profile.name.split(" ")[0].toUpperCase() || "THERE"}{" "}
-              <span /> THIS SPACE IS YOURS
-            </div>
-            <h1>
-              How are you
-              <br />
-              <em>really feeling?</em>
-            </h1>
-            <p>
-              Bring the question. Add the context you choose.
-              <br className="ns-desktop" /> Leave with a clearer next step.
-            </p>
-          </div>
-        )}
-        {!!messages.length && (
-          <div className="ha-transcript" aria-live="polite" aria-busy={busy}>
-            {messages.map((message) => (
-              <article
-                key={message.id}
-                className={`ha-message ${message.role}`}
-              >
-                {message.role === "assistant" && (
-                  <div className="ha-message-label">
-                    <span className="ha-tiny-mark">n.</span>
-                    {message.answer
-                      ? modeText[message.answer.mode]
-                      : "NutritiScan"}
-                  </div>
-                )}
-                {!!message.answer?.steps?.length && (
-                  <details className="ha-steps">
-                    <summary>
-                      <Check size={13} /> {message.answer.steps.length}{" "}
-                      {message.answer.steps.length === 1 ? "step" : "steps"}{" "}
-                      completed <ChevronDown size={12} />
-                    </summary>
-                    <ol>
-                      {message.answer.steps.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ol>
-                  </details>
-                )}
-                <div className="ha-message-body">{message.text}</div>
-                {message.answer?.detail && (
-                  <p className="ha-result-note">{message.answer.detail}</p>
-                )}
-                {!!message.answer?.sources.length && (
-                  <div className="ha-sources">
-                    <span>REFERENCE MATERIAL</span>
-                    {message.answer.sources.map((source) => (
-                      <a
-                        href={source.url}
-                        key={source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <FileText size={13} />
-                        {source.title}
-                        <ArrowUpRight size={12} />
-                      </a>
-                    ))}
-                  </div>
-                )}
-                {message.answer?.followUp && (
-                  <p className="ha-follow-question">
-                    {message.answer.followUp}
-                  </p>
-                )}
-                {message.answer?.draftLog && saveLog && (
-                  <>
+              <div className={`cg-menu-item ${device === "ready" ? "on" : ""}`}>
+                <Cpu size={16} />
+                <span>
+                  <b>Private AI</b>
+                  <small>
+                    Qwen 2.5 runs on your device. About 1 GB download, needs
+                    WebGPU. Experimental, not clinically validated.
+                  </small>
+                  {device === "loading" ? (
+                    <>
+                      <progress value={progress} max={1} />
+                      <span role="status" className="cg-menu-status">
+                        Loading {Math.round(progress * 100)}%{" "}
+                        <button onClick={() => loadController.current?.abort()}>
+                          Cancel
+                        </button>
+                      </span>
+                    </>
+                  ) : device === "ready" ? null : (
                     <button
-                      className="ha-action"
-                      disabled={busy || saving || logged.includes(message.id)}
-                      onClick={async () => {
-                        if (savingLock.current) return;
-                        savingLock.current = true;
-                        setSaving(true);
-                        setLogError("");
-                        try {
-                          await saveLog(message.answer!.draftLog!);
-                          setLogged((current) => [...current, message.id]);
-                        } catch {
-                          setLogError(
-                            "Could not save to your log. Check your connection and try again.",
-                          );
-                        } finally {
-                          savingLock.current = false;
-                          setSaving(false);
-                        }
-                      }}
+                      className="cg-menu-cta"
+                      disabled={busy}
+                      onClick={() => void enableDevice()}
                     >
-                      {logged.includes(message.id) ? (
-                        <>
-                          <Check size={14} /> Added to today’s log
-                        </>
-                      ) : (
-                        <>
-                          <Check size={14} /> Confirm and add to log
-                        </>
-                      )}
+                      Enable private AI <ArrowRight size={13} />
                     </button>
-                    {logError && !logged.includes(message.id) && (
-                      <p role="alert" className="ns-error">
-                        {logError}
-                      </p>
-                    )}
-                  </>
-                )}
-                {message.answer?.draftReminder && (
-                  <button
-                    className="ha-action"
-                    disabled={busy || saved.includes(message.id)}
-                    onClick={() => {
-                      setSaveError("");
-                      setDraft({
-                        ...message.answer!.draftReminder!,
-                        message: message.id,
-                      });
-                    }}
-                  >
-                    {saved.includes(message.id) ? (
-                      <>
-                        <Check size={14} /> Reminder saved
-                      </>
-                    ) : (
-                      <>
-                        <Bell size={14} /> Review and save reminder{" "}
-                        <ArrowUpRight size={13} />
-                      </>
-                    )}
-                  </button>
-                )}
-                {message.answer?.draftTask && (
-                  <button
-                    className="ha-action"
-                    disabled={busy || saved.includes(message.id)}
-                    onClick={() => {
-                      setSaveError("");
-                      setDraft({
-                        title: message.answer!.draftTask!,
-                        date: new Date().toLocaleDateString("en-CA"),
-                        message: message.id,
-                      });
-                    }}
-                  >
-                    {saved.includes(message.id) ? (
-                      <>
-                        <Check size={14} /> Follow-up saved
-                      </>
-                    ) : (
-                      <>
-                        <CalendarDays size={14} /> Draft a follow-up{" "}
-                        <ArrowUpRight size={13} />
-                      </>
-                    )}
-                  </button>
-                )}
-              </article>
-            ))}
-            {busy && (
-              <div className="ha-thinking" role="status">
-                <LoaderCircle size={15} className="ns-spin" />
-                {device === "ready"
-                  ? "Reading references and preparing your answer…"
-                  : "Checking your question…"}
+                  )}
+                  {modelError && (
+                    <span className="ns-error" role="alert">
+                      {modelError}
+                    </span>
+                  )}
+                </span>
+                {device === "ready" && <Check size={15} />}
               </div>
-            )}
-            <div ref={end} />
-          </div>
+              <button
+                className="cg-menu-close"
+                aria-label="Close model settings"
+                onClick={() => setSettings(false)}
+              >
+                <X size={16} />
+              </button>
+            </section>
+          )}
+        </div>
+        {newChat && (
+          <button
+            className="cg-icon cg-mobile-only"
+            aria-label="New chat"
+            onClick={newChat}
+          >
+            <SquarePen size={19} />
+          </button>
         )}
-        <form
-          className="ha-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void ask(question);
-          }}
-        >
-          <textarea
-            aria-label="Message your health assistant"
-            placeholder="Tell me what’s on your mind…"
-            value={question}
-            maxLength={3000}
-            rows={2}
-            onChange={(event) => setQuestion(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                void ask(question);
-              }
-            }}
-          />
-          <div>
-            <button type="button" className="ha-attach" onClick={addReport}>
-              <Plus size={17} /> Add a report
-            </button>
-            <span>
-              {device === "ready"
-                ? "Private · on-device"
-                : "References & record tools"}
-            </span>
-            {busy ? (
-              <button
-                type="button"
-                className="ha-send"
-                aria-label="Stop response"
-                onClick={() => turnController.current?.abort()}
-              >
-                <Square size={15} />
-              </button>
-            ) : (
-              <button
-                className="ha-send"
-                disabled={!question.trim() || device === "loading"}
-                aria-label="Send message"
-              >
-                <ArrowUp size={20} />
-              </button>
-            )}
-          </div>
-        </form>
-        {!messages.length && (
-          <>
-            <div className="ha-start-label">
-              OR START WITH SOMETHING SPECIFIC
-            </div>
-            <div className="ha-starters">
-              {starters.map(([title, prompt, Icon, description]) => (
+      </header>
+
+      <div className="cg-scroll">
+        {!messages.length ? (
+          <div className="cg-empty">
+            <h1>
+              {firstName
+                ? `What’s on your mind, ${firstName}?`
+                : "What’s on your mind today?"}
+            </h1>
+            {composer}
+            <div className="cg-chips">
+              {starters.map(([title, prompt, Icon]) => (
                 <button
                   key={title}
                   aria-label={title}
                   disabled={busy || device === "loading"}
                   onClick={() => void ask(prompt)}
                 >
-                  <Icon size={17} strokeWidth={1.5} />
-                  <span>
-                    <strong>{title}</strong>
-                    <small>{description}</small>
-                  </span>
-                  <ArrowUpRight size={13} />
+                  <Icon size={15} strokeWidth={1.8} />
+                  {title}
                 </button>
               ))}
             </div>
-          </>
+          </div>
+        ) : (
+          <div className="cg-thread" aria-live="polite" aria-busy={busy}>
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <article key={message.id} className="cg-msg user">
+                  <div className="cg-bubble">{message.text}</div>
+                </article>
+              ) : (
+                <article key={message.id} className="cg-msg assistant">
+                  <span className="cg-avatar" aria-hidden="true">
+                    n.
+                  </span>
+                  <div className="cg-answer">
+                    {message.answer && (
+                      <div
+                        className={`cg-mode ${message.answer.mode === "escalation" ? "urgent" : ""}`}
+                      >
+                        {message.answer.draftLog || message.answer.draftReminder
+                          ? "Drafted for you to confirm"
+                          : modeText[message.answer.mode]}
+                        {!!message.answer.steps?.length && (
+                          <details>
+                            <summary>
+                              {message.answer.steps.length}{" "}
+                              {message.answer.steps.length === 1
+                                ? "step"
+                                : "steps"}
+                              <ChevronDown size={12} />
+                            </summary>
+                            <ol>
+                              {message.answer.steps.map((step) => (
+                                <li key={step}>{step}</li>
+                              ))}
+                            </ol>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                    <div className="cg-text">
+                      {message.fresh ? (
+                        <p className="cg-stream">
+                          <Reveal
+                            text={message.text}
+                            onDone={() => settle(message.id)}
+                          />
+                        </p>
+                      ) : (
+                        <Body text={message.text} />
+                      )}
+                    </div>
+                    {!message.fresh && (
+                      <>
+                        {message.answer?.detail && (
+                          <p className="cg-note">{message.answer.detail}</p>
+                        )}
+                        {!!message.answer?.sources.length && (
+                          <div className="cg-sources">
+                            {message.answer.sources.map((source) => (
+                              <a
+                                href={source.url}
+                                key={source.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <FileText size={12} />
+                                {source.title}
+                                <ArrowUpRight size={11} />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        {message.answer?.followUp && (
+                          <p className="cg-follow">{message.answer.followUp}</p>
+                        )}
+                        <div className="cg-actions">
+                          {message.answer?.draftLog && saveLog && (
+                            <button
+                              className="cg-action primary"
+                              disabled={
+                                busy || saving || logged.includes(message.id)
+                              }
+                              onClick={async () => {
+                                if (savingLock.current) return;
+                                savingLock.current = true;
+                                setSaving(true);
+                                setLogError("");
+                                try {
+                                  await saveLog(message.answer!.draftLog!);
+                                  setLogged((c) => [...c, message.id]);
+                                } catch {
+                                  setLogError(
+                                    "Could not save to your log. Check your connection and try again.",
+                                  );
+                                } finally {
+                                  savingLock.current = false;
+                                  setSaving(false);
+                                }
+                              }}
+                            >
+                              <Check size={14} />
+                              {logged.includes(message.id)
+                                ? "Added to today’s log"
+                                : "Confirm and add to log"}
+                            </button>
+                          )}
+                          {message.answer?.draftReminder && (
+                            <button
+                              className="cg-action primary"
+                              disabled={busy || saved.includes(message.id)}
+                              onClick={() => {
+                                setSaveError("");
+                                setDraft({
+                                  ...message.answer!.draftReminder!,
+                                  message: message.id,
+                                });
+                              }}
+                            >
+                              {saved.includes(message.id) ? (
+                                <>
+                                  <Check size={14} /> Reminder saved
+                                </>
+                              ) : (
+                                <>
+                                  <Bell size={14} /> Review and save reminder
+                                </>
+                              )}
+                            </button>
+                          )}
+                          {message.answer?.draftTask && (
+                            <button
+                              className="cg-action"
+                              disabled={busy || saved.includes(message.id)}
+                              onClick={() => {
+                                setSaveError("");
+                                setDraft({
+                                  title: message.answer!.draftTask!,
+                                  date: new Date().toLocaleDateString("en-CA"),
+                                  message: message.id,
+                                });
+                              }}
+                            >
+                              {saved.includes(message.id) ? (
+                                <>
+                                  <Check size={14} /> Follow-up saved
+                                </>
+                              ) : (
+                                <>
+                                  <CalendarDays size={14} /> Draft a follow-up
+                                </>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            className="cg-icon small"
+                            aria-label="Copy answer"
+                            title="Copy"
+                            onClick={() => {
+                              void navigator.clipboard
+                                ?.writeText(message.text)
+                                .then(() => {
+                                  setCopied(message.id);
+                                  setTimeout(() => setCopied(""), 1500);
+                                })
+                                .catch(() => undefined);
+                            }}
+                          >
+                            {copied === message.id ? (
+                              <Check size={14} />
+                            ) : (
+                              <Copy size={14} />
+                            )}
+                          </button>
+                        </div>
+                        {logError &&
+                          message.answer?.draftLog &&
+                          !logged.includes(message.id) && (
+                            <p role="alert" className="ns-error">
+                              {logError}
+                            </p>
+                          )}
+                      </>
+                    )}
+                  </div>
+                </article>
+              ),
+            )}
+            {busy && (
+              <article className="cg-msg assistant" role="status">
+                <span className="cg-avatar" aria-hidden="true">
+                  n.
+                </span>
+                <span className="cg-thinking" aria-label="Thinking">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </article>
+            )}
+            <div ref={end} className="cg-end" />
+          </div>
         )}
-        <button
-          className="ha-mobile-access"
-          onClick={() => navigate("sources")}
-        >
-          <ShieldCheck size={14} /> Choose which records your companion can read{" "}
-          <ArrowUpRight size={13} />
-        </button>
-        <p className="ha-disclaimer">
-          Health education, not diagnosis or emergency care. Chats aren’t saved.{" "}
-          {demo
-            ? "Records shown are fictional."
-            : "Only confirmed actions are saved to your workspace."}
+      </div>
+
+      {!!messages.length && <div className="cg-dock">{composer}</div>}
+      {persistError && (
+        <p className="cg-foot-error" role="alert">
+          {persistError}
         </p>
-      </section>
-      <aside className="ha-context" aria-label="Your health context">
-        <div className="ha-context-heading">
-          <span>YOUR CONTEXT</span>
-          <button
-            onClick={() => navigate("settings")}
-            aria-label="Edit health context"
-          >
-            Edit <ArrowUpRight size={12} />
-          </button>
-        </div>
-        <h2>
-          Your health,
-          <br />
-          <em>in one place.</em>
-        </h2>
-        <p>You choose what to share. Your records stay one click away.</p>
-        <button className="ha-context-row" onClick={() => navigate("records")}>
-          <FileText size={17} />
-          <span>
-            Health records
-            <small>
-              {
-                workspace.reports.filter((r) => r.assistantAccess !== false)
-                  .length
-              }{" "}
-              available to your companion
-            </small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <button className="ha-context-row" onClick={() => navigate("care")}>
-          <CalendarDays size={17} />
-          <span>
-            Follow-ups
-            <small>
-              {workspace.tasks.filter((t) => !t.done).length} open items
-            </small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <button className="ha-context-row" onClick={() => navigate("trends")}>
-          <Activity size={17} />
-          <span>
-            Your health story<small>Results over time</small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <button className="ha-context-row" onClick={() => navigate("sources")}>
-          <ShieldCheck size={17} />
-          <span>
-            Sources & access<small>You’re in control</small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <div className="ha-visit-note">
-          <span>BEFORE YOUR NEXT APPOINTMENT</span>
-          <h3>
-            Bring the questions
-            <br />
-            you meant to ask.
-          </h3>
-          <p>Prepare a brief with your records, notes and questions.</p>
-          <button onClick={() => navigate("visit")}>
-            Prepare my visit <ArrowRight size={15} />
-          </button>
-        </div>
-        <div className="ha-source-note">
-          <span className="ha-status-dot" />
-          <p>
-            Educational references from <b>MedlinePlus</b>, the US National
-            Library of Medicine. Curated notes, not a live medical search.
-          </p>
-        </div>
-      </aside>
+      )}
+      <p className="cg-foot">
+        NutritiScan can make mistakes and is not a doctor. In an emergency, call
+        112.{" "}
+        {demo
+          ? "Demo chats and records are fictional."
+          : persist
+            ? "Chats are saved, encrypted, to your account."
+            : "Chats aren’t saved."}{" "}
+        <button onClick={() => navigate("sources")}>Record access</button>
+      </p>
+
       <dialog
         ref={draftDialog}
         aria-labelledby="draft-title"

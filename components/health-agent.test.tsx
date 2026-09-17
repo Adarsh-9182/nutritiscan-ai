@@ -23,7 +23,7 @@ describe("companion interactions", () => {
   it("offers broad health topics on the home screen", () => {
     render(<HealthAgent {...props()} />);
     expect(
-      screen.getByRole("heading", { name: /How are you/ }),
+      screen.getByRole("heading", { name: /What’s on your mind, Aarav/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Medicines" }),
@@ -59,8 +59,62 @@ describe("companion interactions", () => {
   });
   it("shows a useful fallback when WebGPU is absent", async () => {
     render(<HealthAgent {...props()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Enable private AI" }));
-    fireEvent.click(screen.getByRole("button", { name: /Download & enable/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose model" }));
+    fireEvent.click(screen.getByRole("button", { name: /Enable private AI/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("WebGPU");
+  });
+  it("saves each exchange without drafts and continues a saved chat", async () => {
+    const persist = vi.fn().mockResolvedValue({
+      id: "chat-1",
+      version: 1,
+      title: "Had 2 roti",
+      createdAt: "2026-09-17T00:00:00Z",
+    });
+    const p = { ...props(), persist, saveLog: vi.fn() };
+    const { unmount } = render(<HealthAgent {...p} />);
+    fireEvent.change(screen.getByLabelText("Message your health assistant"), {
+      target: { value: "had 2 roti and dal for lunch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await screen.findByRole("button", { name: /Confirm and add to log/ });
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
+    const [meta, stored] = persist.mock.calls[0];
+    expect(meta).toBeNull();
+    expect(stored.map((m: { role: string }) => m.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+    expect(JSON.stringify(stored)).not.toContain("draftLog");
+    unmount();
+
+    render(
+      <HealthAgent
+        {...p}
+        conversation={{
+          id: "chat-1",
+          version: 1,
+          title: "Had 2 roti",
+          createdAt: "2026-09-17T00:00:00Z",
+          messages: stored,
+        }}
+      />,
+    );
+    expect(
+      screen.getByText("had 2 roti and dal for lunch"),
+    ).toBeInTheDocument();
+    // A reopened chat does not offer to save the old draft again.
+    expect(
+      screen.queryByRole("button", { name: /Confirm and add to log/ }),
+    ).toBeNull();
+    fireEvent.change(screen.getByLabelText("Message your health assistant"), {
+      target: { value: "What should I do next?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
+    expect(persist.mock.calls[1][0]).toMatchObject({
+      id: "chat-1",
+      version: 1,
+    });
+    expect(persist.mock.calls[1][1]).toHaveLength(4);
   });
 });

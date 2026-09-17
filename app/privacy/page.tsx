@@ -34,8 +34,12 @@ export default function Page() {
         address, but this workflow does not send them your chat or records.
         The model uses device memory and caches model files in browser storage.
         Turn it off to release memory; clear site data to remove cached files.
-        Conversations stay in this tab and disappear on refresh or sign-out.
-        Only follow-ups you confirm are saved to your account.
+        When you are signed in, each chat is saved to your account, encrypted
+        on the server like your records, so you can return to it from the chat
+        list. Delete a chat from the list at any time; deleting your account
+        removes all chats. Demo chats stay in the tab and disappear on refresh.
+        Log entries and reminders the companion drafts are saved only after
+        you confirm them.
       </p>
       <p>
         An optional server AI endpoint is available to operators only after
