@@ -235,8 +235,10 @@ describe("companion over Telegram", () => {
     await say("/today I have crushing chest pain and cannot breathe");
     expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
     expect(bot.last().text).not.toContain("care list");
-    await say("/help seene me tez dard aur saans nahi aa rahi");
+    await say("/help I have crushing chest pain and cannot breathe");
     expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
+    // The help text also mentions 112, so check it was not sent instead.
+    expect(bot.last().text).not.toContain("I’m your NutritiScan companion");
     await notify.handleUpdate({
       message: {
         text: "I have crushing chest pain and cannot breathe",
