@@ -34,7 +34,14 @@ export default function Page() {
         address, but this workflow does not send them your chat or records.
         The model uses device memory and caches model files in browser storage.
         Turn it off to release memory; clear site data to remove cached files.
-        When you are signed in, each chat is saved to your account, encrypted
+        When AI answers are switched on, your question, the recent chat and,
+        if you are signed in, a summary of the records you allow in Sources
+        &amp; access, your profile and your last 7 days of daily log are sent
+        to Groq, which runs the open model that writes the answer. Groq’s terms
+        say it does not use these messages to train models; it may keep them
+        for up to 30 days only to investigate abuse or reliability problems.
+        Emergency checks, record summaries and log or reminder drafts run
+        without AI. When you are signed in, each chat is saved to your account, encrypted
         on the server like your records, so you can return to it from the chat
         list. Delete a chat from the list at any time; deleting your account
         removes all chats. Demo chats stay in the tab and disappear on refresh.
