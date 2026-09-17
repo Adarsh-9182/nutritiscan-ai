@@ -126,6 +126,18 @@ describe("Codex review regressions", () => {
       time: "09:00",
     });
     expect(pick("Levothyroxine").task.repeat).toBeUndefined();
+    for (const entry of [
+      "Methotrexate twice weekly",
+      "Vitamin D twice a week",
+      "Iron 3 times a month",
+    ]) {
+      expect(pick(entry).task.repeat, entry).toBeUndefined();
+      expect(pick(entry).why, entry).not.toContain("more than once a day");
+    }
+    expect(pick("Paracetamol 3 times a day").why).toContain(
+      "more than once a day",
+    );
+    expect(pick("Amoxicillin BD").why).toContain("more than once a day");
   });
   it("returns monthly reminders to their original day", () => {
     const jan = { ...task({ repeat: "monthly", date: "2026-01-31" }) };
@@ -188,6 +200,22 @@ describe("calendar export", () => {
     expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
     for (const line of ics.split("\r\n"))
       expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
+  });
+  it("keeps month-end reminders on the last day in calendars", () => {
+    const ics = (t: Partial<CareTask>) =>
+      toICS([task({ repeat: "monthly", ...t })]);
+    expect(ics({ date: "2026-01-31" })).toContain(
+      "RRULE:FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1",
+    );
+    expect(ics({ date: "2026-02-28", anchorDay: 31 })).toContain(
+      "BYMONTHDAY=28,29,30,31;BYSETPOS=-1",
+    );
+    expect(ics({ date: "2026-01-30" })).toContain(
+      "BYMONTHDAY=28,29,30;BYSETPOS=-1",
+    );
+    expect(ics({ date: "2026-01-15" })).toContain(
+      "RRULE:FREQ=MONTHLY;BYMONTHDAY=15",
+    );
   });
   it("folds long titles", () => {
     const ics = toICS([task({ title: "x".repeat(170) })]);
