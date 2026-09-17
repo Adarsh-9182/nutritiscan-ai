@@ -275,6 +275,21 @@ describe("stored day logs", () => {
       [a.id],
     );
     expect(count[0].record_count).toBe(0);
+    // Concurrent first writes for one date: exactly one succeeds.
+    const other = { ...day, date: "2026-09-13" };
+    const results = await Promise.allSettled([
+      service.save(a.id, "day", other),
+      service.save(a.id, "day", other),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    // Export sees every stored day, not only the display window.
+    expect((await service.workspace(a.id, true)).days).toHaveLength(2);
+    await service.remove(
+      a.id,
+      (await service.workspace(a.id)).days!.find(
+        (d) => d.date === "2026-09-13",
+      )!.id,
+    );
     await service.remove(a.id, id);
     expect((await service.workspace(a.id)).days).toEqual([]);
   });

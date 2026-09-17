@@ -50,7 +50,7 @@ export default function DailyLog({
 }: {
   workspace: Workspace;
   disabled: boolean;
-  /** Replaces today's entries; the caller owns persistence. */
+  /** Replaces today's entries. Rejects when nothing was saved. */
   saveToday: (entries: LogEntry[]) => Promise<void>;
   ask: (text: string) => void;
 }) {
@@ -85,8 +85,20 @@ export default function DailyLog({
     }
     setError("");
     const now = new Date().toTimeString().slice(0, 5);
-    await saveToday([...entries, { ...parsed.data, time: now }]);
-    return true;
+    return save([...entries, { ...parsed.data, time: now }]);
+  }
+
+  /** Keeps what the person typed when saving fails, so they can retry. */
+  async function save(next: LogEntry[]) {
+    try {
+      await saveToday(next);
+      return true;
+    } catch (e) {
+      setError(
+        (e as Error).message || "Could not save your log. Please try again.",
+      );
+      return false;
+    }
   }
 
   function submitOther(e: FormEvent<HTMLFormElement>) {
@@ -360,7 +372,7 @@ export default function DailyLog({
                       disabled={disabled}
                       aria-label={`Remove ${describeEntry(entry)}`}
                       onClick={() =>
-                        void saveToday(entries.filter((_, j) => j !== i))
+                        void save(entries.filter((_, j) => j !== i))
                       }
                     >
                       <X size={14} />

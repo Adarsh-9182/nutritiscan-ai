@@ -1045,9 +1045,15 @@ export default function HealthWorkspace() {
               workspace={workspace}
               disabled={pending}
               ask={ask}
-              saveToday={(entries) =>
-                mutate(() => saveDay(localDate(), entries), false)
-              }
+              saveToday={async (entries) => {
+                // Unlike mutate(), failures reach the form so input is kept.
+                setPending(true);
+                try {
+                  await saveDay(localDate(), entries);
+                } finally {
+                  setPending(false);
+                }
+              }}
             />
           )}
           {view === "records" && (
