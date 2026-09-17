@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
+import RecordSources from "./record-sources";
 import { HealthTrends, VisitPreparation } from "./health-story";
 import { DEMO } from "@/lib/workspace/demo";
 import { extractReport } from "@/lib/workspace/reports";
@@ -80,6 +81,7 @@ const NAV = [
   ["trends", "Health trends", Activity],
   ["visit", "Visit preparation", CalendarDays],
   ["care", "Care & follow-ups", Heart],
+  ["sources", "Sources & access", ShieldCheck],
 ] as const;
 type View = (typeof NAV)[number][0] | "settings";
 async function api<T>(
@@ -415,6 +417,8 @@ export default function HealthWorkspace() {
   const [recovery, setRecovery] = useState("");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState(false);
+  const [agentAccessVersion, setAgentAccessVersion] = useState(0);
+  const accessLock = useRef(false);
   const [accounts, setAccounts] = useState(true);
   const [agentSeed, setAgentSeed] = useState<{
     text: string;
@@ -528,6 +532,33 @@ export default function HealthWorkspace() {
   function ask(text: string) {
     setAgentSeed({ text, id: Date.now() });
     setView("assistant");
+  }
+  async function changeReportAccess(
+    report: Saved<Report>,
+    assistantAccess: boolean,
+  ) {
+    if (accessLock.current) return;
+    accessLock.current = true;
+    await mutate(async () => {
+      const updated = { ...report, assistantAccess };
+      if (!demo)
+        await api("records", "POST", {
+          kind: "report",
+          id: report.id,
+          version: report.version,
+          data: updated,
+        });
+      setWorkspace((w) => ({
+        ...w,
+        reports: w.reports.map((r) =>
+          r.id === report.id ? { ...updated, version: report.version + 1 } : r,
+        ),
+      }));
+      setAgentSeed(null);
+      setAgentAccessVersion((v) => v + 1);
+      setNotice("Assistant access updated. A fresh conversation is ready.");
+    }, false);
+    accessLock.current = false;
   }
   async function saveAgentTask(task: CareTask) {
     if (demo)
@@ -1084,6 +1115,7 @@ export default function HealthWorkspace() {
           )}
           <div hidden={view !== "assistant"}>
             <HealthAgent
+              key={agentAccessVersion}
               workspace={workspace}
               demo={demo}
               seed={agentSeed}
@@ -1092,6 +1124,17 @@ export default function HealthWorkspace() {
               saveTask={saveAgentTask}
             />
           </div>
+          {view === "sources" && (
+            <RecordSources
+              reports={reports}
+              pending={pending}
+              changeAccess={(report, allowed) =>
+                void changeReportAccess(report, allowed)
+              }
+              addReport={() => setUpload(true)}
+              openReport={setSelected}
+            />
+          )}
           {view === "care" && (
             <>
               <div className="ns-page-heading">
@@ -1481,12 +1524,24 @@ function ReportModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [filename, setFilename] = useState("");
+  const [source, setSource] = useState<Report["source"]>();
   async function file(file: File) {
     setBusy(true);
     setError("");
     try {
       const { readReportFile } = await import("@/lib/workspace/pdf");
       const text = await readReportFile(file);
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await file.arrayBuffer(),
+      );
+      setSource({
+        method: /\.pdf$/i.test(file.name) ? "pdf" : "text",
+        label: file.name.slice(0, 180),
+        fingerprint: Array.from(new Uint8Array(digest), (n) =>
+          n.toString(16).padStart(2, "0"),
+        ).join(""),
+      });
       setRaw(text);
       setRows(extractReport(text));
       setFilename(file.name);
@@ -1530,6 +1585,8 @@ function ReportModal({
               notes: f.get("notes"),
               observations: rows,
               confirmed: f.get("confirmed") === "on",
+              source: source ?? { method: "manual", label: "Entered by you" },
+              assistantAccess: true,
             });
             await save(report);
           } catch (e) {
@@ -1564,7 +1621,9 @@ function ReportModal({
           <summary>Paste report text instead</summary>
           <textarea
             value={raw}
-            onChange={(e) => setRaw(e.target.value)}
+            onChange={(e) => {
+              setRaw(e.target.value);
+            }}
             maxLength={100000}
             rows={5}
             placeholder="Vitamin B12 245 pg/mL 200–900"
@@ -1575,6 +1634,11 @@ function ReportModal({
             className="ns-button ns-light"
             onClick={() => {
               setRows(extractReport(raw));
+              setSource({
+                method: "text",
+                label: "Pasted text, reviewed by you",
+              });
+              setFilename("");
               setError("");
             }}
           >

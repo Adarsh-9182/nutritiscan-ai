@@ -17,6 +17,7 @@ import {
   LoaderCircle,
   Cpu,
   Square,
+  ShieldCheck,
   CalendarDays,
   ArrowRight,
 } from "lucide-react";
@@ -35,16 +36,42 @@ type Message = {
   answer?: AgentReply;
 };
 const starters = [
-  ["Something feels off", "Help me organise my symptoms", Stethoscope],
-  ["Food & nutrition", "Help me understand a balanced vegetarian diet", Leaf],
-  ["Medicines", "What should I know about medicine interactions?", Pill],
-  ["Sleep & energy", "Help me understand my sleep and energy", Moon],
+  [
+    "Something feels off",
+    "Help me organise my symptoms",
+    Stethoscope,
+    "Make sense of what you’re feeling",
+  ],
+  [
+    "Food & nutrition",
+    "Help me understand a balanced vegetarian diet",
+    Leaf,
+    "Everyday eating, a little clearer",
+  ],
+  [
+    "Medicines",
+    "What should I know about medicine interactions?",
+    Pill,
+    "Understand the questions to ask",
+  ],
+  [
+    "Sleep & energy",
+    "Help me understand my sleep and energy",
+    Moon,
+    "Find a healthier daily rhythm",
+  ],
   [
     "Mental wellbeing",
     "I want to talk about stress and mental wellbeing",
     Heart,
+    "A space to talk about your mind",
   ],
-  ["My health records", "Summarise my latest report", FileText],
+  [
+    "My health records",
+    "Summarise my latest report",
+    FileText,
+    "Put your results into perspective",
+  ],
 ] as const;
 const modeText = {
   ai: "On-device AI · experimental",
@@ -67,7 +94,7 @@ export default function HealthAgent({
   seed: { text: string; id: number } | null;
   addReport: () => void;
   navigate: (
-    view: "records" | "visit" | "care" | "settings" | "trends",
+    view: "records" | "visit" | "care" | "settings" | "trends" | "sources",
   ) => void;
   saveTask: (task: CareTask) => Promise<void>;
 }) {
@@ -229,7 +256,7 @@ export default function HealthAgent({
     }
   }
   return (
-    <div className="ha-layout">
+    <div className={`ha-layout ${messages.length ? "ha-has-messages" : ""}`}>
       <section className="ha-conversation" aria-label="Health conversation">
         <header className="ha-toolbar">
           <span>
@@ -322,7 +349,11 @@ export default function HealthAgent({
         )}
         {!messages.length && (
           <div className="ha-welcome">
-            <div className="ha-kicker">A LITTLE SPACE FOR YOUR HEALTH</div>
+            <div className="ha-kicker">
+              HELLO,{" "}
+              {workspace.profile.name.split(" ")[0].toUpperCase() || "THERE"}{" "}
+              <span /> THIS SPACE IS YOURS
+            </div>
             <h1>
               How are you
               <br />
@@ -488,20 +519,31 @@ export default function HealthAgent({
               OR START WITH SOMETHING SPECIFIC
             </div>
             <div className="ha-starters">
-              {starters.map(([title, prompt, Icon]) => (
+              {starters.map(([title, prompt, Icon, description]) => (
                 <button
                   key={title}
+                  aria-label={title}
                   disabled={busy || device === "loading"}
                   onClick={() => void ask(prompt)}
                 >
                   <Icon size={17} strokeWidth={1.5} />
-                  <span>{title}</span>
+                  <span>
+                    <strong>{title}</strong>
+                    <small>{description}</small>
+                  </span>
                   <ArrowUpRight size={13} />
                 </button>
               ))}
             </div>
           </>
         )}
+        <button
+          className="ha-mobile-access"
+          onClick={() => navigate("sources")}
+        >
+          <ShieldCheck size={14} /> Choose which records your companion can read{" "}
+          <ArrowUpRight size={13} />
+        </button>
         <p className="ha-disclaimer">
           Health education, not diagnosis or emergency care. Chats aren’t saved.{" "}
           {demo
@@ -520,15 +562,22 @@ export default function HealthAgent({
           </button>
         </div>
         <h2>
-          A little context.
-          <br />A better starting point.
+          Your health,
+          <br />
+          <em>in one place.</em>
         </h2>
         <p>You choose what to share. Your records stay one click away.</p>
         <button className="ha-context-row" onClick={() => navigate("records")}>
           <FileText size={17} />
           <span>
             Health records
-            <small>{workspace.reports.length} confirmed reports</small>
+            <small>
+              {
+                workspace.reports.filter((r) => r.assistantAccess !== false)
+                  .length
+              }{" "}
+              available to your companion
+            </small>
           </span>
           <ArrowUpRight size={14} />
         </button>
@@ -546,6 +595,13 @@ export default function HealthAgent({
           <Activity size={17} />
           <span>
             Your health story<small>Results over time</small>
+          </span>
+          <ArrowUpRight size={14} />
+        </button>
+        <button className="ha-context-row" onClick={() => navigate("sources")}>
+          <ShieldCheck size={17} />
+          <span>
+            Sources & access<small>You’re in control</small>
           </span>
           <ArrowUpRight size={14} />
         </button>

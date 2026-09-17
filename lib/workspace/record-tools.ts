@@ -17,6 +17,11 @@ export function recordAnswer(
 ): AssistantAnswer | undefined {
   const urgent = escalation(question, workspace.profile);
   if (urgent) return urgent;
+  // Enforce access at the shared tool boundary for browser and server callers.
+  workspace = {
+    ...workspace,
+    reports: workspace.reports.filter((r) => r.assistantAccess !== false),
+  };
   if (
     /(?:\b(trend|trends|compare|comparison|changed|changes|history)\b|over time).*(?:report|result|record|lab|value)|(?:report|result|record|lab|value).*\b(trend|trends|compare|comparison|changed|changes|history)\b/i.test(
       question,
@@ -67,7 +72,7 @@ export function recordAnswer(
             "",
             "Next: compare your recorded results over time, or prepare questions for your doctor.",
           ].join("\n")
-        : "Add a report in Records and confirm its values first. Then I can organise the results and help you prepare questions for your doctor. I will not fill in missing results.",
+        : "No confirmed reports are available to the companion. Add a report in My records or enable a saved report in Sources & access. I will not fill in missing results.",
       mode: "record-summary",
       sources: report ? [LAB_SOURCE] : [],
     };

@@ -55,6 +55,37 @@ try {
     201,
   );
   assert.equal((await call("state")).reports[0].id, saved.id);
+  const sourcedReport = {
+    ...report,
+    assistantAccess: false,
+    source: {
+      method: "text",
+      label: "Synthetic smoke fixture",
+      fingerprint: "a".repeat(64),
+    },
+  };
+  await call("records", "POST", {
+    kind: "report",
+    id: saved.id,
+    version: 1,
+    data: sourcedReport,
+  });
+  const revokedState = await call("state");
+  assert.equal(revokedState.reports[0].assistantAccess, false);
+  assert.equal(revokedState.reports[0].source.label, "Synthetic smoke fixture");
+  assert.ok(
+    (
+      await call("assistant", "POST", {
+        question: "Summarise my report",
+      })
+    ).text.includes("No confirmed reports are available"),
+  );
+  await call("records", "POST", {
+    kind: "report",
+    id: saved.id,
+    version: 2,
+    data: { ...sourcedReport, assistantAccess: true },
+  });
   assert.equal(
     (await call("assistant", "POST", { question: "Summarise my report" })).mode,
     "record-summary",
@@ -114,7 +145,7 @@ try {
   await call("login", "POST", { username, password });
   assert.equal((await call("state")).reports.length, 1);
   console.log(
-    "PASS: signup, empty account, report persistence, summary, escalation, follow-up, concurrency, export, CSRF, logout and login.",
+    "PASS: signup, empty account, report provenance/access, summary, escalation, follow-up, concurrency, export, CSRF, logout and login.",
   );
 } finally {
   if (created) {

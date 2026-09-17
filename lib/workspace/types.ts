@@ -27,6 +27,17 @@ export const ReportSchema = z.object({
   observations: z.array(ObservationSchema).min(1).max(80),
   notes: z.string().max(2000).default(""),
   confirmed: z.literal(true),
+  source: z
+    .object({
+      method: z.enum(["pdf", "text", "manual"]),
+      label: z.string().trim().min(1).max(180),
+      fingerprint: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
+    })
+    .optional(),
+  assistantAccess: z.boolean().optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
 export const TaskSchema = z.object({
@@ -74,7 +85,10 @@ export function comparableHistory(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export function summaryText(workspace: Workspace, visit?: { notes: string; questions: string[] }): string {
+export function summaryText(
+  workspace: Workspace,
+  visit?: { notes: string; questions: string[] },
+): string {
   return [
     "NUTRITISCAN · VISIT PREPARATION",
     `Prepared ${new Date().toISOString().slice(0, 10)}`,
@@ -95,15 +109,22 @@ export function summaryText(workspace: Workspace, visit?: { notes: string; quest
       ...(r.notes ? [`  Patient note: ${r.notes}`] : []),
     ]),
     "",
-    ...(visit ? [
-      "MY VISIT NOTES", visit.notes.trim() || "No additional notes.", "",
-      "QUESTIONS I CHOSE", ...(visit.questions.length ? visit.questions : ["No questions selected."]),
-    ] : [
-      "QUESTIONS TO DISCUSS",
-      "Which results matter in the context of my symptoms and history?",
-      "Do any results need confirmation or follow-up, and when?",
-      "What should I watch for before our next visit?",
-    ]),
+    ...(visit
+      ? [
+          "MY VISIT NOTES",
+          visit.notes.trim() || "No additional notes.",
+          "",
+          "QUESTIONS I CHOSE",
+          ...(visit.questions.length
+            ? visit.questions
+            : ["No questions selected."]),
+        ]
+      : [
+          "QUESTIONS TO DISCUSS",
+          "Which results matter in the context of my symptoms and history?",
+          "Do any results need confirmation or follow-up, and when?",
+          "What should I watch for before our next visit?",
+        ]),
     "",
     "MY FOLLOW-UP LIST",
     ...workspace.tasks

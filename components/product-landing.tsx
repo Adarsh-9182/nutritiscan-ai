@@ -42,13 +42,16 @@ export default function ProductLanding() {
       <main>
         <section className="ne-hero" id="companion">
           <div className="ne-hero-copy">
+            <div className="ne-proof-pills" aria-label="Product principles">
+              <span>Reference-backed</span>
+              <span>User-controlled records</span>
+              <span>Private AI option</span>
+            </div>
             <span className="ne-kicker">YOUR EVERYDAY HEALTH COMPANION</span>
             <h1>
-              For the questions
+              Health questions deserve
               <br />
-              between
-              <br />
-              <em>appointments.</em>
+              <em>a clearer next step.</em>
             </h1>
             <p>
               A symptom you can’t explain. A medicine you want to understand. A
@@ -71,6 +74,9 @@ export default function ProductLanding() {
               <span>
                 <LockKeyhole size={12} /> No advertising trackers
               </span>
+              <span>
+                <FileText size={12} /> Sources stay visible
+              </span>
             </div>
           </div>
           <div className="ne-preview">
@@ -78,35 +84,76 @@ export default function ProductLanding() {
               <span className="ha-status-dot" /> A little space for your health{" "}
               <span>PRODUCT PREVIEW</span>
             </div>
-            <div className="ne-preview-body">
-              <span className="ne-kicker">START WHERE YOU ARE</span>
-              <h2>
-                How are you
-                <br />
-                <em>really feeling?</em>
-              </h2>
-              <div className="ne-example-question">
-                I’ve been struggling with sleep. Where do I start?
-              </div>
-              <div className="ne-example-answer">
-                <span className="ha-tiny-mark">n.</span>
-                <div>
-                  <b>Let’s take it one step at a time.</b>
-                  <p>
-                    We can explore sleep information, organise what you’ve
-                    noticed, and prepare questions for your clinician.
-                  </p>
-                  <small>
-                    Illustrative conversation · not a medical assessment
-                  </small>
+            <div className="ne-preview-grid">
+              <div className="ne-preview-body">
+                <span className="ne-kicker">START WHERE YOU ARE</span>
+                <h2>
+                  How are you
+                  <br />
+                  <em>really feeling?</em>
+                </h2>
+                <div className="ne-example-question">
+                  I’ve been struggling with sleep. Where do I start?
                 </div>
+                <div className="ne-example-answer">
+                  <span className="ha-tiny-mark">n.</span>
+                  <div>
+                    <b>Let’s take it one step at a time.</b>
+                    <p>
+                      We can explore sleep information, organise what you’ve
+                      noticed, and prepare questions for your clinician.
+                    </p>
+                    <small>
+                      Illustrative conversation · not a medical assessment
+                    </small>
+                  </div>
+                </div>
+                <Link href="/workspace" className="ne-prompt">
+                  Tell me what’s on your mind…
+                  <span>
+                    <ArrowRight size={18} />
+                  </span>
+                </Link>
               </div>
-              <Link href="/workspace" className="ne-prompt">
-                Tell me what’s on your mind…
-                <span>
-                  <ArrowRight size={18} />
-                </span>
-              </Link>
+              <aside
+                className="ne-record-preview"
+                aria-label="Product preview of record sources"
+              >
+                <span className="ne-kicker">YOUR CONTEXT</span>
+                <h3>
+                  One health story.
+                  <br />
+                  <em>Every source visible.</em>
+                </h3>
+                <div>
+                  <FileText size={16} />
+                  <span>
+                    <b>Annual wellness panel</b>
+                    <small>PDF import · confirmed by you</small>
+                  </span>
+                  <Check size={14} />
+                </div>
+                <div>
+                  <Moon size={16} />
+                  <span>
+                    <b>Sleep & energy</b>
+                    <small>Reference notes · MedlinePlus</small>
+                  </span>
+                  <Check size={14} />
+                </div>
+                <div>
+                  <LockKeyhole size={16} />
+                  <span>
+                    <b>Assistant access</b>
+                    <small>You choose which records it reads</small>
+                  </span>
+                  <Check size={14} />
+                </div>
+                <p>
+                  Illustrative product preview. No provider connection is
+                  implied.
+                </p>
+              </aside>
             </div>
             <div className="ne-preview-bottom">
               <span>YOUR QUESTIONS</span>
@@ -114,6 +161,17 @@ export default function ProductLanding() {
               <span>YOUR NEXT STEP</span>
             </div>
           </div>
+        </section>
+        <section
+          className="ne-principle-band"
+          aria-label="NutritiScan product principle"
+        >
+          <span>THE PRODUCT PRINCIPLE</span>
+          <h2>One answer. Every important source and limit kept in view.</h2>
+          <p>
+            NutritiScan separates your records, published reference notes and
+            AI-generated explanation—so you can see what came from where.
+          </p>
         </section>
         <section className="ne-topics" aria-label="Topics to explore">
           <span>HEALTH IS MORE THAN A REPORT.</span>

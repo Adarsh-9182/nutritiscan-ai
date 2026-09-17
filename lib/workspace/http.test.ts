@@ -140,6 +140,63 @@ describe("HTTP authentication and ownership boundary", () => {
       ).status,
     ).toBe(409);
   });
+  it("persists source metadata and revocation, rejects stale updates, and enforces access in the server assistant", async () => {
+    const data = {
+      ...DEMO.reports[0],
+      assistantAccess: false,
+      source: {
+        method: "pdf",
+        label: "synthetic.pdf",
+        fingerprint: "a".repeat(64),
+      },
+    };
+    expect(
+      (
+        await request(
+          "records",
+          "POST",
+          { kind: "report", id: recordId, version: 1, data },
+          aliceCookie,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          "records",
+          "POST",
+          {
+            kind: "report",
+            id: recordId,
+            version: 1,
+            data: { ...data, assistantAccess: true },
+          },
+          aliceCookie,
+        )
+      ).status,
+    ).toBe(409);
+    const state = await (
+      await request("state", "GET", undefined, aliceCookie)
+    ).json();
+    expect(state.reports[0]).toMatchObject({
+      assistantAccess: false,
+      source: data.source,
+      version: 2,
+    });
+    const answer = await (
+      await request(
+        "assistant",
+        "POST",
+        { question: "Summarise my report" },
+        aliceCookie,
+      )
+    ).json();
+    expect(answer.text).toContain("No confirmed reports are available");
+    const exported = await (
+      await request("export", "GET", undefined, aliceCookie)
+    ).json();
+    expect(exported.reports[0].title).toBe(data.title);
+  });
   it("limits request bytes and produces a private account export", async () => {
     expect(
       (

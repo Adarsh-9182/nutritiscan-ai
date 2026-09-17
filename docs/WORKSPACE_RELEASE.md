@@ -28,6 +28,14 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Follow-up proposals require an editable title/date and a separate confirmation. They are care-list items, not notifications or bookings. Conversations are transient and reset on refresh or sign-out.
 - Free cloud inference is not silently enabled for patient content. See [Gemini API data-use terms](https://ai.google.dev/gemini-api/terms) before changing this policy.
 
+## Sources and design refinement — 17 September 2026
+
+- The companion and public site use a more confident editorial hierarchy: larger readable type, restrained proof labels, generous spacing, a wide product demonstration and clearer record-source context. Hubble's current public site informed the centered headline, evidence-led product preview and compact status language; NutritiScan keeps its own ivory, forest and terracotta identity, content and components.
+- A new Sources & access screen lists each saved report, its recorded import method, confirmation time and optional SHA-256 file fingerprint. Older records correctly say that source details were not recorded. The original file is still processed in the browser and is not stored.
+- Each report has a persisted “Use in assistant” control. Disabled reports remain visible in My records and account exports but are excluded at the shared record-tool boundary from future assistant summaries, comparisons and generated visit questions.
+- Changing assistant access starts a fresh local conversation and cancels in-flight work, preventing an answer created from an older permission snapshot from appearing afterward. This control does not delete earlier answers a person may have copied or seen.
+- Source labels and file fingerprints are user-supplied provenance aids, not provider verification, clinical validation or proof that reviewed fields still match the original file. Hospital connections and automatic retrieval remain planned and unavailable.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
@@ -57,12 +65,12 @@ Use a persistent Postgres database. This deployment uses a dedicated Neon free-p
 
 Required values:
 
-| Variable | Meaning |
-| --- | --- |
-| `DATABASE_URL` | TLS Postgres connection (pooler supported, prepared statements disabled) |
-| `HEALTH_DATA_KEY` | Random 32-byte key encoded as 64 hex characters; back up securely |
-| `APP_ORIGIN` | Exact trusted browser origin, e.g. `https://www.nutritiscan.com` |
-| `NEXT_PUBLIC_SITE_URL` | Same canonical site URL for metadata |
+| Variable               | Meaning                                                                  |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `DATABASE_URL`         | TLS Postgres connection (pooler supported, prepared statements disabled) |
+| `HEALTH_DATA_KEY`      | Random 32-byte key encoded as 64 hex characters; back up securely        |
+| `APP_ORIGIN`           | Exact trusted browser origin, e.g. `https://www.nutritiscan.com`         |
+| `NEXT_PUBLIC_SITE_URL` | Same canonical site URL for metadata                                     |
 
 Run `npm run migrate:workspace` with `DATABASE_URL` supplied before deployment. Migration takes an advisory lock and only adds `ns_*` workspace tables; old patient/consultation tables are retained. Use an isolated database branch to test later migrations against representative synthetic records.
 
