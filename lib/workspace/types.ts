@@ -46,11 +46,60 @@ export const TaskSchema = z.object({
   done: z.boolean().default(false),
 });
 export type CareTask = z.infer<typeof TaskSchema>;
+export const LOG_KINDS = [
+  "meal",
+  "water",
+  "sleep",
+  "mood",
+  "symptom",
+  "medicine",
+  "activity",
+] as const;
+export type LogKind = (typeof LOG_KINDS)[number];
+/** One thing a person noted about their day. `amount` means glasses (water),
+ * hours (sleep), 1–5 (mood) or minutes (activity); text-only kinds leave it null. */
+export const LogEntrySchema = z
+  .object({
+    kind: z.enum(LOG_KINDS),
+    text: z.string().trim().max(300).default(""),
+    amount: z.number().finite().min(0).max(1440).nullable().default(null),
+    time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .optional(),
+  })
+  .refine(
+    (e) =>
+      e.kind === "water" || e.kind === "sleep" || e.kind === "mood"
+        ? e.amount !== null
+        : e.text.length > 0,
+    { message: "Add a description or amount for this entry." },
+  )
+  .refine((e) => e.kind !== "sleep" || (e.amount ?? 0) <= 24, {
+    message: "Sleep must be 24 hours or less.",
+  })
+  .refine(
+    (e) =>
+      e.kind !== "mood" ||
+      (Number.isInteger(e.amount) && e.amount! >= 1 && e.amount! <= 5),
+    { message: "Mood is a whole number from 1 to 5." },
+  )
+  .refine((e) => e.kind !== "water" || (e.amount ?? 0) <= 30, {
+    message: "Water is recorded in glasses, up to 30.",
+  });
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+/** A single calendar day of entries, stored as one encrypted record. */
+export const DayLogSchema = z.object({
+  date: z.iso.date(),
+  entries: z.array(LogEntrySchema).max(60),
+});
+export type DayLog = z.infer<typeof DayLogSchema>;
 export type Saved<T> = T & { id: string; createdAt: string; version: number };
 export type Workspace = {
   profile: Profile;
   reports: Saved<Report>[];
   tasks: Saved<CareTask>[];
+  days?: Saved<DayLog>[];
 };
 
 export function rangeStatus(

@@ -36,9 +36,12 @@ import {
   Upload,
   X,
   LoaderCircle,
+  NotebookPen,
 } from "lucide-react";
 import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
+import DailyLog from "./daily-log";
+import { localDate } from "@/lib/workspace/daily";
 import RecordSources from "./record-sources";
 import { HealthTrends, VisitPreparation } from "./health-story";
 import { DEMO } from "@/lib/workspace/demo";
@@ -51,6 +54,7 @@ import {
   type Workspace,
   type Report,
   type Saved,
+  type LogEntry,
   type Observation,
   type CareTask,
   type Profile,
@@ -77,6 +81,7 @@ const dateText = (date: string) =>
 const NAV = [
   ["assistant", "Health companion", MessageCircle],
   ["today", "Overview", LayoutDashboard],
+  ["log", "Daily log", NotebookPen],
   ["records", "My records", FileText],
   ["trends", "Health trends", Activity],
   ["visit", "Visit preparation", CalendarDays],
@@ -593,6 +598,42 @@ export default function HealthWorkspace() {
       }));
     }
   }
+  /** Persist the full entry list for one date: create the day or update it
+   * with its version so concurrent edits fail instead of overwriting. */
+  async function saveDay(date: string, entries: LogEntry[]) {
+    const existing = workspace.days?.find((d) => d.date === date);
+    const data = { date, entries };
+    if (demo) {
+      setWorkspace((w) => ({
+        ...w,
+        days: [
+          ...(w.days ?? []).filter((d) => d.date !== date),
+          {
+            ...data,
+            id: existing?.id ?? crypto.randomUUID(),
+            createdAt: existing?.createdAt ?? new Date().toISOString(),
+            version: (existing?.version ?? 0) + 1,
+          },
+        ].sort((a, b) => a.date.localeCompare(b.date)),
+      }));
+      return;
+    }
+    await api("records", "POST", {
+      kind: "day",
+      data,
+      ...(existing ? { id: existing.id, version: existing.version } : {}),
+    });
+    await refresh();
+  }
+  async function saveAgentLog(entries: LogEntry[]) {
+    const date = localDate();
+    const current = workspace.days?.find((d) => d.date === date);
+    const now = new Date().toTimeString().slice(0, 5);
+    await saveDay(date, [
+      ...(current?.entries ?? []),
+      ...entries.map((e) => ({ ...e, time: e.time ?? now })),
+    ]);
+  }
   if (loading)
     return (
       <div className="ns-loading">
@@ -999,6 +1040,16 @@ export default function HealthWorkspace() {
               </div>
             </>
           )}
+          {view === "log" && (
+            <DailyLog
+              workspace={workspace}
+              disabled={pending}
+              ask={ask}
+              saveToday={(entries) =>
+                mutate(() => saveDay(localDate(), entries), false)
+              }
+            />
+          )}
           {view === "records" && (
             <>
               <div className="ns-page-heading">
@@ -1122,6 +1173,7 @@ export default function HealthWorkspace() {
               addReport={() => setUpload(true)}
               navigate={navigate}
               saveTask={saveAgentTask}
+              saveLog={saveAgentLog}
             />
           </div>
           {view === "sources" && (

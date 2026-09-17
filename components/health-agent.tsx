@@ -26,6 +26,7 @@ import { type DeviceModel } from "@/lib/workspace/device-model";
 import {
   TaskSchema,
   type CareTask,
+  type LogEntry,
   type Workspace,
 } from "@/lib/workspace/types";
 
@@ -88,6 +89,7 @@ export default function HealthAgent({
   addReport,
   navigate,
   saveTask,
+  saveLog,
 }: {
   workspace: Workspace;
   demo: boolean;
@@ -97,6 +99,7 @@ export default function HealthAgent({
     view: "records" | "visit" | "care" | "settings" | "trends" | "sources",
   ) => void;
   saveTask: (task: CareTask) => Promise<void>;
+  saveLog?: (entries: LogEntry[]) => Promise<void>;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
@@ -112,6 +115,8 @@ export default function HealthAgent({
   } | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [logged, setLogged] = useState<string[]>([]);
+  const [logError, setLogError] = useState("");
   const [saveError, setSaveError] = useState("");
   const model = useRef<DeviceModel | null>(null);
   const loadController = useRef<AbortController | null>(null);
@@ -432,6 +437,48 @@ export default function HealthAgent({
                   <p className="ha-follow-question">
                     {message.answer.followUp}
                   </p>
+                )}
+                {message.answer?.draftLog && saveLog && (
+                  <>
+                    <button
+                      className="ha-action"
+                      disabled={
+                        busy || saving || logged.includes(message.id)
+                      }
+                      onClick={async () => {
+                        if (savingLock.current) return;
+                        savingLock.current = true;
+                        setSaving(true);
+                        setLogError("");
+                        try {
+                          await saveLog(message.answer!.draftLog!);
+                          setLogged((current) => [...current, message.id]);
+                        } catch {
+                          setLogError(
+                            "Could not save to your log. Check your connection and try again.",
+                          );
+                        } finally {
+                          savingLock.current = false;
+                          setSaving(false);
+                        }
+                      }}
+                    >
+                      {logged.includes(message.id) ? (
+                        <>
+                          <Check size={14} /> Added to today’s log
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} /> Confirm and add to log
+                        </>
+                      )}
+                    </button>
+                    {logError && !logged.includes(message.id) && (
+                      <p role="alert" className="ns-error">
+                        {logError}
+                      </p>
+                    )}
+                  </>
                 )}
                 {message.answer?.draftTask && (
                   <button

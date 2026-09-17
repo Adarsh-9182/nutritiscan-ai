@@ -2,6 +2,7 @@ import type { AssistantAnswer } from "./assistant";
 import { changesText, visitQuestions } from "./longitudinal";
 import { rangeStatus, statusLabel, type Workspace } from "./types";
 import { escalation } from "./escalation";
+import { logAnswer } from "./daily";
 
 export const LAB_SOURCE = {
   id: "lab",
@@ -77,4 +78,5 @@ export function recordAnswer(
       sources: report ? [LAB_SOURCE] : [],
     };
   }
+  return logAnswer(question, workspace);
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { Workspace } from "./types";
+import type { LogEntry, Workspace } from "./types";
+import { describeEntry, proposeLog } from "./daily";
 import type { AssistantAnswer } from "./assistant";
 import { recordAnswer } from "./record-tools";
 import { escalation } from "./escalation";
@@ -9,6 +10,8 @@ export type AgentReply = AssistantAnswer & {
   steps?: string[];
   followUp?: string;
   draftTask?: string;
+  /** Entries proposed from a first-person note; saved only after confirmation. */
+  draftLog?: LogEntry[];
   detail?: string;
 };
 export type Completion = (
@@ -86,6 +89,20 @@ export async function runHealthAgent(
         },
       ],
       steps: ["Treatment request boundary"],
+    };
+  const note = proposeLog(question);
+  if (note)
+    return {
+      mode: "record-summary",
+      text: [
+        "I can add this to today’s log:",
+        ...note.map((e) => `• ${describeEntry(e)}`),
+        "",
+        "Check it and confirm below. Nutrition figures are estimates from typical portions.",
+      ].join("\n"),
+      sources: [],
+      steps: ["Understood a daily note", "Drafted log entries"],
+      draftLog: note,
     };
   const direct = recordAnswer(question, workspace);
   if (direct)

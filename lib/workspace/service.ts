@@ -8,7 +8,14 @@ import {
   unseal,
   token,
 } from "./crypto";
-import type { Profile, Saved, Report, CareTask, Workspace } from "./types";
+import type {
+  Profile,
+  Saved,
+  Report,
+  CareTask,
+  DayLog,
+  Workspace,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -140,9 +147,15 @@ export class WorkspaceService {
       `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind IN ('report','task') ORDER BY created_at DESC LIMIT 500`,
       [id],
     );
+    // Daily logs are loaded separately and bounded by recency, so a long
+    // history never crowds reports and tasks out of the workspace.
+    const dayRows = await this.db.query<RecordRow>(
+      `SELECT id,kind,payload,created_at,version FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT 120`,
+      [id],
+    );
     const decoded = await Promise.all(
-      records.map(async (r) => ({
-        ...(await unseal<Report | CareTask>(r.payload, `${id}:${r.id}`)),
+      [...records, ...dayRows].map(async (r) => ({
+        ...(await unseal<Report | CareTask | DayLog>(r.payload, `${id}:${r.id}`)),
         id: r.id,
         createdAt: new Date(r.created_at).toISOString(),
         version: r.version,
@@ -153,6 +166,9 @@ export class WorkspaceService {
       profile: await unseal<Profile>(users[0].profile, id),
       reports: decoded.filter((r) => r.kind === "report") as Saved<Report>[],
       tasks: decoded.filter((r) => r.kind === "task") as Saved<CareTask>[],
+      days: (decoded.filter((r) => r.kind === "day") as Saved<DayLog>[]).sort(
+        (a, b) => a.date.localeCompare(b.date),
+      ),
     };
   }
   async profile(id: string, value: Profile) {
@@ -163,8 +179,8 @@ export class WorkspaceService {
   }
   async save(
     id: string,
-    kind: "report" | "task",
-    value: Report | CareTask,
+    kind: "report" | "task" | "day",
+    value: Report | CareTask | DayLog,
     recordId: string = randomUUID(),
     version?: number,
   ) {
@@ -179,6 +195,30 @@ export class WorkspaceService {
           409,
           "This record changed or is no longer available. Refresh before editing.",
         );
+    } else if (kind === "day") {
+      // One record per date, outside the report/task quota, capped separately.
+      const date = (value as DayLog).date;
+      const existing = await this.db.query<{ id: string; payload: string }>(
+        "SELECT id,payload FROM ns_records WHERE user_id=$1 AND kind='day' ORDER BY created_at DESC LIMIT 400",
+        [id],
+      );
+      for (const row of existing) {
+        const day = await unseal<DayLog>(row.payload, `${id}:${row.id}`);
+        if (day.date === date)
+          throw new ApiError(
+            409,
+            "This day already has a log. Refresh and try again.",
+          );
+      }
+      if (existing.length >= 400)
+        throw new ApiError(
+          409,
+          "Daily log limit reached. Export and remove older days first.",
+        );
+      await this.db.query(
+        "INSERT INTO ns_records (id,user_id,kind,payload) VALUES ($1,$2,'day',$3)",
+        [recordId, id, payload],
+      );
     } else {
       // Reserve quota with a conditional row update, atomic under concurrent inserts.
       const rows = await this.db.query<{ id: string }>(
@@ -196,8 +236,8 @@ export class WorkspaceService {
   }
   async remove(id: string, recordId: string) {
     const rows = await this.db.query<{ id: string }>(
-      `WITH removed AS (DELETE FROM ns_records WHERE id=$1 AND user_id=$2 RETURNING id),
-      released AS (UPDATE ns_users SET record_count=GREATEST(0,record_count-1) WHERE id=$2 AND EXISTS (SELECT 1 FROM removed)) SELECT id FROM removed`,
+      `WITH removed AS (DELETE FROM ns_records WHERE id=$1 AND user_id=$2 RETURNING id,kind),
+      released AS (UPDATE ns_users SET record_count=GREATEST(0,record_count-1) WHERE id=$2 AND EXISTS (SELECT 1 FROM removed WHERE kind<>'day')) SELECT id FROM removed`,
       [recordId, id],
     );
     if (!rows.length) throw new ApiError(404, "Record not found.");

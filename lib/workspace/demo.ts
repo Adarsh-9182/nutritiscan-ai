@@ -1,6 +1,48 @@
-import type { Workspace } from "./types";
+import type { DayLog, LogEntry, Workspace } from "./types";
+import { localDate, shiftDate } from "./daily";
+
+// Fictional week relative to today, so the demo log always looks current.
+const demoWeek: [number, number, number, string][] = [
+  [6, 4, 3, "poha and chai"],
+  [7.5, 4, 5, "2 roti, dal and curd"],
+  [5, 2, 4, "aloo paratha and chai"],
+  [8, 5, 6, "idli and sambar"],
+  [5.5, 2, 3, "rice and rajma"],
+  [7, 4, 6, "paneer and 2 roti"],
+];
+const demoDays = (): (DayLog & {
+  id: string;
+  createdAt: string;
+  version: number;
+})[] =>
+  demoWeek.map(([sleep, mood, water, meal], i) => {
+    const date = shiftDate(localDate(), i - demoWeek.length);
+    const entries: LogEntry[] = [
+      { kind: "sleep", text: "", amount: sleep, time: "07:30" },
+      { kind: "meal", text: meal, amount: null, time: "09:00" },
+      { kind: "water", text: "", amount: water, time: "18:00" },
+      { kind: "mood", text: "", amount: mood, time: "21:00" },
+    ];
+    if (i === 2)
+      entries.push({
+        kind: "activity",
+        text: "walk",
+        amount: 30,
+        time: "19:00",
+      });
+    return {
+      date,
+      entries,
+      id: `demo-day-${i}`,
+      createdAt: `${date}T08:00:00Z`,
+      version: 1,
+    };
+  });
 // Fictional, isolated sample. Never copied into a real account.
 export const DEMO: Workspace = {
+  get days() {
+    return demoDays();
+  },
   profile: {
     name: "Aarav",
     language: "English",

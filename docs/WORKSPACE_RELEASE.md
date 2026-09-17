@@ -36,6 +36,15 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Changing assistant access starts a fresh local conversation and cancels in-flight work, preventing an answer created from an older permission snapshot from appearing afterward. This control does not delete earlier answers a person may have copied or seen.
 - Source labels and file fingerprints are user-supplied provenance aids, not provider verification, clinical validation or proof that reviewed fields still match the original file. Hospital connections and automatic retrieval remain planned and unavailable.
 
+## Daily log — 17 September 2026
+
+- A new **Daily log** screen records meals, water, sleep, mood, symptoms, medicines and activity in a few taps. Each calendar day is one encrypted record (`kind = 'day'`, AES-256-GCM like other records), versioned so concurrent edits fail instead of overwriting. Day logs sit outside the 500 report/task quota and are capped at 400 days per account; the workspace loads the latest 120.
+- Meals are estimated with the existing Indian-first food table and portion vocabulary (roti, dal, katori…). Unrecognised meals are stored as notes and never given a guessed estimate.
+- The companion understands first-person notes (“had 2 idli for breakfast, slept 7 hours”, “2 glass paani piya”), shows the proposed entries and saves them only after the person confirms. Symptoms are logged only on explicit request (“log symptom: …”), and urgent-care escalation still runs first.
+- Questions about the log (“what did I eat today”, “how did I sleep this week”, “weekly summary”) are answered deterministically from the record. General education questions such as “how can I understand my sleep?” are not redirected to the log.
+- “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
+- Migration: the `ns_records` kind check is widened to include `day`, and the quota recount excludes day logs. Run `node scripts/workspace-migrate.mjs` before deploying.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
