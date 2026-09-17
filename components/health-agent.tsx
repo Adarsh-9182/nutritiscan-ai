@@ -348,6 +348,19 @@ export default function HealthAgent({
           </section>
         )}
         {!messages.length && (
+          <div className="ha-proof-strip" aria-label="Companion principles">
+            <span>
+              <Check size={12} /> Published references
+            </span>
+            <span>
+              <FileText size={12} /> Your chosen records
+            </span>
+            <span>
+              <Cpu size={12} /> Optional private AI
+            </span>
+          </div>
+        )}
+        {!messages.length && (
           <div className="ha-welcome">
             <div className="ha-kicker">
               HELLO,{" "}
@@ -360,9 +373,8 @@ export default function HealthAgent({
               <em>really feeling?</em>
             </h1>
             <p>
-              A question, a symptom, something on your mind.
-              <br className="ns-desktop" /> Start here. We’ll take it one step
-              at a time.
+              Bring the question. Add the context you choose.
+              <br className="ns-desktop" /> Leave with a clearer next step.
             </p>
           </div>
         )}
