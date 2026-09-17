@@ -3652,3 +3652,43 @@ dialog.ha-draft::backdrop { background:#232b2370; }
 @media (max-width:1100px) { .dl-today { grid-template-columns:repeat(2,minmax(0,1fr)); } .dl-grid { grid-template-columns:minmax(0,1fr); } }
 @media (max-width:560px) { .dl-today { grid-template-columns:minmax(0,1fr); } .dl-bars { gap:4px; } .dl-bar-pair i { width:8px; } .dl-bar-pair { height:100px; } .dl .ns-page-heading { flex-direction:column; align-items:flex-start; } }
 @media (prefers-reduced-motion:reduce) { .dl-entries li, .dl-patterns li { animation:none; } .dl-bar-pair i { transition:none; } }
+.ha-draft-row { display:grid !important; grid-template-columns:1fr 1fr; gap:12px !important; margin-top:0 !important; justify-content:stretch !important; }
+.ha-draft-row label { margin:0 0 4px; }
+.ha-draft select { display:block; width:100%; border:1px solid #d5dbcb; padding:10px; border-radius:6px; margin-top:7px; background:#fff; font:inherit; }
+
+/* Care reminders and companion suggestions */
+.ns-task-form { flex-wrap:wrap; }
+.ns-calendar-note { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:14px; padding:12px 14px; border-radius:10px; background:var(--ns-paper); border:1px dashed var(--ns-line); }
+.ns-calendar-note .ns-small-note { margin:0; flex:1 1 260px; }
+.ns-calendar-note .ns-button { width:auto; }
+.ns-repeat { display:inline-flex; align-items:center; gap:4px; margin-left:8px; padding:1px 7px; border-radius:99px; background:#ecefe4; color:#4f6444; font-style:normal; font-size:11px; }
+.as-panel { margin-bottom:22px; padding:20px 22px; border-radius:14px; background:linear-gradient(135deg,#f3f6ee,#fbfaf5 60%); border:1px solid #dde5d4; animation:dl-in .3s ease-out; }
+.as-panel header { display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.as-panel h2 { font-size:16px; font-weight:600; }
+.as-panel header p { font-size:12px; color:var(--ns-muted); line-height:1.6; margin-top:2px; }
+.as-mark { flex:none; display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:var(--ns-ink); color:#f4f6e9; }
+.as-panel ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.as-panel li { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 14px; border-radius:10px; background:#fff; border:1px solid var(--ns-line); transition:border-color .15s, transform .15s; }
+.as-panel li:hover { border-color:#b8c5ad; transform:translateY(-1px); }
+.as-panel li strong { font-size:13px; font-weight:600; }
+.as-panel li p { font-size:12px; color:var(--ns-muted); line-height:1.6; margin-top:2px; }
+.as-actions { display:flex; align-items:center; gap:6px; flex:none; }
+.as-actions .ns-button { min-height:36px; padding:8px 14px; gap:6px; }
+.as-actions input { border:1px solid var(--ns-line); border-radius:8px; padding:7px 8px; font:inherit; font-size:13px; background:#fff; }
+.as-dismiss { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:8px; background:transparent; color:var(--ns-muted); }
+.as-dismiss:hover { background:#f1efe9; }
+.as-added { display:flex; align-items:center; gap:6px; margin-top:10px; font-size:12px; color:#4f6444; }
+@media (max-width:640px) { .as-panel li { flex-direction:column; align-items:stretch; } .as-actions { justify-content:flex-end; } }
+
+/* Telegram companion settings */
+.tg-card { margin-bottom:22px; }
+.tg-head { display:flex; gap:12px; align-items:flex-start; margin-bottom:14px; }
+.tg-head .ns-card-title { margin-bottom:4px; }
+.tg-icon { flex:none; display:grid; place-items:center; width:34px; height:34px; border-radius:10px; background:#e5f0f7; color:#2a7ab0; }
+.tg-connected { display:flex; align-items:center; gap:6px; font-size:13px; color:#3f6a3a; margin:4px 0 12px; }
+.tg-toggles { display:flex; flex-direction:column; gap:10px; margin:6px 0 14px; font-size:13px; }
+.tg-toggles .ns-check { display:flex; gap:9px; align-items:flex-start; line-height:1.6; }
+.tg-link { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+.tg-card .ns-button { width:auto; }
+.as-actions select { border:1px solid var(--ns-line); border-radius:8px; padding:7px 8px; font:inherit; font-size:13px; background:#fff; }
+.as-actions { flex-wrap:wrap; justify-content:flex-end; }

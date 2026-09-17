@@ -15,6 +15,8 @@ import {
 import { readJsonCapped } from "@/lib/http/guard";
 import { sameOrigin } from "@/lib/workspace/http";
 import { answer, modelConfigured } from "@/lib/workspace/assistant";
+import { NotifyService } from "@/lib/notify/service";
+import { telegram, telegramConfigured } from "@/lib/notify/telegram";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,6 +156,43 @@ async function handle(
     if (route === "records" && req.method === "DELETE") {
       await service.remove(id, z.object({ id: z.uuid() }).parse(body).id);
       return json({ ok: true });
+    }
+    if (route.startsWith("notify")) {
+      const notify = new NotifyService(await database(), telegram());
+      const timeZone = z.string().min(1).max(64);
+      if (route === "notify" && req.method === "GET")
+        return json({
+          configured: telegramConfigured(),
+          ...(await notify.status(id)),
+        });
+      if (!telegramConfigured())
+        throw new ApiError(
+          503,
+          "Telegram reminders are not set up on this deployment yet.",
+        );
+      if (route === "notify/link" && req.method === "POST") {
+        await service.rate(`notify-link:${id}`, 5, 900);
+        const body2 = z.object({ timeZone }).parse(body);
+        return json(await notify.createLink(id, body2.timeZone));
+      }
+      if (route === "notify" && req.method === "PUT") {
+        const value = z
+          .object({
+            timeZone,
+            settings: z.object({
+              titles: z.boolean(),
+              morning: z.boolean(),
+              evening: z.boolean(),
+            }),
+          })
+          .parse(body);
+        await notify.updateSettings(id, value.settings, value.timeZone);
+        return json({ ok: true });
+      }
+      if (route === "notify" && req.method === "DELETE") {
+        await notify.disconnect(id);
+        return json({ ok: true });
+      }
     }
     if (route === "export" && req.method === "GET") {
       const response = json({

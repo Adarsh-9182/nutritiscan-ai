@@ -3,6 +3,7 @@ import { changesText, visitQuestions } from "./longitudinal";
 import { rangeStatus, statusLabel, type Workspace } from "./types";
 import { escalation } from "./escalation";
 import { logAnswer } from "./daily";
+import { nextStepsAnswer } from "./actions";
 
 export const LAB_SOURCE = {
   id: "lab",
@@ -15,6 +16,7 @@ export const LAB_SOURCE = {
 export function recordAnswer(
   question: string,
   workspace: Workspace,
+  today?: string,
 ): AssistantAnswer | undefined {
   const urgent = escalation(question, workspace.profile);
   if (urgent) return urgent;
@@ -78,5 +80,8 @@ export function recordAnswer(
       sources: report ? [LAB_SOURCE] : [],
     };
   }
-  return logAnswer(question, workspace);
+  return (
+    nextStepsAnswer(question, workspace, today) ??
+    logAnswer(question, workspace, today)
+  );
 }

@@ -37,10 +37,19 @@ import {
   X,
   LoaderCircle,
   NotebookPen,
+  Repeat,
 } from "lucide-react";
 import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
 import DailyLog from "./daily-log";
+import AgentSuggestions, { clearDismissals } from "./agent-suggestions";
+import TelegramSettings from "./telegram-settings";
+import {
+  categorise,
+  completeTask,
+  repeatText,
+} from "@/lib/workspace/actions";
+import { toICS } from "@/lib/workspace/calendar";
 import { localDate } from "@/lib/workspace/daily";
 import RecordSources from "./record-sources";
 import { HealthTrends, VisitPreparation } from "./health-story";
@@ -51,6 +60,7 @@ import {
   statusLabel,
   summaryText,
   ReportSchema,
+  TaskSchema,
   type Workspace,
   type Report,
   type Saved,
@@ -85,7 +95,7 @@ const NAV = [
   ["records", "My records", FileText],
   ["trends", "Health trends", Activity],
   ["visit", "Visit preparation", CalendarDays],
-  ["care", "Care & follow-ups", Heart],
+  ["care", "Care & reminders", Heart],
   ["sources", "Sources & access", ShieldCheck],
 ] as const;
 type View = (typeof NAV)[number][0] | "settings";
@@ -598,6 +608,32 @@ export default function HealthWorkspace() {
       }));
     }
   }
+  /** Completing a repeating reminder schedules its next date instead. */
+  function toggleTask(t: Saved<CareTask>) {
+    const repeating = !t.done && t.repeat && t.repeat !== "none";
+    const data = completeTask(t);
+    return mutate(async () => {
+      if (demo)
+        setWorkspace((w) => ({
+          ...w,
+          tasks: w.tasks.map((x) =>
+            x.id === t.id ? { ...data, version: x.version + 1 } : x,
+          ),
+        }));
+      else
+        await api("records", "POST", {
+          kind: "task",
+          id: t.id,
+          version: t.version,
+          data,
+        });
+      if (repeating)
+        setNotice(`Done for now. Next reminder: ${dateText(data.date)}.`);
+    });
+  }
+  function exportCalendar(tasks: Saved<CareTask>[]) {
+    download("nutritiscan-reminders.ics", toICS(tasks), "text/calendar");
+  }
   /** Persist the full entry list for one date: create the day or update it
    * with its version so concurrent edits fail instead of overwriting. */
   async function saveDay(date: string, entries: LogEntry[]) {
@@ -874,6 +910,12 @@ export default function HealthWorkspace() {
                   </span>
                 </div>
               </section>
+              <AgentSuggestions
+                workspace={workspace}
+                disabled={pending}
+                add={saveAgentTask}
+                compact
+              />
               <div className="ns-section-heading">
                 <h2>
                   Your latest snapshot{" "}
@@ -972,31 +1014,16 @@ export default function HealthWorkspace() {
                     </button>
                   </div>
                   {openTasks.length ? (
-                    openTasks.slice(0, 3).map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        task={t}
-                        disabled={pending}
-                        onToggle={() =>
-                          mutate(async () => {
-                            if (demo)
-                              setWorkspace((w) => ({
-                                ...w,
-                                tasks: w.tasks.map((x) =>
-                                  x.id === t.id ? { ...x, done: !x.done } : x,
-                                ),
-                              }));
-                            else
-                              await api("records", "POST", {
-                                kind: "task",
-                                id: t.id,
-                                version: t.version,
-                                data: { ...t, done: !t.done },
-                              });
-                          })
-                        }
-                      />
-                    ))
+                    openTasks
+                      .slice(0, 3)
+                      .map((t) => (
+                        <TaskRow
+                          key={t.id}
+                          task={t}
+                          disabled={pending}
+                          onToggle={() => toggleTask(t)}
+                        />
+                      ))
                   ) : (
                     <div className="ns-inline-empty">
                       <CalendarDays size={25} />
@@ -1198,7 +1225,7 @@ export default function HealthWorkspace() {
               <div className="ns-page-heading">
                 <div>
                   <span className="ns-eyebrow">SMALL STEPS, KEPT TOGETHER</span>
-                  <h1>Care & follow-ups</h1>
+                  <h1>Care & reminders</h1>
                   <p>
                     Your own next steps. Add advice from your clinician,
                     appointments or questions.
@@ -1211,6 +1238,11 @@ export default function HealthWorkspace() {
                   <ArrowDownToLine size={17} /> Visit summary
                 </button>
               </div>
+              <AgentSuggestions
+                workspace={workspace}
+                disabled={pending}
+                add={saveAgentTask}
+              />
               <section className="ns-card">
                 <h2 className="ns-card-title">What’s next?</h2>
                 <form
@@ -1220,11 +1252,15 @@ export default function HealthWorkspace() {
                     const form = e.currentTarget;
                     const f = new FormData(form);
                     void mutate(async () => {
-                      const task = {
-                        title: String(f.get("title")),
+                      const title = String(f.get("title"));
+                      const task = TaskSchema.parse({
+                        title,
                         date: String(f.get("date")),
+                        time: String(f.get("time") ?? "") || undefined,
+                        repeat: String(f.get("repeat") ?? "none"),
+                        category: categorise(title),
                         done: false,
-                      };
+                      });
                       if (demo)
                         setWorkspace((w) => ({
                           ...w,
@@ -1265,14 +1301,38 @@ export default function HealthWorkspace() {
                       required
                     />
                   </label>
+                  <label>
+                    Time
+                    <input name="time" type="time" />
+                  </label>
+                  <label>
+                    Repeat
+                    <select name="repeat" defaultValue="none">
+                      <option value="none">Once</option>
+                      <option value="daily">Every day</option>
+                      <option value="weekly">Every week</option>
+                      <option value="monthly">Every month</option>
+                    </select>
+                  </label>
                   <button className="ns-button ns-dark" disabled={pending}>
-                    <Plus size={17} /> Add task
+                    <Plus size={17} /> Add
                   </button>
                 </form>
-                <p className="ns-small-note">
-                  Tasks appear here when you return. Email and push reminders
-                  are not enabled.
-                </p>
+                <div className="ns-calendar-note">
+                  <p className="ns-small-note">
+                    Want a phone notification? Add your open items to Google
+                    Calendar, Apple Calendar or Outlook — your calendar sends
+                    the alert, at the time you set.
+                  </p>
+                  <button
+                    type="button"
+                    className="ns-button ns-light"
+                    disabled={!openTasks.length}
+                    onClick={() => exportCalendar(openTasks)}
+                  >
+                    <Bell size={16} /> Add all to calendar
+                  </button>
+                </div>
                 <div className="ns-task-list">
                   {[...workspace.tasks]
                     .sort(
@@ -1285,24 +1345,8 @@ export default function HealthWorkspace() {
                         key={t.id}
                         task={t}
                         disabled={pending}
-                        onToggle={() =>
-                          mutate(async () => {
-                            if (demo)
-                              setWorkspace((w) => ({
-                                ...w,
-                                tasks: w.tasks.map((x) =>
-                                  x.id === t.id ? { ...x, done: !x.done } : x,
-                                ),
-                              }));
-                            else
-                              await api("records", "POST", {
-                                kind: "task",
-                                id: t.id,
-                                version: t.version,
-                                data: { ...t, done: !t.done },
-                              });
-                          })
-                        }
+                        onToggle={() => toggleTask(t)}
+                        onCalendar={() => exportCalendar([t])}
                         onDelete={() =>
                           mutate(async () => {
                             if (demo)
@@ -1361,6 +1405,7 @@ export default function HealthWorkspace() {
               }
               onLogout={() =>
                 mutate(async () => {
+                  clearDismissals(workspace.scope);
                   if (!demo) await api("logout", "POST", {});
                   setSignedIn(false);
                   setDemo(false);
@@ -1371,6 +1416,7 @@ export default function HealthWorkspace() {
               onDelete={(password) =>
                 mutate(async () => {
                   if (!demo) await api("account", "DELETE", { password });
+                  clearDismissals(workspace.scope);
                   setSignedIn(false);
                   setDemo(false);
                   setWorkspace(blank);
@@ -1528,19 +1574,22 @@ function TaskRow({
   disabled,
   onToggle,
   onDelete,
+  onCalendar,
 }: {
   task: Saved<CareTask>;
   disabled: boolean;
   onToggle: () => void;
   onDelete?: () => void;
+  onCalendar?: () => void;
 }) {
+  const repeating = task.repeat && task.repeat !== "none";
   return (
     <div className={`ns-task-row ${task.done ? "done" : ""}`}>
       <button
         className="ns-task-check"
         role="checkbox"
         aria-checked={task.done}
-        aria-label={`${task.done ? "Reopen" : "Complete"} ${task.title}`}
+        aria-label={`${task.done ? "Reopen" : repeating ? "Done for now:" : "Complete"} ${task.title}`}
         onClick={onToggle}
         disabled={disabled}
       >
@@ -1551,9 +1600,25 @@ function TaskRow({
         <span>
           <CalendarDays size={12} />
           {dateText(task.date)}
+          {task.time ? ` · ${task.time}` : ""}
+          {repeating ? (
+            <em className="ns-repeat">
+              <Repeat size={11} /> {repeatText[task.repeat!]}
+            </em>
+          ) : null}
           {!task.done && task.date < today() ? " · Past due" : ""}
         </span>
       </div>
+      {onCalendar && !task.done && (
+        <button
+          className="ns-icon-button"
+          aria-label={`Add ${task.title} to calendar`}
+          title="Add to calendar"
+          onClick={onCalendar}
+        >
+          <Bell size={15} />
+        </button>
+      )}
       {onDelete ? (
         <button
           className="ns-icon-button"
@@ -1895,6 +1960,7 @@ function SettingsPanel({
           <p>Your context, your records, your choices.</p>
         </div>
       </div>
+      <TelegramSettings demo={demo} />
       <div className="ns-settings-grid">
         <section className="ns-card">
           <h2 className="ns-card-title">Your health context</h2>

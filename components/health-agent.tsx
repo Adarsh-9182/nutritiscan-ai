@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   CalendarDays,
   ArrowRight,
+  Bell,
 } from "lucide-react";
 import { runHealthAgent, type AgentReply } from "@/lib/workspace/health-agent";
 import { type DeviceModel } from "@/lib/workspace/device-model";
@@ -108,11 +109,9 @@ export default function HealthAgent({
   const [device, setDevice] = useState<"off" | "loading" | "ready">("off");
   const [progress, setProgress] = useState(0);
   const [modelError, setModelError] = useState("");
-  const [draft, setDraft] = useState<{
-    title: string;
-    date: string;
-    message: string;
-  } | null>(null);
+  const [draft, setDraft] = useState<
+    (Omit<CareTask, "done"> & { message: string }) | null
+  >(null);
   const [saved, setSaved] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [logged, setLogged] = useState<string[]>([]);
@@ -247,7 +246,14 @@ export default function HealthAgent({
     setSaving(true);
     setSaveError("");
     try {
-      const task = TaskSchema.parse({ ...draft, done: false });
+      const task = TaskSchema.parse({
+        title: draft.title,
+        date: draft.date,
+        time: draft.time || undefined,
+        repeat: draft.repeat,
+        category: draft.category,
+        done: false,
+      });
       await saveTask(task);
       setSaved((current) => [...current, draft.message]);
       setDraft(null);
@@ -442,9 +448,7 @@ export default function HealthAgent({
                   <>
                     <button
                       className="ha-action"
-                      disabled={
-                        busy || saving || logged.includes(message.id)
-                      }
+                      disabled={busy || saving || logged.includes(message.id)}
                       onClick={async () => {
                         if (savingLock.current) return;
                         savingLock.current = true;
@@ -479,6 +483,30 @@ export default function HealthAgent({
                       </p>
                     )}
                   </>
+                )}
+                {message.answer?.draftReminder && (
+                  <button
+                    className="ha-action"
+                    disabled={busy || saved.includes(message.id)}
+                    onClick={() => {
+                      setSaveError("");
+                      setDraft({
+                        ...message.answer!.draftReminder!,
+                        message: message.id,
+                      });
+                    }}
+                  >
+                    {saved.includes(message.id) ? (
+                      <>
+                        <Check size={14} /> Reminder saved
+                      </>
+                    ) : (
+                      <>
+                        <Bell size={14} /> Review and save reminder{" "}
+                        <ArrowUpRight size={13} />
+                      </>
+                    )}
+                  </button>
                 )}
                 {message.answer?.draftTask && (
                   <button
@@ -695,12 +723,17 @@ export default function HealthAgent({
       >
         {draft && (
           <>
-            <h2 id="draft-title">Review your follow-up</h2>
+            <h2 id="draft-title">
+              {draft.repeat && draft.repeat !== "none"
+                ? "Review your reminder"
+                : "Review your follow-up"}
+            </h2>
             <p>
               {demo
                 ? "Saved in this demo until refresh."
                 : "Saved to your care list after you confirm."}{" "}
-              This does not book an appointment or send a notification.
+              This does not book an appointment. For phone notifications, add
+              your list to your calendar from Care & reminders.
             </p>
             <label>
               What would you like to do?
@@ -719,6 +752,35 @@ export default function HealthAgent({
                 onChange={(e) => setDraft({ ...draft, date: e.target.value })}
               />
             </label>
+            <div className="ha-draft-row">
+              <label>
+                Time (optional)
+                <input
+                  type="time"
+                  value={draft.time ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, time: e.target.value || undefined })
+                  }
+                />
+              </label>
+              <label>
+                Repeat
+                <select
+                  value={draft.repeat ?? "none"}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      repeat: e.target.value as CareTask["repeat"],
+                    })
+                  }
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="daily">Every day</option>
+                  <option value="weekly">Every week</option>
+                  <option value="monthly">Every month</option>
+                </select>
+              </label>
+            </div>
             {saveError && (
               <p role="alert" className="ns-error">
                 {saveError}

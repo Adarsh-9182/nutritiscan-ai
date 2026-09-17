@@ -1,0 +1,27 @@
+name: Companion schedule
+
+# Free scheduler for due reminders and daily check-ins. GitHub may delay
+# scheduled runs; the app tolerates lateness and never double-sends.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run due reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NOTIFY_URL: ${{ vars.NOTIFY_URL || 'https://www.nutritiscan.com/api/cron/notify' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set; skipping."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" "$NOTIFY_URL"
