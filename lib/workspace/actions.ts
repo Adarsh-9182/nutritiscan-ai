@@ -23,33 +23,38 @@ export function categorise(text: string): Category {
   return "other";
 }
 
-/** “9am”, “9:30 pm”, “21:00”, “subah 8 baje”, “raat 10 baje” → HH:MM. */
+/**
+ * Clock times people write: “9am”, “9:30 pm”, “21:00”, “at 9.30”, “9.30 pm”,
+ * “subah 8 baje”. A dotted number is a time only after “at” or before am/pm,
+ * so a dose such as “0.25 mg” is never read as 00:25.
+ */
+const TIME_RE =
+  /(?:\bat\s+)?(?:\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b|\b(1[0-2]|0?[1-9])\.([0-5]\d)\s*(am|pm)\b|\bat\s+([01]?\d|2[0-3])\.([0-5]\d)\b(?!\s*(?:mg|mcg|ml|g|units?|iu|tablets?)\b)|\b(1[0-2]|0?[1-9])\s*(am|pm|a\.m\.|p\.m\.)(?=\W|$)|\b(subah|savere|dopahar|shaam|sham|raat)\s*(1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*baje\b)/gi;
+
 export function parseTime(text: string): string | undefined {
+  const m = new RegExp(TIME_RE.source, "i").exec(text);
+  if (!m) return;
   const pad = (n: number) => String(n).padStart(2, "0");
-  const clock = text.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(am|pm)?\b/i);
-  const bare = text.match(/\b(1[0-2]|0?[1-9])\s*(am|pm|a\.m\.|p\.m\.)/i);
-  const hindi = text.match(
-    /\b(subah|savere|dopahar|shaam|sham|raat)\s*(1[0-2]|0?[1-9])\s*baje\b/i,
-  );
-  let hour: number | undefined;
+  let hour: number;
   let minute = 0;
   let half: string | undefined;
-  if (clock) {
-    hour = Number(clock[1]);
-    minute = Number(clock[2]);
-    half = clock[3];
-  } else if (bare) {
-    hour = Number(bare[1]);
-    half = bare[2];
-  } else if (hindi) {
-    hour = Number(hindi[2]);
-    half = /subah|savere/i.test(hindi[1])
-      ? "am"
-      : /dopahar/i.test(hindi[1]) && hour < 12 && hour >= 11
+  if (m[1] !== undefined)
+    [hour, minute, half] = [Number(m[1]), Number(m[2]), m[3]];
+  else if (m[4] !== undefined)
+    [hour, minute, half] = [Number(m[4]), Number(m[5]), m[6]];
+  else if (m[7] !== undefined) [hour, minute] = [Number(m[7]), Number(m[8])];
+  else if (m[9] !== undefined) [hour, half] = [Number(m[9]), m[10]];
+  else {
+    hour = Number(m[12]);
+    minute = Number(m[13] ?? 0);
+    const part = m[11].toLowerCase();
+    half =
+      part === "subah" ||
+      part === "savere" ||
+      (part === "dopahar" && hour === 11)
         ? "am"
         : "pm";
   }
-  if (hour === undefined) return;
   if (half) {
     if (hour > 12) return;
     const pm = /^p/i.test(half);
@@ -107,10 +112,7 @@ export function proposeReminder(
       /\b(every ?day|daily|roz|rozana|har ?din|each day|every ?week|weekly|har hafte|each week|every ?month|monthly|har mahine|each month|day after tomorrow|tomorrow|parso|kal|next week|agle hafte|next month|agle mahine|in \d{1,3} days?)\b/gi,
       "",
     )
-    .replace(
-      /\b(at\s+)?(([01]?\d|2[0-3])[:.][0-5]\d\s*(am|pm)?|(1[0-2]|0?[1-9])\s*(am|pm|a\.m\.|p\.m\.)|(subah|savere|dopahar|shaam|sham|raat)\s*(1[0-2]|0?[1-9])\s*baje)/gi,
-      "",
-    )
+    .replace(TIME_RE, "")
     .replace(/\b(at|on|ko|ke|par)\s*$/i, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s,.-]+|[\s,.-]+$/g, "");
@@ -125,19 +127,45 @@ export function proposeReminder(
   };
 }
 
+/** The day of month a monthly reminder belongs to, kept separately so a
+ * 31st that falls back to the 28th returns to the 31st next time. */
+export const anchorDay = (task: CareTask) =>
+  task.anchorDay ?? Number(task.date.slice(8));
+
+export function monthlyDate(year: number, month: number, anchor: number) {
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(Math.min(anchor, last)).padStart(2, "0")}`;
+}
+
 /** Marking a repeating reminder done moves it to its next date instead. */
 export function nextOccurrence(task: CareTask, today = localDate()): string {
+  const anchor = anchorDay(task);
   const step = (date: string) => {
     if (task.repeat === "daily") return shiftDate(date, 1);
     if (task.repeat === "weekly") return shiftDate(date, 7);
-    const [y, m, d] = date.split("-").map(Number);
-    const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    return `${m === 12 ? y + 1 : y}-${String((m % 12) + 1).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+    const [y, m] = date.split("-").map(Number);
+    return m === 12
+      ? monthlyDate(y + 1, 1, anchor)
+      : monthlyDate(y, m + 1, anchor);
   };
   let date = step(task.date);
   // A reminder ignored for a while resumes from today, not from the past.
   while (date <= today) date = step(date);
   return date;
+}
+
+/** The task after “done”: repeating items move on, others are completed. */
+export function completeTask<T extends CareTask>(
+  task: T,
+  today = localDate(),
+): T {
+  if (task.done || !task.repeat || task.repeat === "none")
+    return { ...task, done: !task.done };
+  return {
+    ...task,
+    date: nextOccurrence(task, today),
+    ...(task.repeat === "monthly" ? { anchorDay: anchorDay(task) } : {}),
+  };
 }
 
 export const repeatText: Record<Repeat, string> = {
@@ -152,7 +180,25 @@ export type Suggestion = {
   title: string;
   why: string;
   task: CareTask;
+  /** The person must choose how often and when before it can be added. */
+  needsSchedule?: boolean;
 };
+
+/** How often a medicines-list entry says it is taken, if it says so. */
+export function statedFrequency(entry: string): Repeat | "several" | undefined {
+  if (
+    /\b(twice|thrice|bd|bid|tds|tid|qid|[2-4] ?(times|x)|do baar|teen baar)\b/i.test(
+      entry,
+    )
+  )
+    return "several";
+  if (/\b(weekly|once a week|every week|per week|har hafte)\b/i.test(entry))
+    return "weekly";
+  if (/\b(monthly|once a month|every month|har mahine)\b/i.test(entry))
+    return "monthly";
+  if (/\b(daily|once a day|every day|od|qd|roz|rozana)\b/i.test(entry))
+    return "daily";
+}
 
 const mentions = (tasks: Saved<CareTask>[], word: string) =>
   tasks.some(
@@ -230,16 +276,28 @@ export function suggestions(
       )
     )
       continue;
+    // Never invent a schedule: only a frequency and time written in the
+    // medicines list are pre-filled, and the person confirms both.
+    const frequency = statedFrequency(medicine);
+    const time = parseTime(medicine);
     found.push({
       id: `medicine:${medicine.toLowerCase()}`,
       title: `Reminder for ${medicine}`,
-      why: "It is in your medicines list. Set the time your prescriber or pharmacist told you; you can change it before saving.",
+      why:
+        frequency === "several"
+          ? "It is in your medicines list and taken more than once a day. Add one reminder for each time your prescriber gave you."
+          : "It is in your medicines list. Choose how often and when, exactly as your prescriber or pharmacist told you.",
+      needsSchedule: true,
       task: {
         title: `Take ${medicine} as prescribed`,
         date: today,
         done: false,
-        time: "09:00",
-        repeat: "daily",
+        ...(time ? { time } : {}),
+        ...(frequency && frequency !== "several"
+          ? { repeat: frequency }
+          : frequency === "several"
+            ? { repeat: "daily" as const }
+            : {}),
         category: "medicine",
       },
     });

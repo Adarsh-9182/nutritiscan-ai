@@ -42,10 +42,10 @@ import {
 import { Brand } from "./product-landing";
 import HealthAgent from "./health-agent";
 import DailyLog from "./daily-log";
-import AgentSuggestions from "./agent-suggestions";
+import AgentSuggestions, { clearDismissals } from "./agent-suggestions";
 import {
   categorise,
-  nextOccurrence,
+  completeTask,
   repeatText,
 } from "@/lib/workspace/actions";
 import { toICS } from "@/lib/workspace/calendar";
@@ -610,9 +610,7 @@ export default function HealthWorkspace() {
   /** Completing a repeating reminder schedules its next date instead. */
   function toggleTask(t: Saved<CareTask>) {
     const repeating = !t.done && t.repeat && t.repeat !== "none";
-    const data = repeating
-      ? { ...t, date: nextOccurrence(t) }
-      : { ...t, done: !t.done };
+    const data = completeTask(t);
     return mutate(async () => {
       if (demo)
         setWorkspace((w) => ({
@@ -1406,6 +1404,7 @@ export default function HealthWorkspace() {
               }
               onLogout={() =>
                 mutate(async () => {
+                  clearDismissals(workspace.scope);
                   if (!demo) await api("logout", "POST", {});
                   setSignedIn(false);
                   setDemo(false);
@@ -1416,6 +1415,7 @@ export default function HealthWorkspace() {
               onDelete={(password) =>
                 mutate(async () => {
                   if (!demo) await api("account", "DELETE", { password });
+                  clearDismissals(workspace.scope);
                   setSignedIn(false);
                   setDemo(false);
                   setWorkspace(blank);

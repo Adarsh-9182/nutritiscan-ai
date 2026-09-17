@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   categorise,
+  completeTask,
   nextOccurrence,
   nextStepsAnswer,
   parseTime,
@@ -93,6 +94,46 @@ describe("reminder requests", () => {
     expect(categorise("Repeat thyroid test")).toBe("test");
     expect(categorise("Take metformin")).toBe("medicine");
     expect(categorise("Buy vegetables")).toBe("other");
+  });
+});
+
+describe("Codex review regressions", () => {
+  it("never reads a decimal dose as a clock time", () => {
+    expect(
+      proposeReminder(
+        "remind me to take 0.25 mg clonazepam every day at 9am",
+        T,
+      ),
+    ).toMatchObject({
+      title: "Take 0.25 mg clonazepam",
+      time: "09:00",
+      repeat: "daily",
+    });
+    expect(parseTime("take 1.5 tablets")).toBeUndefined();
+    expect(parseTime("at 9.30")).toBe("09:30");
+    expect(parseTime("9.30 pm")).toBe("21:30");
+    expect(parseTime("raat 9:30 baje")).toBe("21:30");
+  });
+  it("keeps a stated medicine frequency and never defaults to daily", () => {
+    const pick = (medicines: string) =>
+      suggestions({ ...base, profile: { ...base.profile, medicines } }, T)[0];
+    expect(pick("Methotrexate once weekly").task.repeat).toBe("weekly");
+    expect(pick("Metformin 500 mg twice daily").why).toContain(
+      "more than once a day",
+    );
+    expect(pick("Vitamin D daily at 9am").task).toMatchObject({
+      repeat: "daily",
+      time: "09:00",
+    });
+    expect(pick("Levothyroxine").task.repeat).toBeUndefined();
+  });
+  it("returns monthly reminders to their original day", () => {
+    const jan = { ...task({ repeat: "monthly", date: "2026-01-31" }) };
+    const feb = completeTask(jan, "2026-01-31");
+    expect(feb).toMatchObject({ date: "2026-02-28", anchorDay: 31 });
+    const mar = completeTask(feb, "2026-02-28");
+    expect(mar.date).toBe("2026-03-31");
+    expect(completeTask(task({}), T).done).toBe(true);
   });
 });
 
@@ -190,10 +231,11 @@ describe("suggestions", () => {
     );
     const meds = list.filter((s) => s.task.category === "medicine");
     expect(meds).toHaveLength(2);
-    expect(meds[0].task).toMatchObject({
-      repeat: "daily",
-      title: "Take Thyroxine 50mcg as prescribed",
-    });
+    // No schedule is invented: nothing in the list says how often or when.
+    expect(meds[0].needsSchedule).toBe(true);
+    expect(meds[0].task.title).toBe("Take Thyroxine 50mcg as prescribed");
+    expect(meds[0].task.repeat).toBeUndefined();
+    expect(meds[0].task.time).toBeUndefined();
     const withReminder = suggestions(
       {
         ...base,

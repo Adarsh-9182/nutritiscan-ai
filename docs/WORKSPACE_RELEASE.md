@@ -56,6 +56,11 @@ This release puts a health companion at the centre of the workspace, with accoun
   - a daily reminder for each medicine in the profile, at an editable time and without a dose;
   - a discussion item when symptoms were logged on 3 or more of the last 7 days.
   Adding a suggestion is the person's explicit confirmation. Dismissals are remembered only in that browser.
+- Fixes from Codex review:
+  - Medicine suggestions never invent a schedule. Only a frequency or time written in the medicines list is pre-filled, and the person must choose both before adding.
+  - A decimal dose (“0.25 mg”) is never read as a clock time.
+  - Monthly reminders keep their original day (31 Jan → 28 Feb → 31 Mar).
+  - Dismissed suggestions are stored only as hashes under a per-account key, which is cleared on sign-out and account deletion.
 - “What should I do next?” / “aage kya karna hai” lists open items and suggestions without a model.
 - The visit summary now includes the last 7 days of the daily log and each reminder's time and repeat.
 

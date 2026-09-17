@@ -167,6 +167,7 @@ export class WorkspaceService {
       profile: await unseal<Profile>(users[0].profile, id),
       reports: decoded.filter((r) => r.kind === "report") as Saved<Report>[],
       tasks: decoded.filter((r) => r.kind === "task") as Saved<CareTask>[],
+      scope: digest(`scope:${id}`).slice(0, 24),
       days: (decoded.filter((r) => r.kind === "day") as Saved<DayLog>[]).sort(
         (a, b) => a.date.localeCompare(b.date),
       ),
