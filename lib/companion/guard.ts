@@ -12,13 +12,20 @@ const STOP_MEDICINE =
 const CERTAINTY =
   /\b(you (?:definitely|certainly) have|you are (?:definitely )?(?:safe|fine) (?:to|and don't need)|no need to see a doctor|doctor ki zaroorat nahi)\b/i;
 
+const RULES: [string, RegExp][] = [
+  ["personal_dose", PERSONAL_DOSE],
+  ["personal_dose_hi", PERSONAL_DOSE_HI],
+  ["stop_medicine", STOP_MEDICINE],
+  ["certain_diagnosis", CERTAINTY],
+];
+
+/** The id of the first rule an answer breaks, or null. */
+export function guardRule(text: string): string | null {
+  return RULES.find(([, re]) => re.test(text))?.[0] ?? null;
+}
+
 export function unsafeOutput(text: string): boolean {
-  return (
-    PERSONAL_DOSE.test(text) ||
-    PERSONAL_DOSE_HI.test(text) ||
-    STOP_MEDICINE.test(text) ||
-    CERTAINTY.test(text)
-  );
+  return guardRule(text) !== null;
 }
 
 export function boundaryText(hinglish: boolean) {

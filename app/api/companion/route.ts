@@ -4,16 +4,10 @@ import { database } from "@/lib/workspace/database";
 import { ApiError, WorkspaceService } from "@/lib/workspace/service";
 import { readJsonCapped } from "@/lib/http/guard";
 import { sameOrigin } from "@/lib/workspace/http";
-import { escalation } from "@/lib/workspace/escalation";
-import { speaksHinglish } from "@/lib/workspace/voice";
-import { ProfileSchema, type Workspace } from "@/lib/workspace/types";
-import { buildMessages } from "@/lib/companion/prompt";
-import {
-  cloudModelReady,
-  ModelUnavailable,
-  streamChat,
-} from "@/lib/companion/llm";
-import { boundaryText, unsafeOutput } from "@/lib/companion/guard";
+import type { Workspace } from "@/lib/workspace/types";
+import { cloudModelReady, providerName } from "@/lib/companion/llm";
+import { runTurn, type TurnOutcome } from "@/lib/companion/turn";
+import { startTrace } from "@/lib/obs/trace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,66 +76,47 @@ export async function POST(req: NextRequest) {
       await service.rate(`companion-guest-day:${ip}`, 60, 86_400);
     }
 
-    const profile =
-      workspace?.profile ?? ProfileSchema.parse({ name: "Guest" });
-    const hinglish = speaksHinglish(last.text, profile);
-    const recentUser = messages
-      .filter((m) => m.role === "user")
-      .slice(-3)
-      .map((m) => m.text)
-      .join("\n");
-    const urgent = escalation(recentUser, profile);
-
     const encoder = new TextEncoder();
     const line = (value: unknown) =>
       encoder.encode(`${JSON.stringify(value)}\n`);
     const controller = new AbortController();
     req.signal.addEventListener("abort", () => controller.abort());
+    const trace = startTrace("companion.turn");
+    trace.set({
+      channel: "web",
+      provider: providerName(),
+      model: process.env.HEALTH_MODEL_NAME ?? "",
+    });
 
     const stream = new ReadableStream<Uint8Array>({
       async start(out) {
-        if (urgent) {
-          out.enqueue(
-            line({ t: "replace", v: urgent.text, mode: "escalation" }),
-          );
-          out.enqueue(line({ t: "done" }));
-          out.close();
-          return;
-        }
-        let text = "";
+        let outcome = "error";
         try {
           const timeout = setTimeout(() => controller.abort(), 55_000);
-          for await (const delta of streamChat(
-            buildMessages(messages, workspace),
-            controller.signal,
-          )) {
-            text += delta;
-            if (unsafeOutput(text)) {
-              controller.abort();
-              out.enqueue(line({ t: "replace", v: boundaryText(hinglish) }));
-              break;
+          // The browser has already routed records and drafts; the server
+          // still runs triage and the guard for every turn.
+          for await (const event of runTurn({
+            messages,
+            workspace,
+            route: false,
+            signal: controller.signal,
+            trace,
+          })) {
+            if (event.t === "done") {
+              outcome = event.outcome;
+              continue;
             }
-            out.enqueue(line({ t: "delta", v: delta }));
+            if (event.t === "answer") continue;
+            out.enqueue(line(event));
           }
           clearTimeout(timeout);
           out.enqueue(line({ t: "done" }));
-        } catch (error) {
-          // Never log prompts, answers or health context.
-          console.error("[companion] stream failed", {
-            code:
-              error instanceof ModelUnavailable
-                ? "MODEL_UNAVAILABLE"
-                : "STREAM_FAILED",
-          });
+        } catch {
           out.enqueue(
-            line({
-              t: "error",
-              v: text
-                ? "The answer was cut off. Please try again."
-                : "The AI is busy right now. Please try again in a minute.",
-            }),
+            line({ t: "error", v: "The AI is unavailable. Please try again." }),
           );
         } finally {
+          trace.end(outcome as TurnOutcome);
           out.close();
         }
       },
@@ -157,8 +132,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof ApiError)
+    if (error instanceof ApiError) {
+      if (error.status === 429)
+        startTrace("companion.turn").end("rate_limited", "http_429");
       return json({ error: error.message }, error.status);
+    }
     if (error instanceof z.ZodError)
       return json({ error: "Check the message and try again." }, 400);
     console.error("[companion] request failed", {

@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@/lib/workspace/database";
 import { digest, seal, token, unseal } from "@/lib/workspace/crypto";
 import { ApiError, WorkspaceService } from "@/lib/workspace/service";
-import { runHealthAgent } from "@/lib/workspace/health-agent";
+import type { AgentReply } from "@/lib/workspace/health-agent";
+import { runTurn, type TurnOutcome } from "@/lib/companion/turn";
+import { providerName } from "@/lib/companion/llm";
+import { startTrace } from "@/lib/obs/trace";
 import { completeTask } from "@/lib/workspace/actions";
 import { escalation } from "@/lib/workspace/escalation";
 import { recentDays } from "@/lib/workspace/daily";
@@ -240,9 +243,38 @@ export class NotifyService {
         : /^\/next\b/.test(text)
           ? "what should I do next"
           : text;
-    const reply = await runHealthAgent(question, workspace, {
-      today: local.date,
+    // Same turn pipeline as the web chat: triage, tools, then AI.
+    const trace = startTrace("companion.turn");
+    trace.set({
+      channel: "telegram",
+      provider: providerName(),
+      model: process.env.HEALTH_MODEL_NAME ?? "",
     });
+    let reply: AgentReply | undefined;
+    let generated = "";
+    let outcome: TurnOutcome = "error";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
+    try {
+      for await (const event of runTurn({
+        messages: [{ role: "user", text: question }],
+        workspace,
+        route: true,
+        signal: controller.signal,
+        today: local.date,
+        trace,
+      })) {
+        if (event.t === "answer") reply = event.reply;
+        else if (event.t === "delta") generated += event.v;
+        else if (event.t === "replace") generated = event.v;
+        else if (event.t === "error") generated ||= event.v;
+        else if (event.t === "done") outcome = event.outcome;
+      }
+    } finally {
+      clearTimeout(timeout);
+      trace.end(outcome);
+    }
+    if (!reply) return this.messenger.send(chat, generated);
     let body = reply.text;
     if (/^\/today\b/.test(text)) {
       const today = recentDays(workspace.days, local.date, 1)[0];

@@ -21,6 +21,20 @@ export function cloudModelReady() {
 
 export class ModelUnavailable extends Error {}
 
+/** A short provider label for traces, never the full URL. */
+export function providerName() {
+  try {
+    const host = new URL(process.env.HEALTH_MODEL_BASE_URL ?? "").hostname;
+    return host.includes("groq")
+      ? "groq"
+      : host === "127.0.0.1" || host === "localhost"
+        ? "local"
+        : "other";
+  } catch {
+    return "none";
+  }
+}
+
 function endpoint() {
   const base = new URL(process.env.HEALTH_MODEL_BASE_URL ?? "");
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(base.hostname);
