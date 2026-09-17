@@ -251,6 +251,7 @@ export default function HealthAgent({
   persist,
   openMenu,
   newChat,
+  guest = false,
 }: {
   workspace: Workspace;
   demo: boolean;
@@ -270,6 +271,7 @@ export default function HealthAgent({
   ) => Promise<ChatMeta>;
   openMenu?: () => void;
   newChat?: () => void;
+  guest?: boolean;
 }) {
   const [messages, setMessages] = useState<Message[]>(
     () => conversation?.messages.map(fromStored) ?? [],
@@ -324,12 +326,17 @@ export default function HealthAgent({
       model.current?.dispose();
     };
   }, []);
+  // A question seeded from the homepage must wait for this check, or it
+  // would be answered without AI before the status arrives.
+  const cloudCheck = useRef<Promise<boolean> | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch("/api/workspace/status", { cache: "no-store" })
+    const check = fetch("/api/workspace/status", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => alive && setCloud(Boolean(s?.model)))
-      .catch(() => undefined);
+      .then((s) => Boolean(s?.model))
+      .catch(() => false);
+    cloudCheck.current = check;
+    void check.then((on) => alive && setCloud(on));
     return () => {
       alive = false;
     };
@@ -491,8 +498,9 @@ export default function HealthAgent({
         (answer.mode === "reference" || answer.mode === "unavailable") &&
         !answer.draftLog &&
         !answer.draftReminder;
+      const useCloud = cloud || (await (cloudCheck.current ?? false));
       const streamed =
-        open && cloud && !model.current
+        open && useCloud && !model.current
           ? await streamAnswer(
               [...before, userMessage],
               answer,
@@ -531,8 +539,13 @@ export default function HealthAgent({
   }
   useEffect(() => {
     if (seed && seed.id !== seenSeed.current) {
-      seenSeed.current = seed.id;
-      void ask(seed.text);
+      // Deferred so a mount that is immediately torn down (React's
+      // development double-mount) never starts a turn it would then abort.
+      const timer = setTimeout(() => {
+        seenSeed.current = seed.id;
+        void ask(seed.text);
+      }, 0);
+      return () => clearTimeout(timer);
     }
     // A seed is an explicit navigation request, not a workspace refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1006,11 +1019,13 @@ export default function HealthAgent({
       <p className="cg-foot">
         NutritiScan can make mistakes and is not a doctor. In an emergency, call
         112.{" "}
-        {demo
-          ? "Demo chats and records are fictional."
-          : persist
-            ? "Chats are saved, encrypted, to your account."
-            : "Chats aren’t saved."}{" "}
+        {guest
+          ? "Guest chats aren’t saved."
+          : demo
+            ? "Demo chats and records are fictional."
+            : persist
+              ? "Chats are saved, encrypted, to your account."
+              : "Chats aren’t saved."}{" "}
         <button onClick={() => navigate("sources")}>Record access</button>
       </p>
 

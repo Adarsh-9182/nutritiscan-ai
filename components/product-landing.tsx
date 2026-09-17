@@ -1,286 +1,181 @@
 import Link from "next/link";
 import {
-  ArrowUpRight,
   ArrowRight,
-  Plus,
+  Bell,
   FileText,
-  Leaf,
-  Moon,
-  Pill,
-  Heart,
-  Stethoscope,
+  Languages,
   LockKeyhole,
-  Check,
+  NotebookPen,
+  ShieldCheck,
+  Stethoscope,
 } from "lucide-react";
+import HomeComposer from "./home-composer";
+import HomeDemo from "./home-demo";
+
+/** The NutritiScan mark: a leaf-shaped pulse on deep green, with a saffron dot. */
+export function Mark({ size = 30 }: { size?: number }) {
+  return (
+    <svg
+      className="ns-logo-mark"
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+    >
+      <rect width="32" height="32" rx="9" fill="#17392f" />
+      <path
+        d="M7 17.5h4.2l2.3-5.5 3.6 10 2.6-6.2h5.3"
+        fill="none"
+        stroke="#f4f1e6"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="24.6" cy="9.4" r="2.6" fill="#f08a24" />
+    </svg>
+  );
+}
+
 export function Brand() {
   return (
     <span className="ns-brand">
-      <span className="ns-mark">
-        <Plus size={21} strokeWidth={2.5} />
+      <Mark />
+      <span className="ns-wordmark">
+        nutriti<b>scan</b>
       </span>
-      nutriti<span>scan</span>
-      <i>°</i>
     </span>
   );
 }
+
+const FEATURES = [
+  {
+    icon: Stethoscope,
+    title: "Ask anything about your health",
+    text: "Symptoms, reports, diet, sleep, medicines. Clear answers in plain language, with the questions to take to your doctor.",
+  },
+  {
+    icon: FileText,
+    title: "Understands your reports",
+    text: "Add a lab report and see what is in or out of range, how it changed over time, and what to ask next.",
+  },
+  {
+    icon: NotebookPen,
+    title: "Remembers your day",
+    text: "Tell it “do roti aur dal khayi” or “slept 6 hours”. It keeps a daily log and points out patterns.",
+  },
+  {
+    icon: Bell,
+    title: "Reminds you",
+    text: "Medicine and check-up reminders in your calendar or on Telegram, set from a single sentence.",
+  },
+];
+
 export default function ProductLanding() {
   return (
-    <div className="ns-marketing ns-editorial">
-      <header className="ns-public-nav">
-        <Link href="/" aria-label="NutritiScan home">
+    <div className="hm">
+      <div className="hm-glow" aria-hidden="true" />
+      <header className="hm-nav">
+        <Link href="/?home" aria-label="NutritiScan home">
           <Brand />
         </Link>
         <nav aria-label="Main navigation">
-          <a href="#companion">The companion</a>
-          <a href="#care">From questions to care</a>
-          <Link href="/privacy">Your privacy</Link>
+          <a href="#features">Features</a>
+          <a href="#safety">Safety</a>
+          <Link href="/privacy">Privacy</Link>
         </nav>
-        <Link className="ns-button ns-dark" href="/workspace">
-          Let’s talk <ArrowUpRight size={16} />
-        </Link>
-      </header>
-      <main>
-        <section className="ne-hero" id="companion">
-          <div className="ne-hero-copy">
-            <div className="ne-proof-pills" aria-label="Product principles">
-              <span>Reference-backed</span>
-              <span>User-controlled records</span>
-              <span>Private AI option</span>
-            </div>
-            <span className="ne-kicker">YOUR EVERYDAY HEALTH COMPANION</span>
-            <h1>
-              Health questions deserve
-              <br />
-              <em>a clearer next step.</em>
-            </h1>
-            <p>
-              A symptom you can’t explain. A medicine you want to understand. A
-              healthier habit you want to start.
-              <br />
-              Let’s make room for all of it.
-            </p>
-            <div className="ne-actions">
-              <Link href="/workspace" className="ns-button ns-dark">
-                Start a conversation <ArrowRight size={17} />
-              </Link>
-              <Link href="/workspace?demo=1">
-                Take a look inside <ArrowUpRight size={15} />
-              </Link>
-            </div>
-            <div className="ne-smallprint">
-              <span>
-                <Check size={13} /> Free early access
-              </span>
-              <span>
-                <LockKeyhole size={12} /> No advertising trackers
-              </span>
-              <span>
-                <FileText size={12} /> Sources stay visible
-              </span>
-            </div>
-          </div>
-          <div className="ne-preview">
-            <div className="ne-preview-top">
-              <span className="ha-status-dot" /> A little space for your health{" "}
-              <span>PRODUCT PREVIEW</span>
-            </div>
-            <div className="ne-preview-grid">
-              <div className="ne-preview-body">
-                <span className="ne-kicker">START WHERE YOU ARE</span>
-                <h2>
-                  How are you
-                  <br />
-                  <em>really feeling?</em>
-                </h2>
-                <div className="ne-example-question">
-                  I’ve been struggling with sleep. Where do I start?
-                </div>
-                <div className="ne-example-answer">
-                  <span className="ha-tiny-mark">n.</span>
-                  <div>
-                    <b>Let’s take it one step at a time.</b>
-                    <p>
-                      We can explore sleep information, organise what you’ve
-                      noticed, and prepare questions for your clinician.
-                    </p>
-                    <small>
-                      Illustrative conversation · not a medical assessment
-                    </small>
-                  </div>
-                </div>
-                <Link href="/workspace" className="ne-prompt">
-                  Tell me what’s on your mind…
-                  <span>
-                    <ArrowRight size={18} />
-                  </span>
-                </Link>
-              </div>
-              <aside
-                className="ne-record-preview"
-                aria-label="Product preview of record sources"
-              >
-                <span className="ne-kicker">YOUR CONTEXT</span>
-                <h3>
-                  One health story.
-                  <br />
-                  <em>Every source visible.</em>
-                </h3>
-                <div>
-                  <FileText size={16} />
-                  <span>
-                    <b>Annual wellness panel</b>
-                    <small>PDF import · confirmed by you</small>
-                  </span>
-                  <Check size={14} />
-                </div>
-                <div>
-                  <Moon size={16} />
-                  <span>
-                    <b>Sleep & energy</b>
-                    <small>Reference notes · MedlinePlus</small>
-                  </span>
-                  <Check size={14} />
-                </div>
-                <div>
-                  <LockKeyhole size={16} />
-                  <span>
-                    <b>Assistant access</b>
-                    <small>You choose which records it reads</small>
-                  </span>
-                  <Check size={14} />
-                </div>
-                <p>
-                  Illustrative product preview. No provider connection is
-                  implied.
-                </p>
-              </aside>
-            </div>
-            <div className="ne-preview-bottom">
-              <span>YOUR QUESTIONS</span>
-              <span>YOUR CONTEXT</span>
-              <span>YOUR NEXT STEP</span>
-            </div>
-          </div>
-        </section>
-        <section
-          className="ne-principle-band"
-          aria-label="NutritiScan product principle"
-        >
-          <span>THE PRODUCT PRINCIPLE</span>
-          <h2>One answer. Every important source and limit kept in view.</h2>
-          <p>
-            NutritiScan separates your records, published reference notes and
-            AI-generated explanation—so you can see what came from where.
-          </p>
-        </section>
-        <section className="ne-topics" aria-label="Topics to explore">
-          <span>HEALTH IS MORE THAN A REPORT.</span>
-          <div>
-            {[
-              [Stethoscope, "Symptoms"],
-              [Pill, "Medicines"],
-              [Leaf, "Nutrition"],
-              [Moon, "Sleep"],
-              [Heart, "Wellbeing"],
-              [FileText, "Your records"],
-            ].map(([Icon, label]) => {
-              const I = Icon as typeof Heart;
-              return (
-                <Link key={String(label)} href="/workspace">
-                  <I size={20} strokeWidth={1.4} />
-                  {String(label)}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-        <section className="ne-care" id="care">
-          <div>
-            <span className="ne-kicker">
-              A CONVERSATION THAT GOES SOMEWHERE
-            </span>
-            <h2>
-              Understand a little more.
-              <br />
-              <em>Know what to ask next.</em>
-            </h2>
-            <p>
-              NutritiScan brings educational references and your own records
-              into one thoughtful workspace.
-            </p>
-          </div>
-          <ol>
-            {[
-              [
-                "01",
-                "Bring your question",
-                "Explore curated information about everyday health. Source links show where the reference notes come from.",
-              ],
-              [
-                "02",
-                "Add the context you choose",
-                "Keep confirmed reports together, compare recorded values and prepare a visit brief.",
-              ],
-              [
-                "03",
-                "Choose your next step",
-                "Review and save a follow-up to your care list. Nothing is booked or sent on your behalf.",
-              ],
-            ].map(([number, title, body]) => (
-              <li key={number}>
-                <span>{number}</span>
-                <div>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-        <section className="ne-privacy">
-          <LockKeyhole size={26} strokeWidth={1.3} />
-          <div>
-            <h2>Personal questions deserve a private space.</h2>
-            <p>
-              Optional on-device AI runs in a compatible browser after a model
-              download. Your conversation stays in the tab. Saved records are
-              encrypted on the server, where the service can decrypt them.
-            </p>
-            <Link href="/privacy">
-              Read how your data is handled <ArrowUpRight size={14} />
-            </Link>
-          </div>
-          <span>
-            YOUR HEALTH.
-            <br />
-            YOUR CONTROL.
-          </span>
-        </section>
-        <section className="ne-close">
-          <span className="ne-kicker">WE’RE STARTING WITH YOU</span>
-          <h2>
-            One question is
-            <br />
-            <em>a good beginning.</em>
-          </h2>
-          <Link className="ns-button ns-dark" href="/workspace">
-            Meet your health companion <ArrowRight size={17} />
+        <div className="hm-nav-actions">
+          <Link href="/workspace?login" className="hm-link">
+            Log in
           </Link>
-          <p>
-            For adults 18+. Educational support, not a doctor or emergency
-            service.
+          <Link href="/workspace" className="hm-btn">
+            Sign up free
+          </Link>
+        </div>
+      </header>
+
+      <main>
+        <section className="hm-hero">
+          <span className="hm-badge">
+            <Languages size={14} /> Made for India · English, हिंदी, Hinglish
+          </span>
+          <h1>
+            Your health questions,
             <br />
-            Early access · limited reference coverage · AI can make mistakes.
+            <span>answered clearly.</span>
+          </h1>
+          <p>
+            An AI health companion that knows your reports, keeps your daily log
+            and checks every message for emergencies first.
           </p>
+          <HomeComposer />
+          <p className="hm-fine">
+            Free. No sign-up needed to ask. Not a doctor, and not for
+            emergencies: call 112.
+          </p>
+        </section>
+
+        <section className="hm-showcase" aria-label="See it work">
+          <HomeDemo />
+          <p className="hm-caption">Examples with fictional data</p>
+        </section>
+
+        <section className="hm-features" id="features">
+          <h2>One companion for everyday health</h2>
+          <div className="hm-grid">
+            {FEATURES.map(({ icon: Icon, title, text }) => (
+              <article key={title}>
+                <span className="hm-icon">
+                  <Icon size={20} />
+                </span>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="hm-safety" id="safety">
+          <div>
+            <h2>Safety runs before the AI does</h2>
+            <p>
+              Every message is checked for warning signs, in English, Hindi and
+              Hinglish, before any model sees it. Answers that drift into doses
+              or diagnoses are stopped before they reach your screen.
+            </p>
+          </div>
+          <ul>
+            <li>
+              <ShieldCheck size={18} /> Emergency guidance comes first, every
+              time
+            </li>
+            <li>
+              <Stethoscope size={18} /> No prescriptions, doses or diagnoses
+            </li>
+            <li>
+              <LockKeyhole size={18} /> Records encrypted; you choose what the
+              AI can read
+            </li>
+          </ul>
+        </section>
+
+        <section className="hm-cta">
+          <h2>Start with one question.</h2>
+          <Link href="/workspace?guest" className="hm-btn big">
+            Open NutritiScan <ArrowRight size={17} />
+          </Link>
         </section>
       </main>
-      <footer className="ne-footer">
+
+      <footer className="hm-footer">
         <Brand />
-        <span>Made for the human behind the health data.</span>
-        <div>
+        <p>
+          Health education and organisation, not medical advice. In an emergency
+          call 112.
+        </p>
+        <nav aria-label="Legal">
           <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms & limitations</Link>
-        </div>
+          <Link href="/terms">Terms</Link>
+        </nav>
       </footer>
     </div>
   );

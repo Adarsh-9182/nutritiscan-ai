@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
+import { Instrument_Sans, Noto_Sans_Devanagari } from "next/font/google";
 import Providers from "@/components/providers";
 import "./globals.css";
 
@@ -53,9 +54,22 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
+const sans = Instrument_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-ui",
+});
+// Hindi answers and the Devanagari parts of the page.
+const devanagari = Noto_Sans_Devanagari({
+  subsets: ["devanagari"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+  variable: "--font-deva",
+});
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sans.variable} ${devanagari.variable}`}>
       <body className={"antialiased"}>
         <Providers>{children}</Providers>
       </body>

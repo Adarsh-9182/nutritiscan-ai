@@ -211,33 +211,41 @@ function Empty({
 function AccountGate({
   onReady,
   demo,
+  guest,
   available,
   initialError,
 }: {
   onReady: (recovery?: string) => void;
   demo: () => void;
+  guest: () => void;
   available: boolean;
   initialError: string;
 }) {
-  const [mode, setMode] = useState<"register" | "login" | "recover">(
-    "register",
+  const [mode, setMode] = useState<"register" | "login" | "recover">(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("login")
+      ? "login"
+      : "register",
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [recovery, setRecovery] = useState("");
+  const [show, setShow] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
     const f = new FormData(e.currentTarget);
+    const agreed = f.get("agree") === "on";
     try {
       const result = await api<{ recovery?: string }>(mode, "POST", {
         username: f.get("username"),
         password: f.get("password"),
         name: f.get("name"),
         recovery: f.get("recovery"),
-        consent: f.get("consent") === "on",
-        adult: f.get("adult") === "on",
+        // One checkbox confirms both age and consent; its label says so.
+        consent: agreed,
+        adult: agreed,
       });
       if (mode === "recover") {
         setRecovery(result.recovery!);
@@ -250,57 +258,27 @@ function AccountGate({
     }
   }
   return (
-    <div className="ns-auth">
-      <section className="ns-auth-story">
-        <Link href="/">
+    <div className="au">
+      <div className="hm-glow" aria-hidden="true" />
+      <header className="au-top">
+        <Link href="/?home" aria-label="NutritiScan home">
           <Brand />
         </Link>
-        <span className="ns-eyebrow">YOUR NEXT CHAPTER STARTS HERE</span>
+      </header>
+      <main className="au-card">
         <h1>
-          A little more
-          <br />
-          clarity.
-          <br />
-          <em>A lot more you.</em>
+          {mode === "register"
+            ? "Create your free account"
+            : mode === "login"
+              ? "Welcome back"
+              : "Recover your account"}
         </h1>
-        <p>
-          Your reports, your questions, your health story.
-          <br />
-          One thoughtful space to bring them together.
-        </p>
-        <div className="ns-auth-quote">
-          <ShieldCheck size={24} />
-          <p>
-            Your account starts empty.
-            <br />
-            <strong>Every record comes from you.</strong>
-          </p>
-        </div>
-        <small>
-          For adults 18+. Education and visit preparation, not medical
-          diagnosis.
-        </small>
-      </section>
-      <section className="ns-auth-form">
-        <Link href="/" className="ns-back">
-          ← Back to NutritiScan
-        </Link>
-        <span className="ns-icon soft">
-          <Heart size={24} />
-        </span>
-        <h2>
+        <p className="au-sub">
           {mode === "register"
-            ? "Make room for your health."
+            ? "Keep your chats, reports, daily log and reminders in one private place."
             : mode === "login"
-              ? "Welcome back."
-              : "Recover your workspace."}
-        </h2>
-        <p>
-          {mode === "register"
-            ? "Create your free early-access workspace."
-            : mode === "login"
-              ? "Sign in to your personal records."
-              : "Use the recovery key you saved when signing up."}
+              ? "Sign in to continue where you left off."
+              : "Use the recovery key you saved when you signed up."}
         </p>
         {recovery && (
           <div className="ns-notice">
@@ -316,14 +294,14 @@ function AccountGate({
         )}
         {!available && (
           <p className="ns-notice">
-            Accounts are temporarily unavailable. You can explore the fictional
-            demo below.
+            Accounts are temporarily unavailable. You can still ask questions
+            without an account.
           </p>
         )}
-        <form onSubmit={submit} className="ns-form">
+        <form onSubmit={submit} className="au-form">
           {mode === "register" && (
             <label>
-              Your name
+              <span>Your name</span>
               <input
                 name="name"
                 required
@@ -334,104 +312,121 @@ function AccountGate({
             </label>
           )}
           <label>
-            Username
+            <span>Username</span>
             <input
               name="username"
               required
               minLength={3}
               maxLength={40}
               pattern="[a-zA-Z0-9_-]+"
+              title="Letters, numbers, - and _"
               autoComplete="username"
-              placeholder="Choose a unique username"
+              placeholder={
+                mode === "register" ? "e.g. aarav_22" : "Your username"
+              }
             />
           </label>
           {mode === "recover" && (
             <label>
-              Recovery key
+              <span>Recovery key</span>
               <input name="recovery" required autoComplete="off" />
             </label>
           )}
           <label>
-            {mode === "recover" ? "New password" : "Password"}
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={12}
-              maxLength={128}
-              autoComplete={
-                mode === "login" ? "current-password" : "new-password"
-              }
-              placeholder="At least 12 characters"
-            />
+            <span>{mode === "recover" ? "New password" : "Password"}</span>
+            <div className="au-password">
+              <input
+                name="password"
+                type={show ? "text" : "password"}
+                required
+                minLength={12}
+                maxLength={128}
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
+                placeholder="At least 12 characters"
+              />
+              <button
+                type="button"
+                onClick={() => setShow(!show)}
+                aria-label={show ? "Hide password" : "Show password"}
+              >
+                {show ? "Hide" : "Show"}
+              </button>
+            </div>
           </label>
           {mode === "register" && (
-            <>
-              <label className="ns-check">
-                <input type="checkbox" name="adult" required /> I am 18 or
-                older.
-              </label>
-              <label className="ns-check">
-                <input type="checkbox" name="consent" required />
-                <span>
-                  I agree to the{" "}
-                  <Link href="/terms" target="_blank">
-                    terms
-                  </Link>{" "}
-                  and consent to storing the records I submit, as described in
-                  the{" "}
-                  <Link href="/privacy" target="_blank">
-                    privacy notice
-                  </Link>
-                  .
-                </span>
-              </label>
-            </>
+            <label className="au-check">
+              <input type="checkbox" name="agree" required />
+              <span>
+                I’m 18 or older and agree to the{" "}
+                <Link href="/terms" target="_blank">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" target="_blank">
+                  Privacy notice
+                </Link>
+                , including storing the records I add.
+              </span>
+            </label>
           )}
           {error && (
             <p className="ns-error" role="alert">
               {error}
             </p>
           )}
-          <button className="ns-button ns-dark" disabled={busy || !available}>
+          <button className="au-primary" disabled={busy || !available}>
             {busy ? (
               <LoaderCircle className="ns-spin" size={18} />
+            ) : mode === "register" ? (
+              "Create free account"
+            ) : mode === "login" ? (
+              "Sign in"
             ) : (
-              <>
-                {mode === "register"
-                  ? "Create workspace"
-                  : mode === "login"
-                    ? "Sign in"
-                    : "Reset password"}
-                <ArrowRight size={17} />
-              </>
+              "Reset password"
             )}
           </button>
         </form>
-        <div className="ns-auth-links">
-          <button
-            onClick={() => {
-              setMode(mode === "register" ? "login" : "register");
-              setError("");
-            }}
-          >
-            {mode === "register"
-              ? "Already have an account? Sign in"
-              : "New here? Create an account"}
-          </button>
-          {mode === "login" && (
-            <button onClick={() => setMode("recover")}>
-              Use a recovery key
-            </button>
+        <div className="au-switch">
+          {mode === "register" ? (
+            <>
+              Already have an account?{" "}
+              <button onClick={() => (setMode("login"), setError(""))}>
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              New here?{" "}
+              <button onClick={() => (setMode("register"), setError(""))}>
+                Create an account
+              </button>
+              {mode === "login" && (
+                <>
+                  {" · "}
+                  <button onClick={() => setMode("recover")}>
+                    Forgot password
+                  </button>
+                </>
+              )}
+            </>
           )}
         </div>
-        <div className="ns-auth-demo">
-          <span>Just looking around?</span>
-          <button className="ns-text-button" onClick={demo}>
-            Explore a fictional sample <ArrowUpRight size={15} />
-          </button>
+        <div className="au-or">
+          <span>or</span>
         </div>
-      </section>
+        <button className="au-secondary" onClick={guest}>
+          Continue without an account
+        </button>
+        <button className="au-tertiary" onClick={demo}>
+          See a sample workspace with fictional records
+        </button>
+      </main>
+      <p className="au-foot">
+        For adults 18+. Health education and organisation, not medical
+        diagnosis. In an emergency call 112.
+      </p>
     </div>
   );
 }
@@ -465,7 +460,22 @@ export default function HealthWorkspace() {
     id: string;
     title: string;
   } | null>(null);
+  const [guest, setGuest] = useState(false);
+  /** A signed-out chat with no records: what the homepage prompt opens. */
+  function openGuest(question?: string) {
+    setDemo(true);
+    setGuest(true);
+    setSignedIn(false);
+    setWorkspace(structuredClone(blank));
+    setLoading(false);
+    setActiveChat(null);
+    setChatKey((k) => k + 1);
+    setAgentSeed(question ? { text: question, id: Date.now() } : null);
+    setView("assistant");
+    setError("");
+  }
   function openDemo() {
+    setGuest(false);
     setDemo(true);
     setSignedIn(false);
     setWorkspace(structuredClone(DEMO));
@@ -486,7 +496,20 @@ export default function HealthWorkspace() {
   }
   useEffect(() => {
     let alive = true;
-    if (new URLSearchParams(location.search).has("demo")) {
+    const params = new URLSearchParams(location.search);
+    if (params.has("guest")) {
+      const q = params.get("q") ?? undefined;
+      queueMicrotask(() => {
+        if (!alive) return;
+        openGuest(q);
+        // Keep the question out of history and shared links.
+        history.replaceState(null, "", "/workspace?guest");
+      });
+      return () => {
+        alive = false;
+      };
+    }
+    if (params.has("demo")) {
       queueMicrotask(() => {
         if (!alive) return;
         setDemo(true);
@@ -793,6 +816,7 @@ export default function HealthWorkspace() {
       <AccountGate
         onReady={ready}
         demo={openDemo}
+        guest={() => openGuest()}
         available={accounts}
         initialError={error}
       />
@@ -880,7 +904,9 @@ export default function HealthWorkspace() {
               {chatSearch
                 ? "No chats match."
                 : demo
-                  ? "Demo chats appear here until you refresh."
+                  ? guest
+                    ? "Guest chats aren’t saved. Sign up free to keep them."
+                    : "Demo chats appear here until you refresh."
                   : "Your chats will appear here."}
             </p>
           ) : (
@@ -961,12 +987,16 @@ export default function HealthWorkspace() {
           </Link>
           <button className="ns-user" onClick={() => navigate("settings")}>
             <span className="ns-avatar">
-              {workspace.profile.name.slice(0, 1).toUpperCase()}
+              {(workspace.profile.name || "G").slice(0, 1).toUpperCase()}
             </span>
             <span>
-              <b>{workspace.profile.name}</b>
+              <b>{workspace.profile.name || "Guest"}</b>
               <small>
-                {demo ? "Fictional demo profile" : "Personal account"}
+                {guest
+                  ? "Not signed in"
+                  : demo
+                    ? "Fictional demo profile"
+                    : "Personal account"}
               </small>
             </span>
             <ChevronRight size={15} />
@@ -1027,17 +1057,21 @@ export default function HealthWorkspace() {
         {demo && (
           <div className="ns-demo-bar">
             <span>
-              <Sparkles size={14} /> Demo workspace · fictional records ·
-              changes last until refresh
+              <Sparkles size={14} />{" "}
+              {guest
+                ? "You’re chatting as a guest · nothing is saved"
+                : "Sample workspace · fictional records · resets on refresh"}
             </span>
             <button
               onClick={() => {
                 setDemo(false);
+                setGuest(false);
                 setWorkspace(blank);
                 setAgentSeed(null);
               }}
             >
-              Create your own <ArrowRight size={14} />
+              {guest ? "Sign up free to save" : "Create your own"}{" "}
+              <ArrowRight size={14} />
             </button>
           </div>
         )}
@@ -1430,6 +1464,7 @@ export default function HealthWorkspace() {
               persist={(meta, messages) => persistChat(meta, messages)}
               openMenu={() => setMobile(true)}
               newChat={newChat}
+              guest={guest}
             />
           </div>
           {view === "sources" && (
