@@ -286,7 +286,7 @@ describe("companion over Telegram", () => {
     expect(bot.last().text).toContain("09:00 — Take vitamin D");
     const done = lastButton();
     const current = (await workspaces.workspace(userId)).tasks[0];
-    expect(done).toBe(`d:${tasks[0].id}:${current.version}`);
+    expect(done).toBe(`d:${tasks[0].id}:${current.version}:20260918`);
     const tapDone = () =>
       notify.handleUpdate(
         { callback_query: { id: "cb", data: done, message: { chat } } },
@@ -313,6 +313,61 @@ describe("companion over Telegram", () => {
       nextDay,
     );
     expect(bot.acks.at(-1)).toBe("Already updated.");
+  });
+
+  it("completes the delivered occurrence, not the day of the tap", async () => {
+    await notify.updateSettings(
+      userId,
+      { titles: true, morning: false, evening: false },
+      "Asia/Kolkata",
+    );
+    const id = await workspaces.save(userId, "task", {
+      title: "Night inhaler",
+      date: "2026-09-10",
+      time: "23:55",
+      repeat: "daily",
+      done: false,
+    });
+    const afterMidnight = new Date("2026-09-19T18:35:00Z"); // 00:05 IST, 20 Sep
+    await notify.runDue(afterMidnight);
+    const button = bot
+      .last()
+      .buttons!.flat()
+      .find((b) => b.data.startsWith(`d:${id}:`))!;
+    expect(button.data.endsWith(":20260919")).toBe(true);
+    await notify.handleUpdate(
+      { callback_query: { id: "cb", data: button.data, message: { chat } } },
+      afterMidnight,
+    );
+    const saved = (await workspaces.workspace(userId)).tasks.find(
+      (t) => t.id === id,
+    )!;
+    // Tonight's 23:55 on the 20th is still ahead.
+    expect(saved.date).toBe("2026-09-20");
+    await workspaces.remove(userId, id);
+  });
+
+  it("releases a claim when sending fails so the next run retries", async () => {
+    const flaky = new FakeMessenger();
+    let fail = true;
+    flaky.send = async (c, text, buttons) => {
+      if (fail) throw new Error("network");
+      flaky.sent.push({ chat: c, text, buttons });
+    };
+    const retrying = new NotifyService(db, flaky, "nutritiscan_bot");
+    const id = await workspaces.save(userId, "task", {
+      title: "Retry me",
+      date: "2026-09-21",
+      time: "10:00",
+      done: false,
+    });
+    const at = new Date("2026-09-21T04:40:00Z"); // 10:10 IST
+    expect((await retrying.runDue(at)).failed).toBe(1);
+    fail = false;
+    expect((await retrying.runDue(at)).sent).toBe(1);
+    expect(flaky.sent.at(-1)?.text).toContain("Retry me");
+    expect((await retrying.runDue(at)).sent).toBe(0);
+    await workspaces.remove(userId, id);
   });
 
   it("sends the morning list and evening nudge once per day", async () => {

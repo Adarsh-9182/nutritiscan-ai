@@ -292,14 +292,16 @@ export class NotifyService {
     const channel = await this.channelFor(chat);
     // Done buttons carry the task version they were sent for, so a replayed
     // or repeated tap cannot move a reminder forward twice.
-    const match = data.match(/^([cxd]):([0-9a-f-]{36})(?::(\d{1,9}))?$/);
+    const match = data.match(
+      /^([cxd]):([0-9a-f-]{36})(?::(\d{1,9}))?(?::(\d{8}))?$/,
+    );
     if (!channel || !match)
       return this.messenger.acknowledge(
         callbackId,
         "This action is no longer available.",
       );
     const userId = channel.user_id;
-    const [, action, id, sentVersion] = match;
+    const [, action, id, sentVersion, occurrence] = match;
     if (action === "d") {
       const local = localNow(channel.time_zone, now);
       const workspace = await this.workspaces.workspace(userId);
@@ -307,7 +309,12 @@ export class NotifyService {
       if (!task || task.done || String(task.version) !== sentVersion)
         return this.messenger.acknowledge(callbackId, "Already updated.");
       const repeating = task.repeat && task.repeat !== "none";
-      const next = TaskSchema.parse(completeTask(task, local.date));
+      const on = occurrence
+        ? `${occurrence.slice(0, 4)}-${occurrence.slice(4, 6)}-${occurrence.slice(6)}`
+        : local.date;
+      const next = TaskSchema.parse(
+        completeTask(task, on < local.date ? on : local.date),
+      );
       try {
         await this.workspaces.save(userId, "task", next, task.id, task.version);
       } catch (error) {
@@ -385,6 +392,23 @@ export class NotifyService {
     return { channels: channels.length, sent, failed };
   }
 
+  /** Sends after claiming `keys`; a failed send releases them for retry. */
+  private async sendClaimed(
+    userId: string,
+    keys: string[],
+    send: () => Promise<void>,
+  ) {
+    try {
+      await send();
+    } catch (error) {
+      await this.db.query(
+        "DELETE FROM ns_notify_log WHERE user_id=$1 AND key = ANY($2)",
+        [userId, keys],
+      );
+      throw error;
+    }
+  }
+
   /** Records a send key first, so overlapping runs never double-send. */
   private async claim(userId: string, key: string) {
     const rows = await this.db.query<{ key: string }>(
@@ -401,22 +425,34 @@ export class NotifyService {
     const chat = await unseal<string>(channel.chat, `${userId}:channel`);
     const workspace = await this.workspaces.workspace(userId);
     let sent = 0;
-    const due = [];
-    for (const { task, date } of dueReminders(workspace.tasks, local))
-      if (await this.claim(userId, `r:${task.id}:${date}:${task.time}`))
-        due.push(task);
+    const due: { task: (typeof workspace.tasks)[number]; date: string }[] = [];
+    const keys: string[] = [];
+    for (const item of dueReminders(workspace.tasks, local)) {
+      const key = `r:${item.task.id}:${item.date}:${item.task.time}`;
+      if (await this.claim(userId, key)) {
+        due.push(item);
+        keys.push(key);
+      }
+    }
     if (due.length) {
-      await this.messenger.send(
-        chat,
-        reminderText(due, settings),
-        settings.titles
-          ? due.map((t) => [
-              {
-                text: `✓ Done: ${t.title.slice(0, 40)}`,
-                data: `d:${t.id}:${t.version}`,
-              },
-            ])
-          : undefined,
+      // Done buttons name the occurrence they belong to, so acknowledging
+      // last night's reminder after midnight does not complete today's.
+      await this.sendClaimed(userId, keys, () =>
+        this.messenger.send(
+          chat,
+          reminderText(
+            due.map((d) => d.task),
+            settings,
+          ),
+          settings.titles
+            ? due.map(({ task: t, date }) => [
+                {
+                  text: `✓ Done: ${t.title.slice(0, 40)}`,
+                  data: `d:${t.id}:${t.version}:${date.replaceAll("-", "")}`,
+                },
+              ])
+            : undefined,
+        ),
       );
       sent++;
     }
@@ -427,7 +463,9 @@ export class NotifyService {
     ) {
       const text = morningText(workspace.tasks, local.date, settings);
       if (text && (await this.claim(userId, `m:${local.date}`))) {
-        await this.messenger.send(chat, text);
+        await this.sendClaimed(userId, [`m:${local.date}`], () =>
+          this.messenger.send(chat, text),
+        );
         sent++;
       }
     }
@@ -437,7 +475,9 @@ export class NotifyService {
         !today?.entries.length &&
         (await this.claim(userId, `e:${local.date}`))
       ) {
-        await this.messenger.send(chat, EVENING_TEXT);
+        await this.sendClaimed(userId, [`e:${local.date}`], () =>
+          this.messenger.send(chat, EVENING_TEXT),
+        );
         sent++;
       }
     }

@@ -187,12 +187,26 @@ export type Suggestion = {
 
 /** How often a medicines-list entry says it is taken, if it says so. */
 export function statedFrequency(entry: string): Repeat | "several" | undefined {
+  const many =
+    /\b(twice|thrice|[2-9] ?(times|x)|do baar|teen baar|char baar)\b/i;
+  // “Twice weekly” or “3 times a month” cannot be expressed as one repeating
+  // reminder, so nothing is pre-filled and the person decides.
   if (
-    /\b(twice|thrice|bd|bid|tds|tid|qid|[2-4] ?(times|x)|do baar|teen baar)\b/i.test(
-      entry,
-    )
+    new RegExp(
+      `${many.source}.{0,15}\\b(week|weekly|month|monthly|hafte|mahine)\\b`,
+      "i",
+    ).test(entry)
+  )
+    return undefined;
+  if (
+    new RegExp(
+      `${many.source}.{0,12}\\b(a day|per day|daily|every day|din|roz)\\b`,
+      "i",
+    ).test(entry) ||
+    /\b(bd|bid|tds|tid|qid)\b/i.test(entry)
   )
     return "several";
+  if (many.test(entry)) return undefined;
   if (/\b(weekly|once a week|every week|per week|har hafte)\b/i.test(entry))
     return "weekly";
   if (/\b(monthly|once a month|every month|har mahine)\b/i.test(entry))
