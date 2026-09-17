@@ -52,4 +52,12 @@ CREATE TABLE IF NOT EXISTS ns_pending (
   id text PRIMARY KEY, user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
   payload text NOT NULL, expires_at timestamptz NOT NULL
 );
+-- Sign-in providers. Only a hash of the provider's subject id is stored.
+CREATE TABLE IF NOT EXISTS ns_identities (
+  subject_hash text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES ns_users(id) ON DELETE CASCADE,
+  provider text NOT NULL CHECK (provider IN ('google')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ns_identities_user ON ns_identities(user_id);
 `;

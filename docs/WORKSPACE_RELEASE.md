@@ -165,6 +165,20 @@ See [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md). In brief:
   - Hindi pregnancy bleeding;
   - four kinds of unsafe output.
 
+## Continue with Google — 17 September 2026
+
+- OpenID Connect authorization code flow with PKCE, a nonce and the minimal scopes `openid profile`. No library was added.
+- Only a SHA-256 hash of the Google subject id is stored, in `ns_identities`. Email is neither requested nor stored. Google accounts have no usable password or recovery key.
+- **Consent:** a new account is created only when the person ticked the 18+/terms box before continuing. Otherwise the callback returns them with a prompt to do so.
+- **State:** the OAuth state is kept in a sealed HttpOnly cookie that lasts 10 minutes and is compared in constant time. Callbacks share the auth network rate limit.
+- **Session cookie:** the session cookie is SameSite=Strict, so the callback answers with a small same-origin page that forwards to `/workspace`, which makes the next request carry the session.
+- **Setup:**
+  1. Create an OAuth client (type "Web application") in Google Cloud.
+  2. Add the redirect URI `https://www.nutritiscan.com/api/auth/google/callback`.
+  3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Vercel.
+  4. Run the migration, which adds `ns_identities`.
+- Without these variables the Google button is hidden.
+
 ### Validation and limits
 
 The new tests cover non-report routing, reference coverage, Hindi tokenisation, citation allowlists, invalid tools, urgent-context handling, medication boundaries, cancellation, and explicit follow-up confirmation. Real browser checks cover desktop/mobile home, medicine references, navigation and saved demo follow-ups. A real Qwen model download, WebGPU initialization, read-tool planning and a supported sleep-education answer were exercised in Chromium with Metal WebGPU enabled. Default headless Chromium had no compatible GPU and returned the explicit fallback. This single inference smoke test does not establish clinical performance. Software tests do not establish clinical reliability. Small general-purpose models can be inaccurate; this remains an educational experiment.
