@@ -81,6 +81,10 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Linking uses a single-use code that lasts 15 minutes, opened as a `t.me` deep link. Each account has at most one chat, and each chat belongs to at most one account. The chat id is stored sealed; lookups use a SHA-256 hash. Only private chats are accepted. Deleting the account removes the channel.
 - `/api/telegram` accepts only requests carrying `X-Telegram-Bot-Api-Secret-Token` and always answers 200. `/api/cron/notify` requires `Authorization: Bearer $CRON_SECRET`. Neither route logs message content or chat ids.
 - Scheduling is free: `docs/companion-schedule.yml`, once copied to `.github/workflows/`, calls the cron route every 15 minutes (GitHub may delay runs) and skips if the `CRON_SECRET` repository secret is missing.
+- Fixes from Codex review:
+  - Emergency checks run on the message text before any command (`/today …`) and for chats that are not linked.
+  - Done buttons carry the task version, so a repeated or replayed tap cannot move a reminder forward twice.
+  - Reminders set for late evening are still delivered after midnight within the 90-minute window.
 - Messages pass through Telegram, which has its own privacy terms. The settings screen says so and says Telegram is not for emergencies.
 
 ### Setting it up

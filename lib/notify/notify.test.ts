@@ -59,9 +59,30 @@ describe("schedule", () => {
     ];
     expect(
       dueReminders(tasks, { date: "2026-09-17", minutes: 9 * 60 + 5 }).map(
-        (t) => t.id,
+        (d) => d.task.id,
       ),
     ).toEqual(["a"]);
+  });
+  it("carries late-evening reminders across midnight", () => {
+    const late = [task({ id: "n", time: "23:55", repeat: "daily" })];
+    expect(dueReminders(late, { date: "2026-09-18", minutes: 5 })).toEqual([
+      { task: late[0], date: "2026-09-17" },
+    ]);
+    expect(dueReminders(late, { date: "2026-09-18", minutes: 120 })).toEqual(
+      [],
+    );
+    const once = [task({ id: "o", time: "23:55" })];
+    expect(
+      dueReminders(once, { date: "2026-09-18", minutes: 5 }).map((d) => d.date),
+    ).toEqual(["2026-09-17"]);
+  });
+  it("uses the anchor day for monthly reminders", () => {
+    expect(
+      occursOn(
+        task({ repeat: "monthly", date: "2026-03-31", anchorDay: 31 }),
+        "2026-03-31",
+      ),
+    ).toBe(true);
   });
   it("hides titles unless the person opts in", () => {
     const due = [task({ time: "09:00" })];
@@ -209,6 +230,24 @@ describe("companion over Telegram", () => {
     expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
   });
 
+  it("escalates emergencies written after a command or from unlinked chats", async () => {
+    const plain = bot.sent.length;
+    await say("/today I have crushing chest pain and cannot breathe");
+    expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
+    expect(bot.last().text).not.toContain("care list");
+    await say("/help seene me tez dard aur saans nahi aa rahi");
+    expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
+    await notify.handleUpdate({
+      message: {
+        text: "I have crushing chest pain and cannot breathe",
+        chat: { id: 4242, type: "private" },
+      },
+    });
+    expect(bot.last().chat).toBe("4242");
+    expect(bot.last().text).toMatch(/emergency|112|108|immediately/i);
+    expect(bot.sent.length).toBe(plain + 3);
+  });
+
   it("sends due reminders once, with Done buttons when titles are shown", async () => {
     await notify.updateSettings(
       userId,
@@ -241,12 +280,34 @@ describe("companion over Telegram", () => {
     await notify.runDue(nextDay);
     expect(bot.last().text).toContain("09:00 — Take vitamin D");
     const done = lastButton();
-    expect(done).toBe(`d:${tasks[0].id}`);
+    const current = (await workspaces.workspace(userId)).tasks[0];
+    expect(done).toBe(`d:${tasks[0].id}:${current.version}`);
+    const tapDone = () =>
+      notify.handleUpdate(
+        { callback_query: { id: "cb", data: done, message: { chat } } },
+        nextDay,
+      );
+    await tapDone();
+    expect(bot.last().text).toContain("Next one: 2026-09-19 at 09:00");
+    // A repeated or replayed tap does not skip another day.
+    const sent = bot.sent.length;
+    await tapDone();
+    expect(bot.acks.at(-1)).toBe("Already updated.");
+    expect(bot.sent.length).toBe(sent);
+    expect((await workspaces.workspace(userId)).tasks[0].date).toBe(
+      "2026-09-19",
+    );
     await notify.handleUpdate(
-      { callback_query: { id: "cb", data: done, message: { chat } } },
+      {
+        callback_query: {
+          id: "cb",
+          data: `d:${tasks[0].id}`,
+          message: { chat },
+        },
+      },
       nextDay,
     );
-    expect(bot.last().text).toContain("Next one: 2026-09-19 at 09:00");
+    expect(bot.acks.at(-1)).toBe("Already updated.");
   });
 
   it("sends the morning list and evening nudge once per day", async () => {
