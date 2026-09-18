@@ -51,6 +51,28 @@ const SOLO_NAME: Record<Exclude<Route, "supervisor">, string> = {
   coach: "Health Coach",
 };
 
+/**
+ * Narrow a specialist's section list to what the caller actually knows.
+ *
+ * Scoping (which sections an expertise needs) and availability (which sections
+ * hold real data) are different questions, and only the caller can answer the
+ * second. The account workspace stores a name, allergies, medicines,
+ * conditions and confirmed lab reports — it never asks for weight, height, a
+ * goal or sleep hours. Those fields are non-optional on HealthProfile, so a
+ * bridge has to put *something* in them, and SECTION_RENDERERS prints
+ * `Height/Weight: 170 cm / 70 kg` with no hedge. The Nutrition Agent would then
+ * compute a protein target in grams from a weight nobody ever gave, and
+ * nothing downstream could tell that figure apart from one the user reported.
+ *
+ * The identity renderer already refuses to guess age and sex for exactly this
+ * reason. This extends the same rule to the rest: a section the caller cannot
+ * vouch for is left out of the prompt entirely, so the agent asks instead of
+ * assuming.
+ */
+function scope(sections: MemorySection[], available: MemorySection[]): MemorySection[] {
+  return sections.filter((s) => available.includes(s));
+}
+
 function specialist(name: string, expertise: string, profile: HealthProfile, sections: MemorySection[], nutrition: string | null, tier = 0) {
   const resolved = resolveModel("specialist", tier);
   return new ToolLoopAgent({
@@ -69,14 +91,20 @@ summary the supervisor can hand to the user. Reference the user's memory when re
   });
 }
 
-export function buildSpecialists(profile: HealthProfile, nutrition: string, tier = 0) {
+export function buildSpecialists(
+  profile: HealthProfile,
+  nutrition: string,
+  tier = 0,
+  /** Sections the caller can actually vouch for; see scope(). */
+  available: MemorySection[] = ALL_MEMORY_SECTIONS,
+) {
   return {
     nutrition: specialist(
       SOLO_NAME.nutrition,
       EXPERTISE.nutrition,
       profile,
       // Not sleep/activity — training frequency doesn't change a food answer.
-      ["identity", "vitals", "goal", "allergies", "medicines", "conditions", "biomarkers"],
+      scope(["identity", "vitals", "goal", "allergies", "medicines", "conditions", "biomarkers"], available),
       nutrition,
       tier,
     ),
@@ -85,7 +113,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string, tier
       EXPERTISE.fitness,
       profile,
       // Not allergies/medicines/biomarkers — a workout plan doesn't hinge on lab values.
-      ["identity", "vitals", "goal", "sleep", "activity", "conditions"],
+      scope(["identity", "vitals", "goal", "sleep", "activity", "conditions"], available),
       nutrition,
       tier,
     ),
@@ -93,7 +121,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string, tier
       SOLO_NAME.doctor,
       `${EXPERTISE.doctor}\n${MEDICAL_REASONING_FORMAT}`,
       profile,
-      ALL_MEMORY_SECTIONS, // triage can turn on any fact — narrowing this one is the actual risk
+      available, // triage can turn on any fact — narrowing beyond availability is the actual risk
       nutrition,
       tier,
     ),
@@ -104,7 +132,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string, tier
       // Not vitals/goal/sleep/activity/allergies — reading a panel doesn't need them.
       // Medicines and conditions stay: some medicines (e.g. biotin, metformin) skew
       // specific assay results, and chronic conditions contextualize an abnormal value.
-      ["identity", "medicines", "conditions", "biomarkers"],
+      scope(["identity", "medicines", "conditions", "biomarkers"], available),
       null, // meal log isn't relevant to interpreting a blood panel
       tier,
     ),
@@ -113,7 +141,7 @@ export function buildSpecialists(profile: HealthProfile, nutrition: string, tier
       EXPERTISE.coach,
       profile,
       // Not allergies/medicines/biomarkers — habit coaching isn't a medical read.
-      ["identity", "goal", "sleep", "activity"],
+      scope(["identity", "goal", "sleep", "activity"], available),
       null, // food is the Nutrition Agent's job, not the Coach's
       tier,
     ),
@@ -156,6 +184,8 @@ export function buildSoloist(
   brief?: string | null,
   /** Rungs down the model ladder; see resolveModel. */
   tier = 0,
+  /** Sections the caller can actually vouch for; see scope(). */
+  available: MemorySection[] = ALL_MEMORY_SECTIONS,
 ) {
   const resolved = resolveModel("supervisor", tier);
   return new ToolLoopAgent({
@@ -174,7 +204,7 @@ ${SAFETY}
 
 ${MEDICAL_REASONING_FORMAT}
 
-${memoryContext(profile, ALL_MEMORY_SECTIONS)}
+${memoryContext(profile, available)}
 ${nutrition ? `\n${nutrition}\n` : ""}${recalled ? `\n${recalled}\n` : ""}`,
   });
 }
@@ -207,9 +237,11 @@ export function buildSupervisor(
   brief?: string | null,
   /** Rungs down the model ladder; see resolveModel. */
   tier = 0,
+  /** Sections the caller can actually vouch for; see scope(). */
+  available: MemorySection[] = ALL_MEMORY_SECTIONS,
 ) {
   const resolved = resolveModel("supervisor", tier);
-  const s = buildSpecialists(profile, nutrition, tier);
+  const s = buildSpecialists(profile, nutrition, tier, available);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
     tool({
@@ -251,7 +283,7 @@ ${SAFETY}
 
 ${MEDICAL_REASONING_FORMAT}
 
-${memoryContext(profile, ALL_MEMORY_SECTIONS)}
+${memoryContext(profile, available)}
 
 ${nutrition}
 ${recalled ? `\n${recalled}\n` : ""}`,

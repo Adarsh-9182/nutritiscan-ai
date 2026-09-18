@@ -94,6 +94,21 @@ export async function runHealthAgent(
      * answer nobody can weigh.
      */
     engineLabel?: string;
+    /**
+     * The multi-agent supervisor, when the caller can reach one.
+     *
+     * It runs after every deterministic branch above it and before the
+     * reference-notes path below, which is the only placement that makes
+     * sense: escalation, the prescribing refusal, reminder and day-log
+     * drafting and record arithmetic are all things a model should not be
+     * deciding, and they stay in front. What is left — an actual health
+     * question — is what the specialists are for.
+     *
+     * Returning null means "no real answer available" (no credential, spent
+     * quota, a timeout), and the reference notes answer instead. That is a
+     * degraded turn, not a failed one, so it must not throw.
+     */
+    consult?: (question: string, opts: { history?: string[]; signal: AbortSignal }) => Promise<AgentReply | null>;
   } = {},
 ): Promise<AgentReply> {
   const signal = options.signal ?? new AbortController().signal;
@@ -182,6 +197,13 @@ export async function runHealthAgent(
           : "Prepared your record summary",
       ],
     };
+  // The specialists get the question before the reference-notes path does.
+  // Everything above this point is deterministic and stays in front of them.
+  if (options.consult) {
+    const consulted = await options.consult(question, { history: options.history, signal });
+    if (consulted) return consulted;
+    abortIfNeeded(signal);
+  }
   // Short follow-ups can use recent topic context; the raw question never leaves
   // the browser when the on-device completion function is used.
   const references = findReferences(question);

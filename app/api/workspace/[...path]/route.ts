@@ -22,6 +22,7 @@ import {
 import { sameOrigin } from "@/lib/workspace/http";
 import { hostedEngine, hostedModelReady } from "@/lib/workspace/cloud-model";
 import { runHealthAgent } from "@/lib/workspace/health-agent";
+import { consultSupervisor } from "@/lib/workspace/supervisor";
 import { DEMO } from "@/lib/workspace/demo";
 import { NotifyService } from "@/lib/notify/service";
 import { telegram, telegramConfigured } from "@/lib/notify/telegram";
@@ -58,9 +59,18 @@ const assistantSchema = z.object({
  * Run the companion server-side.
  *
  * The same agent the browser runs — escalation rules, reference retrieval,
- * record arithmetic and the output validator all unchanged. The only
- * addition is a hosted model to do the writing, so a visitor gets a real
- * answer without a 1 GB download and a WebGPU-capable browser.
+ * record arithmetic and the output validator all unchanged. Two things are
+ * added on the server: a hosted model to do the writing, so a visitor gets a
+ * real answer without a 1 GB download and a WebGPU-capable browser, and the
+ * multi-agent supervisor from lib/agents.
+ *
+ * The supervisor used to be reachable only through POST /api/chat, which took
+ * the profile from the request body and has been disabled behind
+ * LEGACY_CLINICAL_ENABLED since the account workspace became the product.
+ * Reaching it from here instead means the profile is the caller's own
+ * decrypted workspace row and the session has already been checked — the
+ * boundary that endpoint was turned off for is kept, and the specialists come
+ * back. See lib/workspace/supervisor.ts.
  */
 async function companionTurn(
   question: string,
@@ -74,6 +84,12 @@ async function companionTurn(
     history: options.history,
     today: options.today,
     signal: options.signal,
+    consult: (q, opts) =>
+      consultSupervisor(q, workspace, {
+        history: opts.history,
+        signal: opts.signal,
+        engineLabel: engine?.label,
+      }),
   });
 }
 
