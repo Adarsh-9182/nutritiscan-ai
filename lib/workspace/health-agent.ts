@@ -94,6 +94,21 @@ export async function runHealthAgent(
      * answer nobody can weigh.
      */
     engineLabel?: string;
+    /**
+     * The specialist team (lib/workspace/supervisor.ts), when a hosted model
+     * can reach it.
+     *
+     * It answers from a specialist's own knowledge rather than the eight
+     * curated notes, which is the difference between "I don't have a
+     * reference for that" and an actual answer. It runs AFTER every gate
+     * above — escalation, the dose boundary, reminder and log drafts, record
+     * arithmetic — and a failure here falls through to those notes rather
+     * than ending the turn.
+     */
+    expert?: (
+      question: string,
+      options: { history?: string[]; signal?: AbortSignal },
+    ) => Promise<{ text: string; steps: string[] }>;
   } = {},
 ): Promise<AgentReply> {
   const signal = options.signal ?? new AbortController().signal;
@@ -182,6 +197,37 @@ export async function runHealthAgent(
           : "Prepared your record summary",
       ],
     };
+  /*
+   * The specialist team answers first, when there is one.
+   *
+   * Everything above this line is deterministic and stays that way: an
+   * emergency, a dose request, a reminder or a question about saved records
+   * is never handed to a model. What is left is the part a model is actually
+   * for — explaining something — and the eight curated notes were only ever
+   * a stand-in for a brain that could do it.
+   */
+  if (options.expert) {
+    try {
+      const expert = await options.expert(question, {
+        history: options.history,
+        signal,
+      });
+      abortIfNeeded(signal);
+      if (expert.text.trim())
+        return {
+          mode: "ai",
+          text: expert.text,
+          sources: [],
+          steps: expert.steps,
+          detail: options.engineLabel,
+        };
+    } catch (error) {
+      abortIfNeeded(signal);
+      if (error instanceof Error && error.name === "AbortError") throw error;
+      // Fall through to the reference notes below: a specialist that could
+      // not answer is not a reason to end the turn empty-handed.
+    }
+  }
   // Short follow-ups can use recent topic context; the raw question never leaves
   // the browser when the on-device completion function is used.
   const references = findReferences(question);

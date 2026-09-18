@@ -206,10 +206,22 @@ export const ALL_MEMORY_SECTIONS: MemorySection[] = ["identity", "vitals", "goal
 
 const SECTION_RENDERERS: Record<MemorySection, (p: HealthProfile) => string> = {
   identity: (p) => `Name: ${p.name}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,
-  vitals: (p) => `Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}`,
-  goal: (p) => `Primary goal: ${p.goal}`,
-  sleep: (p) => `Sleep: ~${p.sleepHours} h/night`,
-  activity: (p) => `Exercise: ${p.exerciseDaysPerWeek} days/week   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
+  // Zero means "never recorded", not "zero centimetres". The workspace
+  // profile has no height, weight or goal field at all, so a specialist
+  // reading this section would otherwise be handed a default body — 170 cm,
+  // 70 kg, BMI 24 — that the person never told us, and be unable to tell it
+  // apart from something they did. Same reasoning as the identity renderer.
+  vitals: (p) =>
+    p.heightCm && p.weightKg
+      ? `Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}`
+      : `Height/Weight: not recorded — do not assume, estimate or use a default body size`,
+  goal: (p) => `Primary goal: ${p.goal || "not recorded — ask rather than assume"}`,
+  sleep: (p) =>
+    p.sleepHours
+      ? `Sleep: ~${p.sleepHours} h/night`
+      : `Sleep: not recorded — do not assume a number`,
+  activity: (p) =>
+    `Exercise: ${p.exerciseDaysPerWeek ? `${p.exerciseDaysPerWeek} days/week` : "not recorded"}   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
   allergies: (p) => `Allergies: ${p.allergies.length ? p.allergies.join(", ") : "none recorded"}`,
   medicines: (p) => `Medicines: ${p.medicines.length ? p.medicines.join(", ") : "none recorded"}`,
   conditions: (p) => `Conditions: ${p.conditions.length ? p.conditions.join(", ") : "none recorded"}`,

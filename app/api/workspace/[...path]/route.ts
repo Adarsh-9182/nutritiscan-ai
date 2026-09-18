@@ -21,7 +21,9 @@ import {
 } from "@/lib/http/guard";
 import { sameOrigin } from "@/lib/workspace/http";
 import { hostedEngine, hostedModelReady } from "@/lib/workspace/cloud-model";
+import { runExpertTurn } from "@/lib/workspace/supervisor";
 import { runHealthAgent } from "@/lib/workspace/health-agent";
+import { hasAnyModel } from "@/lib/agents/provider";
 import { DEMO } from "@/lib/workspace/demo";
 import { NotifyService } from "@/lib/notify/service";
 import { telegram, telegramConfigured } from "@/lib/notify/telegram";
@@ -68,9 +70,24 @@ async function companionTurn(
   options: { history?: string[]; today?: string; signal: AbortSignal },
 ) {
   const engine = hostedEngine();
+  /*
+   * The specialist team needs the AI SDK ladder (Gemini or the Gateway), not
+   * just any completion function: it runs tool-calling agents, which an
+   * operator's bare chat endpoint cannot be assumed to support. Where only
+   * that endpoint is configured, the single-completion path still answers.
+   */
+  const expert = hasAnyModel()
+    ? (question: string, o: { history?: string[]; signal?: AbortSignal }) =>
+        runExpertTurn(question, workspace, {
+          history: o.history,
+          signal: o.signal,
+          language: workspace.profile.language,
+        })
+    : undefined;
   return runHealthAgent(question, workspace, {
     complete: engine?.complete,
     engineLabel: engine?.label,
+    expert,
     history: options.history,
     today: options.today,
     signal: options.signal,
