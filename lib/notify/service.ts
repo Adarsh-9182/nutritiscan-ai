@@ -3,6 +3,7 @@ import type { Database } from "@/lib/workspace/database";
 import { digest, seal, token, unseal } from "@/lib/workspace/crypto";
 import { ApiError, WorkspaceService } from "@/lib/workspace/service";
 import { runHealthAgent } from "@/lib/workspace/health-agent";
+import { hostedEngine } from "@/lib/workspace/cloud-model";
 import { completeTask } from "@/lib/workspace/actions";
 import { escalation } from "@/lib/workspace/escalation";
 import { recentDays } from "@/lib/workspace/daily";
@@ -240,8 +241,13 @@ export class NotifyService {
         : /^\/next\b/.test(text)
           ? "what should I do next"
           : text;
+    // Telegram already runs on the server, so it gets the hosted engine when
+    // one is configured — and the reference notes when it is not.
+    const engine = hostedEngine();
     const reply = await runHealthAgent(question, workspace, {
       today: local.date,
+      complete: engine?.complete,
+      engineLabel: engine?.label,
     });
     let body = reply.text;
     if (/^\/today\b/.test(text)) {

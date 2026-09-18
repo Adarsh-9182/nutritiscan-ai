@@ -15,10 +15,11 @@ export default function Page() {
         NutritiScan helps adults organise confirmed report values, compare them
         with the reference ranges printed on those reports, maintain their own
         follow-up list and prepare information for a clinician. It may provide
-        source-linked general education. Optional on-device AI is a small
-        general-purpose model, requires a compatible browser and a model
-        download, and can produce inaccurate answers. Educational coverage
-        is limited; source links are reference material, not clinical verification.
+        source-linked general education. Explanations are written by a general-purpose
+        AI model — hosted by default where this deployment has one, or entirely on your
+        own device after an optional download — and can be inaccurate. Educational
+        coverage is limited; source links are reference material, not clinical
+        verification.
       </p>
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>

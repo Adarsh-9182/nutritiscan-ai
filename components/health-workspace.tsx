@@ -435,6 +435,8 @@ export default function HealthWorkspace() {
   const [agentAccessVersion, setAgentAccessVersion] = useState(0);
   const accessLock = useRef(false);
   const [accounts, setAccounts] = useState(true);
+  /** Whether this deployment can answer with a hosted model (status → model). */
+  const [cloudAI, setCloudAI] = useState(false);
   const [agentSeed, setAgentSeed] = useState<{
     text: string;
     id: number;
@@ -455,6 +457,7 @@ export default function HealthWorkspace() {
     ]);
     setWorkspace(w);
     setAccounts(s.accounts);
+    setCloudAI(s.model);
     setSignedIn(true);
     setDemo(false);
   }
@@ -467,6 +470,12 @@ export default function HealthWorkspace() {
         setWorkspace(structuredClone(DEMO));
         setLoading(false);
       });
+      // The demo answers through the same engine as the product, so it still
+      // needs to know whether one is configured. A failed check simply leaves
+      // the companion on its reference notes.
+      api<{ model: boolean; accounts: boolean }>("status")
+        .then((s) => alive && setCloudAI(s.model))
+        .catch(() => {});
       return () => {
         alive = false;
       };
@@ -478,6 +487,7 @@ export default function HealthWorkspace() {
       if (!alive) return;
       if (s.status === "fulfilled") {
         setAccounts(s.value.accounts);
+        setCloudAI(s.value.model);
       } else {
         setAccounts(false);
       }
@@ -1202,6 +1212,7 @@ export default function HealthWorkspace() {
               key={agentAccessVersion}
               workspace={workspace}
               demo={demo}
+              cloudAI={cloudAI}
               seed={agentSeed}
               addReport={() => setUpload(true)}
               navigate={navigate}
