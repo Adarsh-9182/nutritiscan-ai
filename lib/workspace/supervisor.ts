@@ -31,7 +31,6 @@ import { buildSoloist, buildSupervisor } from "../agents";
 import { routeOf } from "../agents/demo";
 import { MODEL_TIERS, hasAnyModel } from "../agents/provider";
 import {
-  ALL_MEMORY_SECTIONS,
   type Biomarker,
   type HealthProfile,
   type MemorySection,
@@ -67,7 +66,7 @@ const MAX_BIOMARKERS = 24;
  * What is here is either recorded or honestly empty: the renderers say "none
  * recorded" for a blank list, which is true when someone left the field blank.
  */
-const WORKSPACE_SECTIONS: MemorySection[] = [
+export const WORKSPACE_SECTIONS: MemorySection[] = [
   "identity",
   "allergies",
   "medicines",
@@ -259,5 +258,3 @@ export async function consultSupervisor(
 
   return null;
 }
-
-export { ALL_MEMORY_SECTIONS };

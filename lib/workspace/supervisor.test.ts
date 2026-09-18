@@ -1,0 +1,98 @@
+import { describe, expect, it } from "vitest";
+import { DEMO } from "./demo";
+import { consultSupervisor, WORKSPACE_SECTIONS, workspaceMemory } from "./supervisor";
+import { memoryContext } from "../memory/profile";
+
+/** What the agents actually read — the prompt, not the object behind it. */
+const prompt = (workspace = structuredClone(DEMO)) =>
+  memoryContext(workspaceMemory(workspace), WORKSPACE_SECTIONS);
+
+describe("workspace memory", () => {
+  it("states no height, weight, goal or sleep the workspace never collected", () => {
+    // HealthProfile requires these four, so the bridge fills them with zeroes
+    // and withholds their sections instead. If a section ever comes back, the
+    // renderer will print `Height/Weight: 0 cm / 0 kg` as fact — which is worse
+    // than the default it replaced, because it looks like a measurement.
+    const text = prompt();
+    for (const leaked of ["Height/Weight", "BMI", "Primary goal", "Sleep:", "Exercise:"])
+      expect(text).not.toContain(leaked);
+  });
+
+  it("never lets a zero placeholder reach the prompt", () => {
+    expect(prompt()).not.toMatch(/\b0 (cm|kg|h\/night)\b/);
+  });
+
+  it("keeps the fields the workspace does collect", () => {
+    const text = prompt();
+    expect(text).toContain(DEMO.profile.name);
+    for (const kept of ["Allergies:", "Medicines:", "Conditions:", "Recent lab biomarkers:"])
+      expect(text).toContain(kept);
+  });
+
+  it("refuses to guess age and sex", () => {
+    expect(prompt()).toContain("not recorded — do not assume one");
+  });
+
+  it("excludes a report the person revoked from the companion", () => {
+    const workspace = structuredClone(DEMO);
+    workspace.reports[0].assistantAccess = false;
+    workspace.reports[0].observations[0].name = "Excluded private marker";
+    expect(prompt(workspace)).not.toContain("Excluded private marker");
+    // And the same workspace with that report simply absent reads identically.
+    const withoutIt = { ...workspace, reports: workspace.reports.slice(1) };
+    expect(prompt(workspace)).toBe(prompt(withoutIt));
+  });
+
+  it("carries a lab value's own reference range rather than a generic status", () => {
+    const workspace = structuredClone(DEMO);
+    workspace.reports = [
+      {
+        ...workspace.reports[0],
+        assistantAccess: true,
+        date: "2026-09-01",
+        observations: [{ name: "Vitamin B12", value: 180, unit: "pg/mL", low: 200, high: 900 }],
+      },
+    ];
+    const marker = workspaceMemory(workspace).biomarkers[0];
+    expect(marker).toMatchObject({ name: "Vitamin B12", value: "180 pg/mL", status: "low" });
+    expect(marker.note).toContain("reference 200–900 pg/mL");
+  });
+});
+
+describe("consulting the specialists", () => {
+  it("returns null with no model credential so the caller falls back", async () => {
+    // The deployment this ships to has no key yet. A throw here would turn a
+    // degraded turn into a failed one; null means "use the reference notes".
+    const before = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const beforeGateway = process.env.AI_GATEWAY_API_KEY;
+    const beforeOidc = process.env.VERCEL_OIDC_TOKEN;
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    delete process.env.AI_GATEWAY_API_KEY;
+    delete process.env.VERCEL_OIDC_TOKEN;
+    try {
+      await expect(
+        consultSupervisor("how much protein should I eat", structuredClone(DEMO)),
+      ).resolves.toBeNull();
+    } finally {
+      if (before !== undefined) process.env.GOOGLE_GENERATIVE_AI_API_KEY = before;
+      if (beforeGateway !== undefined) process.env.AI_GATEWAY_API_KEY = beforeGateway;
+      if (beforeOidc !== undefined) process.env.VERCEL_OIDC_TOKEN = beforeOidc;
+    }
+  });
+
+  it("answers an emergency from a fixed template, with no model call", async () => {
+    // Triage runs before the credential check on purpose: a keyless deployment
+    // must still stop the turn rather than hand it to the reference notes.
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-key-not-used";
+    try {
+      const reply = await consultSupervisor(
+        "crushing chest pain spreading to my left arm and I can't breathe",
+        structuredClone(DEMO),
+      );
+      expect(reply?.mode).toBe("escalation");
+      expect(reply?.steps).toContain("Checked urgent signs");
+    } finally {
+      delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    }
+  });
+});
