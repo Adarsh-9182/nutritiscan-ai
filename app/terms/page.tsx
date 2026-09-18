@@ -1,5 +1,10 @@
 import Link from "next/link";
-export const metadata = { title: "Terms & product scope" };
+export const metadata = {
+  title: "Terms & product scope",
+  description:
+    "What NutritiScan is and is not: educational support with sources, not diagnosis, prescribing or emergency care. Early access, limited coverage, adults 18+.",
+  alternates: { canonical: "/terms" },
+};
 export default function Page() {
   return (
     <main className="ns-policy">

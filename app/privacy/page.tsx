@@ -1,5 +1,10 @@
 import Link from "next/link";
-export const metadata = { title: "Privacy & your records" };
+export const metadata = {
+  title: "Privacy & your records",
+  description:
+    "What NutritiScan stores, what reaches the model, what stays on your device, and how to remove your records. Hosted answers never send your saved reports.",
+  alternates: { canonical: "/privacy" },
+};
 export default function Page() {
   return (
     <main className="ns-policy">
