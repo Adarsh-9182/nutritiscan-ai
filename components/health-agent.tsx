@@ -76,16 +76,52 @@ const starters = [
   ],
 ] as const;
 const modeText = {
-  ai: "On-device AI · experimental",
+  ai: "AI-assisted answer · experimental",
   reference: "Health reference notes · no AI inference",
   "record-summary": "Your confirmed records · no AI inference",
   escalation: "Human support comes first",
   unavailable: "Coverage limit",
 };
 
+/**
+ * A turn taken on the server.
+ *
+ * The same agent as the browser path, run where a hosted model key lives.
+ * Only the question and the person's own recent messages are posted; the
+ * reference notes, record arithmetic and safety rules are applied on the
+ * other side, exactly as they are here.
+ */
+async function serverTurn(
+  question: string,
+  demo: boolean,
+  history: string[],
+  signal: AbortSignal,
+): Promise<AgentReply> {
+  const response = await fetch(
+    `/api/workspace/assistant${demo ? "/demo" : ""}`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        history,
+        today: new Date().toLocaleDateString("en-CA"),
+      }),
+    },
+  );
+  const data = await response.json();
+  if (!response.ok)
+    throw new Error(data?.error || "The answer could not be completed.");
+  return data as AgentReply;
+}
+
 export default function HealthAgent({
   workspace,
   demo,
+  cloudAI,
   seed,
   addReport,
   navigate,
@@ -94,6 +130,8 @@ export default function HealthAgent({
 }: {
   workspace: Workspace;
   demo: boolean;
+  /** Whether this deployment can answer with a hosted model. */
+  cloudAI: boolean;
   seed: { text: string; id: number } | null;
   addReport: () => void;
   navigate: (
@@ -157,15 +195,43 @@ export default function HealthAgent({
       text: text.trim().slice(0, 3000),
     };
     setMessages((current) => [...current, userMessage]);
+    const history = messages
+      .filter((m) => m.role === "user")
+      .slice(-3)
+      .map((m) => m.text);
     try {
-      const answer = await runHealthAgent(userMessage.text, workspace, {
-        complete: model.current?.complete,
-        signal: controller.signal,
-        history: messages
-          .filter((m) => m.role === "user")
-          .slice(-3)
-          .map((m) => m.text),
-      });
+      /*
+       * Which engine answers.
+       *
+       * On-device wins when it is loaded — someone who downloaded a model to
+       * keep the question in the tab should not have it posted anywhere. With
+       * no device model, the server answers when this deployment has a key,
+       * and if that call fails the browser still runs the agent over the
+       * reference notes rather than leaving the turn empty.
+       */
+      const answer = model.current
+        ? await runHealthAgent(userMessage.text, workspace, {
+            complete: model.current.complete,
+            signal: controller.signal,
+            history,
+          })
+        : cloudAI
+          ? await serverTurn(
+              userMessage.text,
+              demo,
+              history,
+              controller.signal,
+            ).catch(async (error) => {
+              if (controller.signal.aborted) throw error;
+              return runHealthAgent(userMessage.text, workspace, {
+                signal: controller.signal,
+                history,
+              });
+            })
+          : await runHealthAgent(userMessage.text, workspace, {
+              signal: controller.signal,
+              history,
+            });
       if (mounted.current && !controller.signal.aborted)
         setMessages((current) => [
           ...current,
@@ -272,6 +338,13 @@ export default function HealthAgent({
         <header className="ha-toolbar">
           <span>
             <span className="ha-status-dot" /> Your health companion
+            <b className="ha-engine-tag">
+              {device === "ready"
+                ? "On-device AI"
+                : cloudAI
+                  ? "AI engine on"
+                  : "References only"}
+            </b>
           </span>
           <div>
             <button
@@ -310,11 +383,20 @@ export default function HealthAgent({
                 <X size={18} />
               </button>
             </div>
+            {cloudAI && (
+              <p>
+                Answers come from the hosted NutritiScan engine by default —
+                your question and the published reference notes go to the model
+                provider, never your stored reports. Would you rather the
+                question stayed on this device?
+              </p>
+            )}
             <p>
               Qwen 2.5 · open model · no API charges. An initial download of
               roughly 1 GB uses your connection and browser storage. A
               WebGPU-capable browser and sufficient memory are required. Your
-              chat stays in this tab.
+              chat stays in this tab, and it answers instead of the hosted
+              engine while it is on.
             </p>
             <small>
               Experimental general-purpose model, not clinically validated. It
@@ -538,7 +620,7 @@ export default function HealthAgent({
             {busy && (
               <div className="ha-thinking" role="status">
                 <LoaderCircle size={15} className="ns-spin" />
-                {device === "ready"
+                {device === "ready" || cloudAI
                   ? "Reading references and preparing your answer…"
                   : "Checking your question…"}
               </div>
@@ -578,7 +660,9 @@ export default function HealthAgent({
             <span>
               {device === "ready"
                 ? "Private · on-device"
-                : "References & record tools"}
+                : cloudAI
+                  ? "AI answers · sources shown"
+                  : "References & record tools"}
             </span>
             {busy ? (
               <button

@@ -11,10 +11,18 @@ import {
   ProfileSchema,
   ReportSchema,
   TaskSchema,
+  type Workspace,
 } from "@/lib/workspace/types";
-import { readJsonCapped } from "@/lib/http/guard";
+import {
+  checkRate,
+  clientKey,
+  readJsonCapped,
+  tooManyRequests,
+} from "@/lib/http/guard";
 import { sameOrigin } from "@/lib/workspace/http";
-import { answer, modelConfigured } from "@/lib/workspace/assistant";
+import { hostedEngine, hostedModelReady } from "@/lib/workspace/cloud-model";
+import { runHealthAgent } from "@/lib/workspace/health-agent";
+import { DEMO } from "@/lib/workspace/demo";
 import { NotifyService } from "@/lib/notify/service";
 import { telegram, telegramConfigured } from "@/lib/notify/telegram";
 
@@ -30,6 +38,45 @@ const Username = z
   .regex(/^[a-zA-Z0-9_-]+$/);
 const Password = z.string().min(12).max(128);
 const authSchema = z.object({ username: Username, password: Password });
+/**
+ * A companion turn.
+ *
+ * `history` is the person's own recent messages, which is what lets a short
+ * follow-up ("and the other one?") find its topic. It is capped here rather
+ * than trusted from the client.
+ */
+const assistantSchema = z.object({
+  question: z.string().trim().min(1).max(3000),
+  history: z.array(z.string().max(3000)).max(3).optional(),
+  today: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+/**
+ * Run the companion server-side.
+ *
+ * The same agent the browser runs — escalation rules, reference retrieval,
+ * record arithmetic and the output validator all unchanged. The only
+ * addition is a hosted model to do the writing, so a visitor gets a real
+ * answer without a 1 GB download and a WebGPU-capable browser.
+ */
+async function companionTurn(
+  question: string,
+  workspace: Workspace,
+  options: { history?: string[]; today?: string; signal: AbortSignal },
+) {
+  const engine = hostedEngine();
+  return runHealthAgent(question, workspace, {
+    complete: engine?.complete,
+    engineLabel: engine?.label,
+    history: options.history,
+    today: options.today,
+    signal: options.signal,
+  });
+}
+
 const json = (value: unknown, status = 200) =>
   NextResponse.json(value, {
     status,
@@ -59,7 +106,7 @@ async function handle(
   try {
     if (route === "status" && req.method === "GET")
       return json({
-        model: modelConfigured(),
+        model: hostedModelReady(),
         accounts:
           Boolean(
             process.env.DATABASE_URL &&
@@ -72,13 +119,39 @@ async function handle(
         403,
         "This request must come from the NutritiScan app.",
       );
-    const service = new WorkspaceService(await database());
     let body: unknown = {};
     if (req.method !== "GET") {
       const parsed = await readJsonCapped(req, 200_000);
       if (!parsed.ok) throw new ApiError(parsed.status, parsed.error);
       body = parsed.value;
     }
+    /*
+     * The fictional demo, which has no account and therefore no session.
+     *
+     * It is the only unauthenticated path to the model, so it is metered
+     * separately and by network address. The limiter is the in-memory one
+     * from lib/http/guard: per instance, reset on cold start, and a real
+     * bound on a single warm lambda rather than on the fleet — the same
+     * trade the public routes have always made, and the reason the demo
+     * workspace it answers over is a copy of fixed fiction.
+     */
+    if (route === "assistant/demo" && req.method === "POST") {
+      const verdict = checkRate(`assistant-demo:${clientKey(req)}`, 10, 60_000);
+      if (!verdict.ok)
+        return tooManyRequests(
+          verdict.retryAfter,
+          "The demo is busy right now. Wait a moment, or create an account for your own workspace.",
+        );
+      const turn = assistantSchema.parse(body);
+      return json(
+        await companionTurn(turn.question, structuredClone(DEMO), {
+          history: turn.history,
+          today: turn.today,
+          signal: req.signal,
+        }),
+      );
+    }
+    const service = new WorkspaceService(await database());
     if (
       ["register", "login", "recover"].includes(route) &&
       req.method === "POST"
@@ -214,12 +287,14 @@ async function handle(
       return sessionResponse("", { ok: true });
     }
     if (route === "assistant" && req.method === "POST") {
-      const { question } = z
-        .object({ question: z.string().trim().min(1).max(3000) })
-        .parse(body);
-      await service.rate(`assistant:${id}`, 10);
+      const turn = assistantSchema.parse(body);
+      await service.rate(`assistant:${id}`, 20);
       return json(
-        await answer(question, await service.workspace(id), req.signal),
+        await companionTurn(turn.question, await service.workspace(id), {
+          history: turn.history,
+          today: turn.today,
+          signal: req.signal,
+        }),
       );
     }
     throw new ApiError(404, "Not found.");

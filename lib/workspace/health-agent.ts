@@ -87,6 +87,13 @@ export async function runHealthAgent(
     history?: string[];
     /** The person's local date; defaults to this device's date. */
     today?: string;
+    /**
+     * What produced the answer, shown under it. Two engines can supply
+     * `complete` — the on-device model in the browser and the hosted one on
+     * the server — and an answer that does not say which one ran is an
+     * answer nobody can weigh.
+     */
+    engineLabel?: string;
   } = {},
 ): Promise<AgentReply> {
   const signal = options.signal ?? new AbortController().signal;
@@ -289,7 +296,9 @@ export async function runHealthAgent(
         "Selected read tools",
         "Drafted an educational explanation",
       ],
-      detail: "On-device AI · experimental, not clinically validated",
+      detail:
+        options.engineLabel ??
+        "On-device AI · experimental, not clinically validated",
     };
   } catch (error) {
     abortIfNeeded(signal);
