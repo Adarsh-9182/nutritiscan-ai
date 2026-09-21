@@ -122,8 +122,9 @@ export default function ProductLanding() {
           <Link href="/privacy">Privacy</Link>
         </nav>
         <div className="nl-nav-actions">
-          <Link href="/workspace?demo=1" className="nl-ghost">
-            Live demo
+          {/* The chat on the home page is the live demo now. */}
+          <Link href="/" className="nl-ghost">
+            Ask something
           </Link>
           <Link className="nl-cta" href="/workspace">
             Open the app <ArrowUpRight size={15} />

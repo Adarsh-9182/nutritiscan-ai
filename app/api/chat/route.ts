@@ -11,7 +11,7 @@ import { demoAnswer, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
 import { recallRelevant } from "@/lib/memory/recall";
-import { type HealthProfile } from "@/lib/memory/profile";
+import { recordedSections, type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
 import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { assessTurn, halts } from "@/lib/safety/triage";
@@ -136,12 +136,12 @@ async function streamRealSupervisor(
     // difference rather than resolving one.
     const stream = solo
       ? await createAgentUIStream({
-          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier),
+          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier, recordedSections(profile)),
           uiMessages: messages,
           abortSignal: signal,
         })
       : await createAgentUIStream({
-          agent: buildSupervisor(profile, nutrition, recalled, triage, brief, tier),
+          agent: buildSupervisor(profile, nutrition, recalled, triage, brief, tier, recordedSections(profile)),
           uiMessages: messages,
           abortSignal: signal,
         });
@@ -338,8 +338,22 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/*
+ * This route was retired behind LEGACY_CLINICAL_ENABLED to stop an older
+ * anonymous endpoint from bypassing the account workspace. It is open again,
+ * because the thing it was accused of is not something it does.
+ *
+ * It reads no workspace. `profile` and `meals` come from the caller's own
+ * browser storage, are sanitised by safeProfile/safeMeals before they reach an
+ * instruction block, and never touch the database — so there is no account
+ * boundary here to go around. The account path has its own supervisor now
+ * (lib/workspace/supervisor.ts), reached with a session and the person's own
+ * encrypted records; this is the anonymous one, and the two do not meet.
+ *
+ * What it is exposed to is cost and abuse, which is what the rate limiter
+ * below is for. /api/scan stays behind the flag: that one takes uploads.
+ */
 export async function POST(req: Request) {
-  if (process.env.LEGACY_CLINICAL_ENABLED !== "true") return Response.json({ error: "Please use the secure workspace. This legacy endpoint is retired." }, { status: 410, headers: { "cache-control": "no-store" } });
   const rate = checkRate(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "You're sending messages faster than I can think. Give me a few seconds.");

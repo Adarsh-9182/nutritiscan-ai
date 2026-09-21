@@ -48,6 +48,11 @@ export const demoProfile: HealthProfile = {
   name: "Adarsh",
   age: 24,
   sex: "male",
+  // Every field here is specified, which is what `onboarded` means — the flag
+  // was simply never set. It matters now that recordedSections() reads it:
+  // without it this fully-populated persona would be treated as someone who
+  // has told us nothing, and the demo would refuse to quote its own numbers.
+  onboarded: true,
   heightCm: 173, // 5'8"
   weightKg: 65,
   goal: "Build muscle",
@@ -203,6 +208,26 @@ export function insight(p: HealthProfile): string {
 export type MemorySection = "identity" | "vitals" | "goal" | "sleep" | "activity" | "allergies" | "medicines" | "conditions" | "biomarkers";
 
 export const ALL_MEMORY_SECTIONS: MemorySection[] = ["identity", "vitals", "goal", "sleep", "activity", "allergies", "medicines", "conditions", "biomarkers"];
+
+/**
+ * The sections of a profile that hold something the person actually told us.
+ *
+ * blankProfile has to put a number in heightCm, weightKg, sleepHours and
+ * exerciseDaysPerWeek because the type demands one, and the renderers below
+ * state all four flatly — "Height/Weight: 170 cm / 70 kg", no hedge. Run
+ * un-onboarded through the full section list and the Nutrition Agent computes
+ * a protein target in grams from a default, which reads in the answer exactly
+ * like one computed from a measurement.
+ *
+ * `onboarded` is the only signal available for this: it is set when someone
+ * has been through first run and given a weight, a height and a goal. Before
+ * that, those sections are withheld and the agent asks for what it needs. The
+ * identity renderer already applies the same rule to age and sex.
+ */
+export function recordedSections(p: HealthProfile): MemorySection[] {
+  const recorded: MemorySection[] = ["identity", "allergies", "medicines", "conditions", "biomarkers"];
+  return p.onboarded ? ALL_MEMORY_SECTIONS : recorded;
+}
 
 const SECTION_RENDERERS: Record<MemorySection, (p: HealthProfile) => string> = {
   identity: (p) => `Name: ${p.name}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,

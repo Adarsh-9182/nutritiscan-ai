@@ -6,7 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
 import PatientChart from "@/components/patient-chart";
-import Onboarding from "@/components/onboarding";
 import { newThread, useProfile } from "@/lib/memory/store";
 
 /**
@@ -54,12 +53,19 @@ export default function ChatWorkspace() {
   return (
     <div className="flex h-[100svh] flex-col overflow-hidden">
       {/*
-        Onboarding used to be mounted by the dashboard. With that route
-        gone it was mounted by nothing, and a first-time visitor would
-        never be asked their name or their goal — so every answer would be
-        written for the demo profile. It belongs to the app, not to a page.
+        Onboarding is deliberately NOT mounted here any more.
+
+        This component is the home page now, and it opened with a modal
+        demanding a name, a weight and a height before a first-time visitor
+        could read a single word or ask a single question. That is the wrong
+        first thing to do to someone who arrived to find out what this is.
+
+        Nothing is lost by dropping it: the agents are told which sections of
+        the memory were actually recorded (recordedSections), so an
+        un-onboarded visitor's answers simply do not claim to know a weight
+        nobody gave — the agent asks instead. Details can be filled in from
+        the chart panel, or in the account workspace.
       */}
-      <Onboarding />
 
       {/* Slim top bar — the conversation owns the rest of the screen. */}
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
@@ -73,14 +79,19 @@ export default function ChatWorkspace() {
           <span aria-hidden="true">☰</span>
         </button>
 
-        <Link href="/chat" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-white">✦</span>
+        <Link href="/" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-[#07130c]">+</span>
           <span className="text-[13px] font-semibold">NutritiScan</span>
         </Link>
 
         <span className="ml-auto hidden t-label text-[var(--text-dim)] sm:block">
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
+
+        {/* Everything the home page used to say about the product lives here now. */}
+        <Link href="/about" className="btn-ghost rounded-full px-3 py-1 t-label">
+          About
+        </Link>
 
         {/*
           There is no primary nav any more, because there is nowhere else to

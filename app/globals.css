@@ -3819,3 +3819,59 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
   .nl-badge i { animation: none; }
   .nl-cta:hover, .nl-card:hover { transform: none; }
 }
+
+/* ============================================================
+   CHAT HOME — the conversation as the home page.
+
+   A theme scope, not a layout. ChatWorkspace and everything
+   under it is written against the application tokens, so
+   re-pointing those tokens here dresses the whole chat in the
+   landing's green without a single component knowing about it.
+   ============================================================ */
+.ns-chat-home {
+  --bg: #05080a;
+  --surface: #0e1613;
+  --surface-2: #14201b;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --text: #e9f2ec;
+  --text-muted: #a3b5a9;
+  --text-dim: #869388;
+  /* What the person said, enclosed. The app's blue-grey bubble reads as a
+     foreign object on this ground. */
+  --said: #16231d;
+  --emerald: #6fe8b4;
+  --emerald-deep: #48cf95;
+  --chat-ground: var(--bg);
+  position: relative;
+  isolation: isolate;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* The same rise as the landing, sized to one screen rather than to a
+   scrolling document — this page does not scroll, its transcript does. */
+.ns-chat-glow { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(86vw 82vh at 50% 122%,
+      #5fd3a37a 0%, #33a97a5e 20%, #1b70544a 40%, #0d3a2c3d 62%, #05080a00 84%),
+    radial-gradient(48vw 44vh at 88% -16%, #1f5c4640 0, #05080a00 70%);
+}
+
+/* The agent constellation on the chat home. */
+.ns-chat-home .ns-hero-title {
+  background: linear-gradient(180deg, #ffffff 20%, #a8f0cf 120%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ns-orbit-ring { position: absolute; inset: -14px; border-radius: 9999px;
+  border: 1px solid rgba(111, 232, 180, 0.35); animation: ns-orbit-pulse 2.6s ease-out infinite; }
+@keyframes ns-orbit-pulse {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+/* Stars over the bloom, the same field the landing uses. */
+.ns-chat-glow::before { content: ""; position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='340' height='340'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='23' cy='41' r='1' opacity='.55'/%3E%3Ccircle cx='97' cy='18' r='.8' opacity='.4'/%3E%3Ccircle cx='151' cy='63' r='1.1' opacity='.6'/%3E%3Ccircle cx='211' cy='29' r='.7' opacity='.35'/%3E%3Ccircle cx='288' cy='52' r='1' opacity='.5'/%3E%3Ccircle cx='44' cy='112' r='.9' opacity='.45'/%3E%3Ccircle cx='196' cy='104' r='1.2' opacity='.62'/%3E%3Ccircle cx='317' cy='118' r='1' opacity='.5'/%3E%3Ccircle cx='15' cy='186' r='1.1' opacity='.55'/%3E%3Ccircle cx='163' cy='193' r='.9' opacity='.48'/%3E%3Ccircle cx='238' cy='222' r='1' opacity='.52'/%3E%3Ccircle cx='58' cy='269' r='1' opacity='.5'/%3E%3Ccircle cx='187' cy='277' r='1.1' opacity='.58'/%3E%3Ccircle cx='327' cy='284' r='.95' opacity='.46'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 340px 340px;
+  mask-image: linear-gradient(#000 0, #000 50%, transparent 90%);
+}
+@media (prefers-reduced-motion: reduce) { .ns-orbit-ring { animation: none; } }

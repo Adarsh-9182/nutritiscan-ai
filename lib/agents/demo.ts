@@ -92,7 +92,37 @@ export function demoAnswer(
   }
 
   const route = routeOf(text);
-  const name = p.name;
+  // blankProfile's name is the greeting filler "there" — never address someone by it.
+  const name = p.onboarded && p.name && p.name !== "there" ? p.name : "";
+  const to = name ? `, ${name}` : "";
+
+  /*
+   * Nothing here may state a body metric the person never gave.
+   *
+   * blankProfile has to put a number in weightKg, heightCm, sleepHours and
+   * exerciseDaysPerWeek because the type requires one, and the answers below
+   * quote all four flatly — "At 70 kg … aim for ~84 g/day". To a first-time
+   * visitor that is not a default, it is a personalised target, and it is
+   * wrong. The agent prompts already withhold these sections
+   * (recordedSections); the keyless brain has to hold the same line, because
+   * with no credential configured it is the only thing anybody sees.
+   *
+   * Only the routes that reason from the body are gated. Doctor, lab and a
+   * plain question do not need a weight, and blocking those would be an
+   * obstacle rather than a safeguard.
+   */
+  if (!p.onboarded && (route === "nutrition" || route === "fitness" || route === "supervisor")) {
+    return `I'd rather ask than guess.
+
+To answer that properly I need a couple of things about you — they change the numbers completely, and I don't have them yet.
+
+- Your **weight**, and your **height** if you have it
+- What you're working toward: building muscle, losing fat, or staying healthy
+
+Tell me in a sentence ("68 kg, 5'9\", trying to build muscle") and I'll work from that. You can also open the chart beside this conversation and fill it in once.
+
+_I won't invent a target from an average — a protein or calorie figure is only useful if it's actually yours._`;
+  }
 
   if (route === "doctor") {
     // Deliberately no Inference, Recommendation, or Confidence section here.
@@ -127,7 +157,7 @@ export function demoAnswer(
       "Anything that reliably makes it better or worse?",
     ].filter((q): q is string => q !== null);
 
-    return `Sorry you're not feeling well, ${name}. Let me help you think this through calmly.
+    return `Sorry you're not feeling well${to}. Let me help you think this through calmly.
 
 **Facts**
 - Here's what I have: ${said}. That's not enough to reason from yet — I can't tell you what you have, because I have your answers to none of the questions below, and any specific cause I named would be a guess dressed up as a read.
@@ -179,7 +209,7 @@ _This is educational information, not a diagnosis. If you're worried or it worse
 - Nothing is logged yet, so I genuinely don't know what you're eating and won't guess.
 - Scan or describe a couple of meals and I'll answer this from your real intake instead of a formula.`;
 
-    return `Here's your nutrition read, ${name} — tuned to your goal of **${p.goal.toLowerCase()}**.
+    return `Here's your nutrition read${to} — tuned to your goal of **${p.goal.toLowerCase()}**.
 
 ${actual}
 
@@ -205,7 +235,7 @@ _General guidance, not a prescription — check supplements with your clinician.
 
   if (route === "fitness") {
     const b = bmi(p);
-    return `Let's map your training to your goal, ${name}.
+    return `Let's map your training to your goal${to}.
 
 **Where you are**
 - ${p.heightCm} cm (${heightImperial(p.heightCm)}), ${p.weightKg} kg → ${bmiBand(b)}.
@@ -227,7 +257,7 @@ _Educational guidance. Ease off and check with a professional if you feel pain b
     // "Your Vitamin B12 is on the low side" unconditionally — to users with an
     // empty panel, under a heading promising to read "your latest labs".
     if (!p.biomarkers.length) {
-      return `I don't have any lab values for you yet, ${name} — so there's nothing here I can honestly interpret, and I won't guess.
+      return `I don't have any lab values for you yet${to} — so there's nothing here I can honestly interpret, and I won't guess.
 
 **How to give me something to read**
 - Open the dashboard and use **+ Report**, then paste the lines from your report — e.g. \`Vitamin B12: 180 pg/mL\`, \`Vitamin D 34\`, \`TSH 5.2\`.
@@ -250,7 +280,7 @@ _I interpret values in plain language — I don't diagnose. Please review result
       ? flagged.map((bm) => `- **${bm.name}** sits outside its typical reference range (${bm.status} at ${bm.value}). By itself that only means it's worth a closer look — not what's causing it.`).join("\n")
       : "- Nothing in this panel sits outside its reference range, based on what's recorded.";
 
-    return `Here's a plain-language read of your recorded labs, ${name}:
+    return `Here's a plain-language read of your recorded labs${to}:
 
 **Facts**
 ${lines}
@@ -280,7 +310,7 @@ _I interpret values in plain language — I don't diagnose. Please review result
       ? trends.map((x) => `- ${x.label}: **${x.delta}** ${x.good ? "✅" : ""}`).join("\n")
       : "- I don't have enough history to point at a trend yet. Trends appear once there are repeated readings to compare.";
 
-    return `Love the focus on the fundamentals, ${name}. Here's your coach view.
+    return `Love the focus on the fundamentals${to}. Here's your coach view.
 
 **What's going well**
 ${going}
@@ -295,7 +325,7 @@ ${going}
 _Small, repeatable steps beat big resets. I'll remember your progress and nudge gently._`;
   }
 
-  return `Hi ${name} — I'm your NutritiScan supervisor. I coordinate five specialists (Nutrition, Fitness, Doctor, Lab, and your Health Coach) and I remember your full picture: ${p.weightKg} kg, goal to ${p.goal.toLowerCase()}, ~${p.sleepHours}h sleep, training ${p.exerciseDaysPerWeek} days a week.
+  return `Hi${name ? ` ${name}` : ""} — I'm your NutritiScan supervisor. I coordinate five specialists (Nutrition, Fitness, Doctor, Lab, and your Health Coach) and I remember your full picture: ${p.weightKg} kg, goal to ${p.goal.toLowerCase()}, ~${p.sleepHours}h sleep, training ${p.exerciseDaysPerWeek} days a week.
 
 Ask me anything — for example:
 - "I have a fever" → I'll triage it carefully

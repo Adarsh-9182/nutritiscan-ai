@@ -20,7 +20,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { UIMessage } from "ai";
-import { demoProfile, PROFILE_KEY, type HealthProfile } from "./profile";
+import { blankProfile, PROFILE_KEY, type HealthProfile } from "./profile";
 import { MEALS_KEY, type LoggedMeal } from "./meals";
 import { capTranscript, CHAT_KEY, safeTranscript } from "./transcript";
 import {
@@ -110,7 +110,22 @@ function createStore<T>(key: string, fallback: T) {
   return { subscribe, read, write, serverValue: () => fallback };
 }
 
-const profileStore = createStore<HealthProfile>(PROFILE_KEY, demoProfile);
+/*
+ * A new visitor starts empty, not as Adarsh.
+ *
+ * The fallback used to be demoProfile, and the first-run modal was what
+ * replaced it — so the moment that modal stopped being mounted, someone
+ * arriving for the first time was greeted by name, shown a fictional B12 of
+ * 180 pg/mL flagged Low in the chart beside them, and had all of it sent to
+ * the agents as their own history. Fiction presented as a person's own lab
+ * result is the one thing a health product cannot do by accident.
+ *
+ * blankProfile leaves `onboarded` false, which recordedSections() reads: the
+ * agents are told a name is not recorded rather than being handed a default
+ * weight to reason from. The fictional workspace still exists behind
+ * /workspace?demo=1, where it is labelled as fiction.
+ */
+const profileStore = createStore<HealthProfile>(PROFILE_KEY, blankProfile);
 const mealsStore = createStore<LoggedMeal[]>(MEALS_KEY, []);
 const transcriptStore = createStore<UIMessage[]>(CHAT_KEY, []);
 

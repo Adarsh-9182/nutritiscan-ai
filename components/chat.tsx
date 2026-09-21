@@ -8,6 +8,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
+import { AgentConstellation, AgentRun } from "@/components/agent-orbit";
 import { deleteThread, newThread, readActiveThread, readMeals, readProfile, saveThread, useActiveThreadId, useHydrated, useThreads } from "@/lib/memory/store";
 import type { Thread } from "@/lib/memory/threads";
 import type { HealthProfile } from "@/lib/memory/profile";
@@ -166,6 +167,15 @@ function ConsultNote({ note }: { note: NotePart }) {
     </details>
   );
 }
+
+/** One opening question per specialist, for the constellation's buttons. */
+const AGENT_PROMPTS: Record<string, string> = {
+  nutrition: "Am I eating enough protein?",
+  fitness: "Best workout for building muscle?",
+  doctor: "I have a headache since yesterday.",
+  lab: "Explain my blood report.",
+  coach: "Help me fix my sleep schedule.",
+};
 
 const SUGGESTIONS = [
   "I have a fever.",
@@ -590,12 +600,21 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-8">
           <div className="w-full max-w-2xl">
             <div className="mb-6 text-center">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-white">
+              {/* The team, drawn — each specialist opens with its own question. */}
+              <div className="hidden sm:block">
+                <AgentConstellation onPick={(id) => send(AGENT_PROMPTS[id] ?? SUGGESTIONS[0])} />
+              </div>
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-white sm:hidden">
                 ✦
               </div>
-              <h1 className="mt-4 text-[22px] font-semibold tracking-tight">Hi {profile.name}. How are you feeling?</h1>
+              {/* blankProfile's name is "there", which greets a first-time
+                  visitor as "Hi there." — fine as a greeting, wrong as a name.
+                  Only use it once it is one. */}
+              <h1 className="ns-hero-title mt-4 text-[26px] font-semibold tracking-tight sm:text-[32px]">
+                {profile.onboarded && profile.name ? `Hi ${profile.name}. How are you feeling?` : "How are you feeling?"}
+              </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                Five specialists read every message — symptoms, food, training, sleep, labs.
+                A Supervisor and five specialist agents — Doctor, Nutrition, Fitness, Lab and Coach — work every message together.
               </p>
             </div>
 
@@ -742,6 +761,16 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                       theirs.
                     */}
                     <div className="pl-8">
+                      {/* The live team readout: on the turn being answered, and
+                          kept afterwards on any answer the specialists fed. */}
+                      {(trace || (busy && idx === messages.length - 1)) && (
+                        <AgentRun
+                          agents={trace?.agents ?? []}
+                          consultDone={trace?.done ?? false}
+                          hasText={Boolean(text)}
+                          live={busy && idx === messages.length - 1}
+                        />
+                      )}
                       {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                       {note && <ConsultNote note={note} />}
 
@@ -814,15 +843,8 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
               )}
 
               {status === "submitted" && (
-                <div className="flex items-center gap-2 pl-8">
-                  {[0, 1, 2].map((d) => (
-                    <motion.span
-                      key={d}
-                      className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]"
-                      animate={{ opacity: [0.2, 1, 0.2] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }}
-                    />
-                  ))}
+                <div className="pl-8">
+                  <AgentRun agents={[]} consultDone={false} hasText={false} live />
                 </div>
               )}
 

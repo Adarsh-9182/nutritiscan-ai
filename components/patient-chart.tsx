@@ -90,7 +90,10 @@ function TodayBlock() {
         <p className="t-meta text-[var(--text-muted)]">Protein</p>
         <p className="t-meta tabular-nums text-[var(--text)]">
           <span className="font-medium">{Math.round(t.protein)}</span>
-          <span className="text-[var(--text-dim)]"> / {t.target} g</span>
+          {/* The target is grams per kilo of body weight. With no recorded
+              weight it is grams per kilo of the type's default, which is not
+              this person's target and must not be shown as one. */}
+          <span className="text-[var(--text-dim)]">{profile.onboarded ? ` / ${t.target} g` : " g logged"}</span>
         </p>
       </div>
 
@@ -324,16 +327,35 @@ export default function PatientChart() {
       */}
       <header className="border-b border-[var(--border)] px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="t-title text-[var(--text)]">{profile.name || "Unnamed"}</h2>
+          {/*
+            blankProfile's name is "there" — a greeting filler, not a name, and
+            it read as one here ("there · 170 cm · 70 kg"). Until someone has
+            actually been through first run this banner says what it is.
+          */}
+          <h2 className="t-title text-[var(--text)]">
+            {profile.onboarded && profile.name ? profile.name : "Your chart"}
+          </h2>
           <span className="t-label tabular-nums text-[var(--text-dim)]">
             {profile.age ? `${profile.age} y` : "—"}
             {profile.sex ? ` · ${profile.sex[0].toUpperCase()}` : ""}
           </span>
         </div>
-        <p className="t-label mt-1 tabular-nums text-[var(--text-dim)]">
-          {profile.heightCm} cm · {profile.weightKg} kg · BMI {bmi}
-        </p>
-        {profile.goal && (
+        {profile.onboarded ? (
+          <p className="t-label mt-1 tabular-nums text-[var(--text-dim)]">
+            {profile.heightCm} cm · {profile.weightKg} kg · BMI {bmi}
+          </p>
+        ) : (
+          /*
+            Not "170 cm · 70 kg · BMI 24.2". Those are the type's defaults, and
+            printed in the same slot as a measured value they are
+            indistinguishable from one — in a chart, next to real lab rows,
+            that is a fabricated vital sign.
+          */
+          <p className="t-label mt-1 text-[var(--text-dim)]">
+            Height and weight not recorded yet
+          </p>
+        )}
+        {profile.onboarded && profile.goal && (
           <p className="t-label mt-2 inline-flex rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--text-muted)]">
             {profile.goal}
           </p>
