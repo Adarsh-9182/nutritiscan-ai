@@ -3875,3 +3875,16 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
   mask-image: linear-gradient(#000 0, #000 50%, transparent 90%);
 }
 @media (prefers-reduced-motion: reduce) { .ns-orbit-ring { animation: none; } }
+
+/* Floating panels on the chat: glass cards lifted off the ground. */
+.ns-float {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(111, 232, 180, 0.04) inset;
+}
+/* Drawers sit over the conversation on small screens, so they must not show it through. */
+.ns-float.ns-float-solid { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }

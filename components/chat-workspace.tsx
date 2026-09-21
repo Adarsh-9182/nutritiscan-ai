@@ -24,7 +24,15 @@ export default function ChatWorkspace() {
   const [profile] = useProfile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chartOpen, setChartOpen] = useState(false);
+  // The floating panels on wide screens. Remembered per browser, open by default.
+  const [railShown, setRailShown] = usePanelPref("ns-rail", true);
+  const [chartShown, setChartShown] = usePanelPref("ns-chart", true);
   const reduceMotion = useReducedMotion();
+
+  // One button per panel: on a wide screen it floats the card in and out, on
+  // a narrow one it opens the same panel as a drawer.
+  const toggleRail = () => (matchMedia("(min-width: 1024px)").matches ? setRailShown(!railShown) : setDrawerOpen((v) => !v));
+  const toggleChart = () => (matchMedia("(min-width: 1280px)").matches ? setChartShown(!chartShown) : setChartOpen((v) => !v));
 
   /*
    * Keyboard shortcuts, scoped to not steal keys from the composer.
@@ -71,10 +79,10 @@ export default function ChatWorkspace() {
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
         <button
           type="button"
-          onClick={() => setDrawerOpen((v) => !v)}
-          aria-label={drawerOpen ? "Hide conversations" : "Show conversations"}
-          aria-expanded={drawerOpen}
-          className="btn-ghost grid h-8 w-8 place-items-center rounded-lg lg:hidden"
+          onClick={toggleRail}
+          aria-label="Show or hide conversations"
+          title="Conversations"
+          className="btn-ghost grid h-8 w-8 place-items-center rounded-lg"
         >
           <span aria-hidden="true">☰</span>
         </button>
@@ -100,19 +108,36 @@ export default function ChatWorkspace() {
         */}
         <button
           type="button"
-          onClick={() => setChartOpen((v) => !v)}
-          aria-expanded={chartOpen}
-          className="btn-ghost rounded-full px-3 py-1 t-label xl:hidden"
+          onClick={toggleChart}
+          aria-label="Show or hide your chart"
+          className="btn-ghost rounded-full px-3 py-1 t-label"
         >
-          {chartOpen ? "Hide chart" : "Chart"}
+          Chart
         </button>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Permanent rail from lg up. */}
-        <aside className="hidden w-[264px] shrink-0 border-r border-[var(--border)] lg:block">
-          <ThreadSidebar />
-        </aside>
+        {/*
+          Floating rail from lg up: a card lifted off the ground rather than a
+          column ruled off from the chat, and it can be put away entirely so
+          the conversation takes the whole width.
+        */}
+        <AnimatePresence initial={false}>
+          {railShown && (
+            <motion.aside
+              key="rail"
+              initial={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: -24 }}
+              animate={reduceMotion ? { opacity: 1 } : { width: 280, opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: -24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              className="hidden shrink-0 overflow-hidden lg:block"
+            >
+              <div className="ns-float ml-3 my-3 h-[calc(100%-24px)] w-[264px]">
+                <ThreadSidebar />
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
         {/* Drawer below lg. */}
         <AnimatePresence>
@@ -132,7 +157,7 @@ export default function ChatWorkspace() {
                 animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { x: -280 }}
                 transition={{ type: "spring", stiffness: 380, damping: 36 }}
-                className="fixed inset-y-0 left-0 z-50 w-[280px] border-r border-[var(--border)] bg-[var(--bg)] lg:hidden"
+                className="ns-float ns-float-solid fixed bottom-3 left-3 top-3 z-50 w-[280px] max-w-[calc(100vw-24px)] lg:hidden"
               >
                 <ThreadSidebar onNavigate={() => setDrawerOpen(false)} />
               </motion.aside>
@@ -163,9 +188,22 @@ export default function ChatWorkspace() {
           Hidden below xl, where there is no room for a third column and the
           conversation has the stronger claim on the width.
         */}
-        <aside className="hidden w-[320px] shrink-0 border-l border-[var(--border)] xl:block">
-          <PatientChart />
-        </aside>
+        <AnimatePresence initial={false}>
+          {chartShown && (
+            <motion.aside
+              key="chart"
+              initial={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: 24 }}
+              animate={reduceMotion ? { opacity: 1 } : { width: 332, opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: 24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              className="hidden shrink-0 overflow-hidden xl:block"
+            >
+              <div className="ns-float my-3 mr-3 h-[calc(100%-24px)] w-[320px]">
+                <PatientChart />
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
         {/* The same chart as a right-hand drawer below xl. */}
         <AnimatePresence>
@@ -185,7 +223,7 @@ export default function ChatWorkspace() {
                 animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { x: 320 }}
                 transition={{ type: "spring", stiffness: 380, damping: 36 }}
-                className="fixed inset-y-0 right-0 z-50 w-[320px] max-w-[86vw] border-l border-[var(--border)] bg-[var(--bg)] xl:hidden"
+                className="ns-float ns-float-solid fixed bottom-3 right-3 top-3 z-50 w-[320px] max-w-[calc(100vw-24px)] xl:hidden"
               >
                 <PatientChart />
               </motion.aside>
@@ -195,4 +233,23 @@ export default function ChatWorkspace() {
       </div>
     </div>
   );
+}
+
+/** A remembered on/off for a floating panel. Storage can throw (private mode); the default then holds. */
+function usePanelPref(key: string, fallback: boolean): [boolean, (v: boolean) => void] {
+  const [value, setValue] = useState(fallback);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a browser-only preference after hydration
+      if (saved !== null) setValue(saved === "1");
+    } catch {}
+  }, [key]);
+  const set = (v: boolean) => {
+    setValue(v);
+    try {
+      localStorage.setItem(key, v ? "1" : "0");
+    } catch {}
+  };
+  return [value, set];
 }
