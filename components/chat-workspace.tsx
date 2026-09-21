@@ -88,9 +88,8 @@ export default function ChatWorkspace() {
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
-        {/* Everything the home page used to say about the product lives here now. */}
-        <Link href="/about" className="btn-ghost rounded-full px-3 py-1 t-label">
-          About
+        <Link href="/?home" className="btn-ghost rounded-full px-3 py-1 t-label">
+          Home
         </Link>
 
         {/*

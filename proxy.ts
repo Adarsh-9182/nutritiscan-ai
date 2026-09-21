@@ -29,7 +29,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
 
   const url = request.nextUrl.clone();
-  url.pathname = "/workspace";
+  // The green agent chat is the app now; the older workspace stays at /workspace.
+  url.pathname = "/chat";
   url.search = "";
   return NextResponse.redirect(url);
 }
