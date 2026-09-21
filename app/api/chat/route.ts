@@ -149,7 +149,9 @@ async function streamRealSupervisor(
     // A soloist makes no ask* tool call, so without this the UI could not
     // say which specialist answered. Same part id as the keyless path, so a
     // retry down the model ladder updates the trace rather than adding one.
-    if (solo) writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: false } } as never);
+    // Written only after the stream's own "start": a data part ahead of it
+    // opens a message of its own, and the answer then arrives as a second.
+    let traced = !solo;
 
     for await (const chunk of stream) {
       const c = chunk as { type?: string; delta?: string };
@@ -180,11 +182,17 @@ async function streamRealSupervisor(
         continue;
       }
 
+      // Close the trace inside the message, not after the stream has finished it.
+      if (solo && traced && type === "finish") {
+        writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: true } } as never);
+      }
       writer.write(chunk as never);
+      if (!traced && type === "start") {
+        writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: false } } as never);
+        traced = true;
+      }
       if (!NON_CONTENT_CHUNK_TYPES.has(type ?? "")) wrote = true;
     }
-
-    if (solo) writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: true } } as never);
 
     if (buffered) {
       if (!held.trim()) return "unavailable";
