@@ -146,6 +146,11 @@ async function streamRealSupervisor(
           abortSignal: signal,
         });
 
+    // A soloist makes no ask* tool call, so without this the UI could not
+    // say which specialist answered. Same part id as the keyless path, so a
+    // retry down the model ladder updates the trace rather than adding one.
+    if (solo) writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: false } } as never);
+
     for await (const chunk of stream) {
       const c = chunk as { type?: string; delta?: string };
       const type = c.type;
@@ -178,6 +183,8 @@ async function streamRealSupervisor(
       writer.write(chunk as never);
       if (!NON_CONTENT_CHUNK_TYPES.has(type ?? "")) wrote = true;
     }
+
+    if (solo) writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: true } } as never);
 
     if (buffered) {
       if (!held.trim()) return "unavailable";
