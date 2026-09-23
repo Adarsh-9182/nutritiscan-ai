@@ -7,7 +7,6 @@ import {
   X,
   Check,
   FileText,
-  Activity,
   Pill,
   Moon,
   Leaf,
@@ -135,7 +134,7 @@ export default function HealthAgent({
   seed: { text: string; id: number } | null;
   addReport: () => void;
   navigate: (
-    view: "records" | "visit" | "care" | "settings" | "trends" | "sources",
+    view: "records" | "visit" | "care" | "settings" | "sources",
   ) => void;
   saveTask: (task: CareTask) => Promise<void>;
   saveLog?: (entries: LogEntry[]) => Promise<void>;
@@ -759,13 +758,6 @@ export default function HealthAgent({
             <small>
               {workspace.tasks.filter((t) => !t.done).length} open items
             </small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <button className="ha-context-row" onClick={() => navigate("trends")}>
-          <Activity size={17} />
-          <span>
-            Your health story<small>Results over time</small>
           </span>
           <ArrowUpRight size={14} />
         </button>

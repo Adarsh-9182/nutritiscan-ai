@@ -1,4 +1,6 @@
 import postgres from "postgres";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { workspaceSchema } from "./schema";
 
 export interface Database {
@@ -7,6 +9,7 @@ export interface Database {
 }
 
 export async function createLocalDatabase(path?: string): Promise<Database> {
+  if (path) await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const { PGlite } = await import("@electric-sql/pglite");
   const instance = new PGlite(path);
   await instance.exec(workspaceSchema);

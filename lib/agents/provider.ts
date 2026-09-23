@@ -135,7 +135,19 @@ export function hasGemini(): boolean {
 }
 
 export function hasGateway(): boolean {
-  return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
+  if (process.env.AI_GATEWAY_API_KEY) return true;
+  const token = process.env.VERCEL_OIDC_TOKEN;
+  if (!token) return false;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString()) as { exp?: unknown };
+    // A copied local OIDC token expires quickly. Leave a minute for the
+    // request; otherwise status says AI is ready when every call will fail.
+    return typeof payload.exp === "number" && payload.exp * 1000 > Date.now() + 60_000;
+  } catch {
+    return false;
+  }
 }
 
 /** Whether any real model can be reached. The demo brain answers when false. */

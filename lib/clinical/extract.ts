@@ -166,7 +166,7 @@ const CONCEPTS: ConceptSpec[] = [
     label: "Chest pain or pressure",
     patterns: [
       "chest pain", "pain in (my|the) chest", "chest hurts", "chest is hurting",
-      "chest discomfort", "chest tightness", "tight(ness)? in my chest", "tight chest",
+      "chest discomfort", "discomfort in (my|the) chest", "chest tightness", "tight(ness)? in my chest", "tight chest",
       "pressure (in|on) my chest", "chest pressure", "heavy chest", "heaviness in my chest",
       "weight on my chest", "elephant (sitting )?on my chest", "band around my chest",
     ],
@@ -233,14 +233,14 @@ const CONCEPTS: ConceptSpec[] = [
     patterns: [
       "weak(ness)? (on|down) (one|my left|my right) side", "(left|right) side (is|feels|went) (weak|numb|dead)",
       "can not (move|lift|feel) my (left|right) (arm|leg|hand|side)",
-      "arm (went|has gone) (limp|dead|numb)", "one side.{0,15}numb",
+      "arm (went|has gone) (limp|dead|numb)", "(left|right) arm feels (weak|numb|dead)", "one side.{0,15}numb",
     ],
   },
   {
     id: "slurred-speech",
     label: "Speech disturbance",
     patterns: [
-      "slur\\w*.{0,10}speech", "speech (is|has become|sounds) slurred", "words are (coming out wrong|jumbled)",
+      "slur\\w*.{0,10}speech", "speech (is|has become|has gone|sounds) slurred", "words are (coming out wrong|jumbled)",
       "can not (speak|talk) properly", "can not get my words out", "trouble (speaking|finding words)",
     ],
   },

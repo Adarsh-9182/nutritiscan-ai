@@ -49,9 +49,9 @@ const BENTO = [
   {
     icon: Sparkles,
     tone: "lime",
-    title: "A real AI engine, on by default",
-    body: "Ask in your own words and get an answer written for you — grounded in published reference notes, with every source shown next to it.",
-    tag: "Hosted engine",
+    title: "AI when an engine is connected",
+    body: "Ask in your own words. A connected model can explain the published notes; without one, the notes and record tools still work and the app says so.",
+    tag: "Engine status shown",
   },
   {
     icon: Cpu,
@@ -122,7 +122,7 @@ export default function ProductLanding() {
           <Link href="/privacy">Privacy</Link>
         </nav>
         <div className="nl-nav-actions">
-          <Link className="nl-cta" href="/chat">
+          <Link className="nl-cta" href="/workspace">
             Start a conversation <ArrowRight size={15} />
           </Link>
         </div>
@@ -131,7 +131,7 @@ export default function ProductLanding() {
       <main>
         <section className="nl-hero" id="top">
           <span className="nl-badge">
-            <i /> AI engine live · free early access
+            <i /> Reference-backed help · free early access
           </span>
           <h1>
             Health questions,
@@ -145,7 +145,7 @@ export default function ProductLanding() {
             a search bar at 2am.
           </p>
           <div className="nl-hero-actions">
-            <Link href="/chat" className="nl-cta nl-cta-lg">
+            <Link href="/workspace" className="nl-cta nl-cta-lg">
               Start a conversation <ArrowRight size={17} />
             </Link>
           </div>
@@ -154,7 +154,7 @@ export default function ProductLanding() {
               <Check size={13} /> No card, no trial countdown
             </li>
             <li>
-              <FileText size={13} /> Sources on every answer
+              <FileText size={13} /> Sources shown when used
             </li>
             <li>
               <LockKeyhole size={13} /> No advertising trackers
@@ -165,7 +165,7 @@ export default function ProductLanding() {
             <div className="nl-preview-bar">
               <span className="nl-dot" />
               <span>Your health companion</span>
-              <b>AI engine on</b>
+              <b>Illustrative preview</b>
             </div>
             <div className="nl-preview-grid">
               <div className="nl-thread">
@@ -251,9 +251,9 @@ export default function ProductLanding() {
           <div className="nl-section-head">
             <span className="nl-eyebrow">WHAT’S UNDER THE HOOD</span>
             <h2>
-              The engine is back on,
+              See what shaped each answer,
               <br />
-              and it shows its working.
+              with the sources in view.
             </h2>
             <p>
               An answer you can’t trace is just a rumour with better grammar.
@@ -320,7 +320,7 @@ export default function ProductLanding() {
           <h2>
             One question is <em>a good beginning.</em>
           </h2>
-          <Link className="nl-cta nl-cta-lg" href="/chat">
+          <Link className="nl-cta nl-cta-lg" href="/workspace">
             Meet your health companion <ArrowRight size={17} />
           </Link>
           <p>Free early access · no card · your records stay yours.</p>
@@ -333,7 +333,7 @@ export default function ProductLanding() {
         <div>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms & limitations</Link>
-          <Link href="/chat">Start a conversation</Link>
+          <Link href="/workspace">Start a conversation</Link>
         </div>
       </footer>
     </div>

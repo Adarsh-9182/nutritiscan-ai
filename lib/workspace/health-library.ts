@@ -1,5 +1,5 @@
 /** Curated educational summaries, not a clinical knowledge base or live search.
- * Source pages checked 2026-09-16. Keep summaries and provenance together. */
+ * Source pages checked 2026-09-16; B12 checked 2026-09-23. Keep summaries and provenance together. */
 export const HEALTH_LIBRARY = [
   {
     id: "nutrition",
@@ -10,6 +10,14 @@ export const HEALTH_LIBRARY = [
     text: "Nutrition is about the nutrients in food and how the body uses them. A varied eating pattern can include vegetables, fruit, whole grains and sources of protein. Individual needs differ with health conditions and life stage. Restrictive diets and supplements are not a substitute for individual advice from a qualified professional.",
     question:
       "What does a usual day of eating look like, and what would you like to understand?",
+  },
+  {
+    id: "b12",
+    title: "Vitamin B12",
+    url: "https://ods.od.nih.gov/factsheets/VitaminB12-Consumer/",
+    keywords: "b12 cobalamin vitamin vegetarian vegan fortified शाकाहारी विटामिन",
+    text: "Vitamin B12 helps keep blood and nerve cells healthy. It occurs naturally in animal foods; some plant-based foods are fortified with it. People who eat little or no animal foods may not get enough. A clinician can assess an individual's status and discuss whether fortified foods or a supplement are appropriate; this note cannot establish a deficiency or determine a personal dose.",
+    question: "Are you asking about food sources, a test result, or a concern to discuss with a clinician?",
   },
   {
     id: "sleep",

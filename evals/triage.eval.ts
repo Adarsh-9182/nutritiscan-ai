@@ -188,8 +188,8 @@ evalSuite("triage golden: must stay out of the way", () => {
     {
       id: "edu.question",
       turn: "what are the warning signs of a heart attack?",
-      verdict: "emergency" as const,
-      note: "KNOWN FALSE POSITIVE. An educational question fires the cardiac rule. Acceptable per the stated recall-over-precision bias, and the emergency template's closing line offers the user a way back. Worth fixing with intent classification in Phase 5.",
+      verdict: "self_care" as const,
+      note: "An educational question without a current symptom should not trigger emergency triage.",
     },
   ].forEach(check);
 });

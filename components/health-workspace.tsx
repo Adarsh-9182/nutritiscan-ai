@@ -52,7 +52,7 @@ import {
 import { toICS } from "@/lib/workspace/calendar";
 import { localDate } from "@/lib/workspace/daily";
 import RecordSources from "./record-sources";
-import { HealthTrends, VisitPreparation } from "./health-story";
+import { VisitPreparation } from "./health-story";
 import { DEMO } from "@/lib/workspace/demo";
 import { extractReport } from "@/lib/workspace/reports";
 import {
@@ -93,7 +93,6 @@ const NAV = [
   ["today", "Overview", LayoutDashboard],
   ["log", "Daily log", NotebookPen],
   ["records", "My records", FileText],
-  ["trends", "Health trends", Activity],
   ["visit", "Visit preparation", CalendarDays],
   ["care", "Care & reminders", Heart],
   ["sources", "Sources & access", ShieldCheck],
@@ -994,24 +993,6 @@ export default function HealthWorkspace() {
                   </button>
                 </Empty>
               )}
-              <section className="ns-story-entry">
-                <div>
-                  <span className="ns-eyebrow">
-                    ONE REPORT IS A MOMENT. TOGETHER, A STORY.
-                  </span>
-                  <h2>See what changed since last time.</h2>
-                  <p>
-                    Explore your recorded results across dates, with the
-                    original report behind every number.
-                  </p>
-                </div>
-                <button
-                  className="ns-button ns-dark"
-                  onClick={() => navigate("trends")}
-                >
-                  Explore health trends <ArrowUpRight size={17} />
-                </button>
-              </section>
               <div className="ns-overview-bottom">
                 <section className="ns-card">
                   <div className="ns-section-heading">
@@ -1190,15 +1171,6 @@ export default function HealthWorkspace() {
                   />
                 )}
             </>
-          )}
-          {view === "trends" && (
-            <HealthTrends
-              workspace={workspace}
-              openReport={(id) =>
-                setSelected(workspace.reports.find((r) => r.id === id) ?? null)
-              }
-              addReport={() => setUpload(true)}
-            />
           )}
           {view === "visit" && (
             <VisitPreparation

@@ -38,6 +38,21 @@ describe("emergency detection", () => {
     expect(state.triage.firedRules).toContain(expectedRule);
     expect(halts(state.triage)).toBe(true);
   });
+
+  it("recognises mild chest discomfort when diabetes is recorded", () => {
+    const state = assess("Bit of discomfort in my chest since this morning", {
+      ...blankProfile,
+      conditions: ["Type 2 diabetes"],
+    });
+    expect(state.triage.verdict).toBe("emergency");
+    expect(state.triage.firedRules).toContain("cardiac.chest-pain-high-risk-patient");
+  });
+
+  it("recognises slurred speech and one-sided arm weakness in first person", () => {
+    const state = assess("my speech has gone slurred and my right arm feels dead");
+    expect(state.triage.verdict).toBe("emergency");
+    expect(state.triage.firedRules).toContain("neuro.stroke-signs");
+  });
 });
 
 describe("risk-factor-sensitive rules", () => {
@@ -113,6 +128,11 @@ describe("non-clinical turns", () => {
     // Palpitations are in the lexicon but no rule covers them on their own.
     // "We saw a symptom and have no rule for it" must not read as "nothing".
     expect(verdictOf("my heart has been racing a bit lately")).toBe("routine");
+  });
+
+  it("does not treat resolved history or an educational question as a current emergency", () => {
+    expect(verdictOf("I had chest pain three years ago but it was reflux")).toBe("self_care");
+    expect(verdictOf("what are the warning signs of a heart attack?")).toBe("self_care");
   });
 });
 

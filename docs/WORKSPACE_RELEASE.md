@@ -192,11 +192,13 @@ The assistant supports an OpenAI-compatible chat endpoint, including a locally o
 ```sh
 # Example local configuration after installing a compatible open model:
 HEALTH_MODEL_BASE_URL=http://127.0.0.1:11434/v1
-HEALTH_MODEL_NAME=<installed-model-id>
+HEALTH_MODEL_NAME=qwen3.5:4b
+HEALTH_MODEL_REASONING_EFFORT=none
 HEALTH_MODEL_APPROVED=true
 ```
 
 Set `HEALTH_MODEL_API_KEY` only if the endpoint requires it. The adapter sends the question and language preference, not the record/profile payload. Users can still type sensitive information, so verify hosting, license, retention and data-use terms before enabling it. A Vercel server cannot reach an Ollama server on your laptop through its own localhost address.
+Ollama's Qwen 3.5 4B can spend a short completion budget on hidden thinking and return no answer; `HEALTH_MODEL_REASONING_EFFORT=none` requests a direct answer through its OpenAI-compatible API. This is a local-development example, not clinical approval.
 
 The current model experiment is constrained to explaining the included lab-reference source. It uses bounded structured output, source IDs, a timeout and a fail-closed output check. This is not broad clinical RAG and the lexical filter is not a medical safety guarantee. Failed/unconfigured generation is explicitly labelled; no canned answer is presented as a model response. `LEGACY_CLINICAL_ENABLED` stays false to prevent older anonymous/free-provider endpoints from bypassing the workspace boundary.
 

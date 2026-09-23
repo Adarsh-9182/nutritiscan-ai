@@ -1,7 +1,8 @@
-import { ToolLoopAgent, tool } from "ai";
+import { ToolLoopAgent, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
 import { resolveModel } from "./provider";
+import { ACTION_INSTRUCTIONS, actionTools } from "./actions";
 import type { Route } from "./demo";
 import { memoryContext, ALL_MEMORY_SECTIONS, type HealthProfile, type MemorySection } from "../memory/profile";
 
@@ -186,11 +187,14 @@ export function buildSoloist(
   tier = 0,
   /** Sections the caller can actually vouch for; see scope(). */
   available: MemorySection[] = ALL_MEMORY_SECTIONS,
+  allowActions = true,
 ) {
   const resolved = resolveModel("supervisor", tier);
   return new ToolLoopAgent({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
+    tools: allowActions ? actionTools(profile) : {},
+    stopWhen: stepCountIs(4),
     instructions: `You are the ${SOLO_NAME[route]} inside NutritiScan AI, a health operating system.
 ${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
 ${EXPERTISE[route]}
@@ -199,6 +203,8 @@ You are answering the user directly — there is no supervisor to synthesize
 after you. Give one warm, complete, personalized answer. Stay within your
 expertise, and say plainly when something belongs to another specialty or to
 a real clinician.
+Reply in the user's language — Hinglish if they write Hinglish.
+${allowActions ? ACTION_INSTRUCTIONS : "Do not claim to save or change a record. The account workspace handles record edits separately."}
 
 ${SAFETY}
 
@@ -206,6 +212,36 @@ ${MEDICAL_REASONING_FORMAT}
 
 ${memoryContext(profile, available)}
 ${nutrition ? `\n${nutrition}\n` : ""}${recalled ? `\n${recalled}\n` : ""}`,
+  });
+}
+
+/**
+ * The supervisor answering on its own, for turns that are not a health
+ * question at all — a greeting, thanks, "what can you do". Sending "hi"
+ * through the full team cost three sequential model calls and ~50 s; this is
+ * one call, and it still holds the action tools, so "hi, I'm Riya, 60 kg"
+ * gets saved.
+ */
+export function buildGeneralist(
+  profile: HealthProfile,
+  tier = 0,
+  available: MemorySection[] = ALL_MEMORY_SECTIONS,
+) {
+  const resolved = resolveModel("specialist", tier);
+  return new ToolLoopAgent({
+    model: resolved.model,
+    providerOptions: resolved.providerOptions,
+    tools: actionTools(profile),
+    stopWhen: stepCountIs(3),
+    instructions: `You are the Supervisor of NutritiScan AI, a health companion with five specialist
+agents behind you: Nutrition, Fitness, Doctor, Lab and Health Coach.
+This message is conversational, not a health question. Reply briefly and warmly (2–4 short
+sentences), in the user's language — Hinglish if they write Hinglish. If it helps, say in one line
+what you can do: answer health questions, log meals, read lab values, and track their chart.
+Invite one concrete next step. No headings, no Facts/Inference sections.
+${ACTION_INSTRUCTIONS}
+
+${memoryContext(profile, available)}`,
   });
 }
 
@@ -239,6 +275,7 @@ export function buildSupervisor(
   tier = 0,
   /** Sections the caller can actually vouch for; see scope(). */
   available: MemorySection[] = ALL_MEMORY_SECTIONS,
+  allowActions = true,
 ) {
   const resolved = resolveModel("supervisor", tier);
   const s = buildSpecialists(profile, nutrition, tier, available);
@@ -250,7 +287,7 @@ export function buildSupervisor(
         task: z.string().describe(`The specific question to route to the ${label}.`),
       }),
       execute: async ({ task }, { abortSignal }) => {
-        const r = await agent.generate({ prompt: task, abortSignal });
+        const r = await agent.generate({ prompt: `${recalled ?? ""}\n${task}`, abortSignal });
         return r.text;
       },
     });
@@ -258,6 +295,9 @@ export function buildSupervisor(
   return new ToolLoopAgent({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
+    // Save → consult (in parallel) → answer. Anything longer is the model
+    // wandering, and every extra step is seconds against the response budget.
+    stopWhen: stepCountIs(4),
     instructions: `You are the Supervisor of NutritiScan AI — an AI Health Operating System.
 ${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
 You coordinate five specialists (Nutrition, Fitness, Doctor, Lab, Health Coach) to help the
@@ -275,9 +315,15 @@ How you work:
   factor might matter (poor sleep behind constant hunger, a medicine that could explain
   low energy for training, a flagged lab value relevant to a symptom), consult that
   second specialist too rather than letting the primary one answer blind to it.
+- Speed matters: call every specialist you need IN THE SAME STEP (parallel tool calls), never
+  one after another, and consult at most three. Pass each one only the part of the question
+  it owns, plus any saved facts it needs.
 - Synthesize the specialists' input into ONE warm, clear, personalized answer for the user.
+- Reply in the user's language — Hinglish if they write Hinglish.
   Do not mention the internal routing or agent names unless it helps clarity.
 - Keep it scannable, human, and calm.
+
+${allowActions ? ACTION_INSTRUCTIONS : "Do not claim to save or change a record. The account workspace handles record edits separately."}
 
 ${SAFETY}
 
@@ -288,6 +334,7 @@ ${memoryContext(profile, available)}
 ${nutrition}
 ${recalled ? `\n${recalled}\n` : ""}`,
     tools: {
+      ...(allowActions ? actionTools(profile) : {}),
       askNutritionAgent: delegate(s.nutrition, "Nutrition Agent"),
       askFitnessAgent: delegate(s.fitness, "Fitness Agent"),
       askDoctorAgent: delegate(s.doctor, "Doctor Agent"),

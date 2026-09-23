@@ -13,7 +13,7 @@
 // safety block that matters more.
 // ============================================================
 
-import type { HealthProfile } from "./profile";
+import { isRecorded, type HealthProfile } from "./profile";
 import type { LoggedMeal } from "./meals";
 import { dayTotals, mealsOn } from "./meals";
 import { proteinTarget } from "../nutrition/analyze";
@@ -25,14 +25,19 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 const DETAIL_LIMIT = 6;
 
 export function nutritionContext(p: HealthProfile, meals: LoggedMeal[]): string {
-  const target = proteinTarget(p);
+  // A target from the type's default weight reads exactly like a personal
+  // one, so none is stated until a weight has actually been given.
+  const target = isRecorded(p, "weightKg") ? proteinTarget(p) : null;
+  const targetLine = target
+    ? `Daily protein target from their ${isRecorded(p, "goal") ? "goal and " : ""}weight: ${target} g.`
+    : "Daily protein target: UNKNOWN — their weight is not recorded. Do not state a gram target; ask for their weight (or use calculateTargets once they give it).";
 
   if (!meals.length) {
     return `[NUTRITION MEMORY]
 No meals have been logged yet, so you do NOT know what this person eats.
 Do not estimate, assume, or invent their intake. If they ask about their diet,
 say plainly that nothing is logged yet and invite them to scan or describe a meal.
-Daily protein target from their goal and weight: ${target} g.
+${targetLine}
 [END NUTRITION MEMORY]`;
   }
 
@@ -71,7 +76,7 @@ Daily protein target from their goal and weight: ${target} g.
           : `${days} days logged in the last 14 — a reasonably solid basis for dietary comments.`;
 
   return `[NUTRITION MEMORY — what this person has actually eaten]
-Daily protein target: ${target} g (from their goal and body weight).
+${targetLine}
 Today so far: ${loggedToday} meal${loggedToday === 1 ? "" : "s"}, ${today.kcal} kcal, ${today.protein} g protein, ${today.fiber} g fibre.
 Last 14 days, averaged over days with data: ${avg((d) => d.kcal)} kcal/day, ${avg((d) => d.protein)} g protein/day, ${avg((d) => d.fiber)} g fibre/day.
 Most recent meals:

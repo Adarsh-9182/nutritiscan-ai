@@ -5,9 +5,9 @@ import {
   type UIMessage,
   type UIMessageStreamWriter,
 } from "ai";
-import { buildSoloist, buildSupervisor } from "@/lib/agents";
+import { buildGeneralist, buildSoloist, buildSupervisor } from "@/lib/agents";
 import { MODEL_TIERS } from "@/lib/agents/provider";
-import { demoAnswer, routeOf } from "@/lib/agents/demo";
+import { demoAnswer, isSmallTalk, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
 import { recallRelevant } from "@/lib/memory/recall";
@@ -125,8 +125,11 @@ async function streamRealSupervisor(
    * actually applies. The soloist compensates for having no supervisor by
    * taking the full memory rather than its usual slice; see buildSoloist.
    */
-  const route = routeOf(lastUserText(messages));
+  const text = lastUserText(messages);
+  const route = routeOf(text);
   const solo = route !== "supervisor";
+  // A greeting does not need the team; see buildGeneralist.
+  const general = !solo && !buffered && isSmallTalk(text);
   const brief = clinicalBrief(state);
 
   try {
@@ -137,6 +140,12 @@ async function streamRealSupervisor(
     const stream = solo
       ? await createAgentUIStream({
           agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier, recordedSections(profile)),
+          uiMessages: messages,
+          abortSignal: signal,
+        })
+      : general
+      ? await createAgentUIStream({
+          agent: buildGeneralist(profile, tier, recordedSections(profile)),
           uiMessages: messages,
           abortSignal: signal,
         })
@@ -369,6 +378,11 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * below is for. /api/scan stays behind the flag: that one takes uploads.
  */
 export async function POST(req: Request) {
+  // The browser-storage chat is retained for development only. Patient
+  // conversations use the authenticated, account-scoped workspace endpoint.
+  if (process.env.LEGACY_CLINICAL_ENABLED !== "true") {
+    return Response.json({ error: "Use the signed-in health workspace." }, { status: 410 });
+  }
   const rate = checkRate(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "You're sending messages faster than I can think. Give me a few seconds.");
@@ -473,7 +487,10 @@ export async function POST(req: Request) {
       // deterministically. A keyless deployment must not lose the one part of
       // the answer that matters most.
       if (directive) writeFixed(writer, `${urgentPreamble(state)}\n\n---\n\n`);
-      await streamDemo(writer, userText, profile, meals, state, signal);
+      // Only the client going away stops the fallback. The model budget may
+      // be exactly what ran out, and it must not also silence the answer
+      // that stands in for it — that is how a turn used to end with nothing.
+      await streamDemo(writer, userText, profile, meals, state, req.signal);
       writeNote(writer, state);
     },
     onError: () => "Something went wrong on our side. Please try again.",

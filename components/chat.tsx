@@ -9,6 +9,9 @@ import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
 import { AgentConstellation, AgentRun } from "@/components/agent-orbit";
+import { actionPartsOf, applyActions } from "@/lib/memory/apply-actions";
+import { useMeals, useProfile as useProfileStore } from "@/lib/memory/store";
+import { isRecorded } from "@/lib/memory/profile";
 import { deleteThread, newThread, readActiveThread, readMeals, readProfile, saveThread, useActiveThreadId, useHydrated, useThreads } from "@/lib/memory/store";
 import type { Thread } from "@/lib/memory/threads";
 import type { HealthProfile } from "@/lib/memory/profile";
@@ -72,6 +75,39 @@ function Markdown({ text }: { text: string }) {
         if (/^\d+\.\s/.test(t))
           return <p key={i} className="pl-1 text-[var(--text-muted)]"><Inline text={t} /></p>;
         return <p key={i} className="text-[var(--text)]"><Inline text={t} /></p>;
+      })}
+    </div>
+  );
+}
+
+/**
+ * What the agents saved on this turn, said where it happened. A chart that
+ * changes silently is a chart nobody trusts.
+ */
+function ActionChips({ parts }: { parts: ReturnType<typeof actionPartsOf> }) {
+  if (!parts.length) return null;
+  return (
+    <div className="mb-3 flex flex-col gap-1.5">
+      {parts.map((p) => {
+        const done = p.state === "output-available" && p.output;
+        const failed = p.state === "output-error" || (done && p.output!.kind === "none");
+        const icon = p.type === "tool-logMeal" ? "🍽" : p.type === "tool-recordLabResult" ? "🧪" : "📋";
+        return (
+          <div
+            key={p.toolCallId}
+            className="flex items-start gap-2 rounded-xl border px-3 py-2 text-[12.5px]"
+            style={{
+              borderColor: failed ? "var(--border)" : "color-mix(in oklab, var(--emerald) 40%, transparent)",
+              background: failed ? "transparent" : "color-mix(in oklab, var(--emerald) 8%, transparent)",
+            }}
+          >
+            <span aria-hidden>{icon}</span>
+            <span className={failed ? "text-[var(--text-dim)]" : "text-[var(--text)]"}>
+              {!done ? "Saving to your chart…" : p.output!.summary}
+            </span>
+            {done && !failed && <span className="ml-auto text-[var(--emerald)]" aria-label="saved">✓</span>}
+          </div>
+        );
       })}
     </div>
   );
@@ -256,6 +292,17 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
   // to. `useChat` owns the list from here.
   const restored = useMemo(() => thread.messages, [thread.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
+
+  /*
+   * The agents act as well as answer: a completed updateProfile, logMeal or
+   * recordLabResult call carries the change as its output, and it lands in
+   * the chart here — once per call, however often this re-renders.
+   */
+  const [, setProfileStore] = useProfileStore();
+  const [, , addMealStore] = useMeals();
+  useEffect(() => {
+    applyActions(messages, { setProfile: setProfileStore, addMeal: addMealStore });
+  }, [messages, setProfileStore, addMealStore]);
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -611,7 +658,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                   visitor as "Hi there." — fine as a greeting, wrong as a name.
                   Only use it once it is one. */}
               <h1 className="ns-hero-title mt-4 text-[26px] font-semibold tracking-tight sm:text-[32px]">
-                {profile.onboarded && profile.name ? `Hi ${profile.name}. How are you feeling?` : "How are you feeling?"}
+                {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. How are you feeling?` : "How are you feeling?"}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
                 A Supervisor and five specialist agents — Doctor, Nutrition, Fitness, Lab and Coach — work every message together.
@@ -771,6 +818,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           live={busy && idx === messages.length - 1}
                         />
                       )}
+                      <ActionChips parts={actionPartsOf(m)} />
                       {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                       {note && <ConsultNote note={note} />}
 

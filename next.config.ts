@@ -39,6 +39,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The local smoke flow uses 127.0.0.1 while Next dev advertises localhost.
+  // Allow this loopback hostname for dev assets/HMR without widening to LAN.
+  allowedDevOrigins: ["127.0.0.1"],
   // This project has its own lockfile; pin the workspace root to silence
   // Next's multi-lockfile inference warning.
   turbopack: { root: __dirname },

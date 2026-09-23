@@ -59,7 +59,7 @@ export default async function Image() {
         </div>
 
         <div style={{ display: "flex", gap: 36, fontSize: 24, color: "#93a79a" }}>
-          <div style={{ display: "flex" }}>Sources on every answer</div>
+          <div style={{ display: "flex" }}>Sources shown when used</div>
           <div style={{ display: "flex" }}>Your records stay yours</div>
           <div style={{ display: "flex" }}>Not a doctor</div>
         </div>

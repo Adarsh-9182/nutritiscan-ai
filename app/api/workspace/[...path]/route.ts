@@ -88,6 +88,7 @@ async function companionTurn(
       consultSupervisor(q, workspace, {
         history: opts.history,
         signal: opts.signal,
+        references: opts.references,
         engineLabel: engine?.label,
       }),
   });

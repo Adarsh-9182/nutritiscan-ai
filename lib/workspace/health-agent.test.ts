@@ -43,6 +43,19 @@ describe("health companion boundaries", () => {
     expect(result.mode).toBe("unavailable");
     expect(complete).not.toHaveBeenCalled();
   });
+  it("answers a greeting without recycling the previous health topic", async () => {
+    const consult = vi.fn();
+    const result = await runHealthAgent("Hi", DEMO, { history: ["Help with sleep"], consult });
+    expect(result.text).toMatch(/Hello|Namaste/);
+    expect(result.sources).toHaveLength(0);
+    expect(consult).not.toHaveBeenCalled();
+  });
+  it("does not treat an unrelated question as a follow-up to old references", async () => {
+    const consult = vi.fn();
+    const result = await runHealthAgent("Explain rare chromosomal rearrangements", DEMO, { history: ["Help with sleep"], consult });
+    expect(result.mode).toBe("unavailable");
+    expect(consult).not.toHaveBeenCalled();
+  });
   it("checks emergency context before every tool or model call", async () => {
     const complete = vi.fn();
     const result = await runHealthAgent("Summarise my report", DEMO, {
@@ -133,6 +146,36 @@ describe("health companion boundaries", () => {
         ["sleep"],
       ),
     ).toThrow();
+    expect(
+      parseEducation(
+        JSON.stringify({
+          explanation: "This chat cannot diagnose deficiency. A clinician can assess your individual situation.",
+          sourceIds: ["b12"],
+        }),
+        ["b12"],
+      ).explanation,
+    ).toContain("cannot diagnose");
+    expect(() =>
+      parseEducation(
+        JSON.stringify({
+          explanation: "This chat cannot diagnose deficiency, but you have anemia.",
+          sourceIds: ["b12"],
+        }),
+        ["b12"],
+      ),
+    ).toThrow();
+  });
+  it("allows the nutrient name B12 only when that reference is present, not numeric doses", () => {
+    const safe = JSON.stringify({
+      explanation: "Vitamin B12 supports blood and nerve health. Ask a clinician about individual needs.",
+      sourceIds: ["b12"],
+    });
+    expect(parseEducation(safe, ["b12"]).explanation).toContain("B12");
+    expect(() => parseEducation(safe, ["sleep"])).toThrow();
+    expect(() => parseEducation(JSON.stringify({
+      explanation: "Vitamin B12 supports blood health. Take 500 mcg every day.",
+      sourceIds: ["b12"],
+    }), ["b12"])).toThrow();
   });
   it("does not return an answer after cancellation", async () => {
     const controller = new AbortController();
@@ -148,5 +191,6 @@ describe("health companion boundaries", () => {
   it("retrieves Hindi and Hinglish topics", () => {
     expect(findReferences("neend kyu nahi aati")[0].id).toBe("sleep");
     expect(findReferences("दवा")[0].id).toBe("medicines");
+    expect(findReferences("Why is B12 important for vegetarians?")[0].id).toBe("b12");
   });
 });

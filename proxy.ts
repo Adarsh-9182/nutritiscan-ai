@@ -4,19 +4,15 @@ import type { NextRequest } from "next/server";
 /**
  * The split root.
  *
- * `/` used to serve the marketing page to everyone, so opening the app as
- * someone who already had conversations meant landing on a pitch and having
- * to find the product underneath it. Every assistant people compare this to
- * does the opposite: the front door is the conversation, and the marketing
- * page is what you get only if you have never been here.
+ * Returning visitors enter the account workspace from `/`; new visitors see
+ * the marketing page. The workspace verifies the session before reading data.
  *
  * The decision is made from a cookie rather than in the page so that `/`
  * stays statically generated. A first-time visitor — and every crawler,
  * which never carries the cookie — still gets the prerendered marketing
  * page with no server round trip.
  *
- * `?home` is the way back: the footer and the chat's logo use it so someone
- * who wants the marketing page can always reach it.
+ * `?home` remains a way to view the marketing page.
  */
 export const RETURNING_COOKIE = "ns-returning";
 
@@ -29,8 +25,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
 
   const url = request.nextUrl.clone();
-  // The green agent chat is the app now; the older workspace stays at /workspace.
-  url.pathname = "/chat";
+  url.pathname = "/workspace";
   url.search = "";
   return NextResponse.redirect(url);
 }

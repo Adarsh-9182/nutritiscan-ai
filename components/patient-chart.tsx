@@ -8,7 +8,7 @@ import { buildTimeline, timeAgo, KIND_META } from "@/lib/health/timeline";
 import { toLoggedMeal } from "@/lib/memory/meals";
 import { journalEntry } from "@/lib/memory/journal";
 import { mergeBiomarkers, parseLabReport } from "@/lib/memory/labs";
-import type { Biomarker } from "@/lib/memory/profile";
+import { isRecorded, type Biomarker } from "@/lib/memory/profile";
 import type { ScanResult } from "@/lib/nutrition/analyze";
 
 /* =====================================================================
@@ -93,7 +93,7 @@ function TodayBlock() {
           {/* The target is grams per kilo of body weight. With no recorded
               weight it is grams per kilo of the type's default, which is not
               this person's target and must not be shown as one. */}
-          <span className="text-[var(--text-dim)]">{profile.onboarded ? ` / ${t.target} g` : " g logged"}</span>
+          <span className="text-[var(--text-dim)]">{isRecorded(profile, "weightKg") ? ` / ${t.target} g` : " g logged"}</span>
         </p>
       </div>
 
@@ -333,16 +333,22 @@ export default function PatientChart() {
             actually been through first run this banner says what it is.
           */}
           <h2 className="t-title text-[var(--text)]">
-            {profile.onboarded && profile.name ? profile.name : "Your chart"}
+            {isRecorded(profile, "name") && profile.name !== "there" ? profile.name : "Your chart"}
           </h2>
           <span className="t-label tabular-nums text-[var(--text-dim)]">
             {profile.age ? `${profile.age} y` : "—"}
             {profile.sex ? ` · ${profile.sex[0].toUpperCase()}` : ""}
           </span>
         </div>
-        {profile.onboarded ? (
+        {profile.onboarded || isRecorded(profile, "weightKg") || isRecorded(profile, "heightCm") ? (
           <p className="t-label mt-1 tabular-nums text-[var(--text-dim)]">
-            {profile.heightCm} cm · {profile.weightKg} kg · BMI {bmi}
+            {[
+              isRecorded(profile, "heightCm") && `${profile.heightCm} cm`,
+              isRecorded(profile, "weightKg") && `${profile.weightKg} kg`,
+              isRecorded(profile, "heightCm") && isRecorded(profile, "weightKg") && `BMI ${bmi}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         ) : (
           /*
@@ -355,7 +361,7 @@ export default function PatientChart() {
             Height and weight not recorded yet
           </p>
         )}
-        {profile.onboarded && profile.goal && (
+        {isRecorded(profile, "goal") && profile.goal && (
           <p className="t-label mt-2 inline-flex rounded border border-[var(--border)] px-1.5 py-0.5 text-[var(--text-muted)]">
             {profile.goal}
           </p>

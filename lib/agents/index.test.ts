@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSpecialists, buildSupervisor } from "./index";
+import { buildSoloist, buildSpecialists, buildSupervisor } from "./index";
 import { demoProfile } from "../memory/profile";
 
 // buildSpecialists/buildSupervisor construct ToolLoopAgent instances. The
@@ -92,5 +92,17 @@ describe("agent context scoping — each specialist gets only the memory it need
     const text = instructionsOf(buildSupervisor(demoProfile, NUTRITION_CONTEXT_SAMPLE));
     expect(text).toMatch(/cross-domain/i);
     expect(text).toMatch(/only one positioned to notice/i);
+  });
+
+  it("does not offer browser-only save actions in the account workspace", () => {
+    const solo = buildSoloist("nutrition", demoProfile, "", null, null, null, 0, [], false);
+    const supervisor = buildSupervisor(demoProfile, "", null, null, null, 0, [], false);
+    for (const agent of [solo, supervisor]) {
+      const settings = (agent as unknown as { settings: { tools: Record<string, unknown> } }).settings;
+      expect(settings.tools).not.toHaveProperty("updateProfile");
+      expect(settings.tools).not.toHaveProperty("logMeal");
+      expect(settings.tools).not.toHaveProperty("recordLabResult");
+      expect(instructionsOf(agent)).toContain("Do not claim to save or change a record");
+    }
   });
 });
