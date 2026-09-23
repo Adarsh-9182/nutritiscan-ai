@@ -110,7 +110,7 @@ describe("Hinglish replies", () => {
       "BP ki dawai kitni goli leni chahiye",
       workspace,
     );
-    expect(reply.text).toContain("jaankari nahi deta");
+    expect(reply.text).toContain("dose tay karna");
   });
   it("answers log questions in Hinglish", () => {
     expect(

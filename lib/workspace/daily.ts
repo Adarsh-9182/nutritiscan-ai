@@ -309,6 +309,7 @@ function dayText(d: DayTotals) {
     d.mood !== null ? `mood ${d.mood}/5` : "",
     d.activityMinutes ? `${d.activityMinutes} min activity` : "",
     d.symptoms.length ? `symptoms: ${d.symptoms.join("; ")}` : "",
+    d.medicines.length ? `medicines: ${d.medicines.join("; ")}` : "",
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "nothing logged";
 }

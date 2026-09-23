@@ -6,6 +6,7 @@ import {
   FileText,
   Leaf,
   Moon,
+  Pill,
   Heart,
   Stethoscope,
   LockKeyhole,
@@ -35,6 +36,7 @@ export function Brand() {
 /** The strip that scrolls under the hero. Duplicated once for a seamless loop. */
 const TOPICS = [
   [Stethoscope, "Symptoms"],
+  [Pill, "Medicines"],
   [Leaf, "Nutrition"],
   [Moon, "Sleep"],
   [Heart, "Wellbeing"],
@@ -92,7 +94,7 @@ const STEPS = [
   [
     "01",
     "Bring the question",
-    "A symptom you can’t explain, a report you want to understand, a habit you want to start. Plain words are enough.",
+    "A symptom you can’t explain, a medicine you want to understand, a habit you want to start. Plain words are enough.",
   ],
   [
     "02",
@@ -120,9 +122,6 @@ export default function ProductLanding() {
           <Link href="/privacy">Privacy</Link>
         </nav>
         <div className="nl-nav-actions">
-          <Link className="nl-ghost" href="/workspace?auth=login">
-            Sign in
-          </Link>
           <Link className="nl-cta" href="/workspace">
             Start a conversation <ArrowRight size={15} />
           </Link>
@@ -148,9 +147,6 @@ export default function ProductLanding() {
           <div className="nl-hero-actions">
             <Link href="/workspace" className="nl-cta nl-cta-lg">
               Start a conversation <ArrowRight size={17} />
-            </Link>
-            <Link href="/workspace?auth=login" className="nl-ghost nl-ghost-lg">
-              Sign in
             </Link>
           </div>
           <ul className="nl-trust">

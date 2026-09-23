@@ -7,6 +7,7 @@ import {
   X,
   Check,
   FileText,
+  Pill,
   Moon,
   Leaf,
   Heart,
@@ -47,6 +48,12 @@ const starters = [
     "Help me understand a balanced vegetarian diet",
     Leaf,
     "Everyday eating, a little clearer",
+  ],
+  [
+    "Medicines",
+    "What should I know about medicine interactions?",
+    Pill,
+    "Understand the questions to ask",
   ],
   [
     "Sleep & energy",
@@ -495,22 +502,6 @@ export default function HealthAgent({
                 <div className="ha-message-body">{message.text}</div>
                 {message.answer?.detail && (
                   <p className="ha-result-note">{message.answer.detail}</p>
-                )}
-                {!!message.answer?.recordRefs?.length && (
-                  <div className="ha-sources">
-                    <span>YOUR CONFIRMED RECORDS · NOT PROVIDER-VERIFIED</span>
-                    {message.answer.recordRefs.map((report) => (
-                      <button
-                        type="button"
-                        key={report.id}
-                        onClick={() => navigate("sources")}
-                      >
-                        <FileText size={13} />
-                        {report.title} · {report.date}
-                        <ArrowRight size={12} />
-                      </button>
-                    ))}
-                  </div>
                 )}
                 {!!message.answer?.sources.length && (
                   <div className="ha-sources">
