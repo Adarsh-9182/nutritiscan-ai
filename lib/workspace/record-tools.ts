@@ -4,6 +4,7 @@ import { rangeStatus, statusLabel, type Workspace } from "./types";
 import { escalation } from "./escalation";
 import { logAnswer } from "./daily";
 import { nextStepsAnswer } from "./actions";
+import { medicineBoundary, mentionsMedicines } from "./medicine-boundary";
 
 export const LAB_SOURCE = {
   id: "lab",
@@ -20,11 +21,18 @@ export function recordAnswer(
 ): AssistantAnswer | undefined {
   const urgent = escalation(question, workspace.profile);
   if (urgent) return urgent;
+  if (mentionsMedicines(question, workspace.profile))
+    return medicineBoundary(question, workspace.profile);
   // Enforce access at the shared tool boundary for browser and server callers.
   workspace = {
     ...workspace,
     reports: workspace.reports.filter((r) => r.assistantAccess !== false),
   };
+  const recordRef = (report: Workspace["reports"][number]) => ({
+    id: report.id,
+    title: report.title,
+    date: report.date,
+  });
   if (
     /(?:\b(trend|trends|compare|comparison|changed|changes|history)\b|over time).*(?:report|result|record|lab|value)|(?:report|result|record|lab|value).*\b(trend|trends|compare|comparison|changed|changes|history)\b/i.test(
       question,
@@ -34,17 +42,20 @@ export function recordAnswer(
       text: changesText(workspace),
       mode: "record-summary",
       sources: [LAB_SOURCE],
+      recordRefs: workspace.reports.map(recordRef),
     };
   if (
     /(?:prepare|plan|questions?|summary).*(?:appointment|doctor|visit|डॉक्टर)|(?:appointment|doctor|visit).*(?:prepare|questions?|summary)/i.test(
       question,
     )
-  )
+  ) {
+    const questions = visitQuestions(workspace);
+    const usedIds = new Set(questions.flatMap((item) => item.reportId ? [item.reportId] : []));
     return {
       text: [
         "Questions prepared from your confirmed records",
         "",
-        ...visitQuestions(workspace).map(
+        ...questions.map(
           (q, i) => `${i + 1}. ${q.text}\n   ${q.reason}`,
         ),
         "",
@@ -52,7 +63,9 @@ export function recordAnswer(
       ].join("\n"),
       mode: "record-summary",
       sources: [],
+      recordRefs: workspace.reports.filter((report) => usedIds.has(report.id)).map(recordRef),
     };
+  }
   if (
     /(?:my|saved|latest|summarise|summarize|मेरी).*(?:report|result|record|रिपोर्ट)|summar.*report/i.test(
       question,
@@ -71,13 +84,14 @@ export function recordAnswer(
                 `${o.name}: ${o.value} ${o.unit} — ${statusLabel[rangeStatus(o)]}.`,
             ),
             "",
-            "These comparisons use only the ranges you confirmed from this report. They do not establish a diagnosis or rule out illness. A clinician can interpret them alongside your symptoms, history and medicines.",
+            "These comparisons use only the ranges you confirmed from this report. They do not establish a diagnosis or rule out illness. A clinician can interpret them alongside your symptoms and history.",
             "",
             "Next: compare your recorded results over time, or prepare questions for your doctor.",
           ].join("\n")
         : "No confirmed reports are available to the companion. Add a report in My records or enable a saved report in Sources & access. I will not fill in missing results.",
       mode: "record-summary",
       sources: report ? [LAB_SOURCE] : [],
+      recordRefs: report ? [recordRef(report)] : [],
     };
   }
   return (

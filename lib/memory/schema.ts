@@ -16,7 +16,7 @@
 // ============================================================
 
 import { z } from "zod";
-import { blankProfile, type HealthProfile } from "./profile";
+import { blankProfile, RECORDED_FIELDS, type HealthProfile } from "./profile";
 import type { LoggedMeal } from "./meals";
 
 /** Field budgets. Generous for real use, far too small to smuggle a prompt. */
@@ -132,6 +132,7 @@ export const HealthProfileSchema = z.object({
    * onboarding re-trigger on every visit.
    */
   onboarded: z.boolean().catch(false).optional(),
+  recorded: z.array(z.enum(RECORDED_FIELDS)).catch([]).optional(),
 });
 
 /**

@@ -129,6 +129,9 @@ const endpointComplete: Completion = async (system, question, signal) => {
         model: process.env.HEALTH_MODEL_NAME,
         temperature: 0,
         max_tokens: MAX_OUTPUT_TOKENS,
+        ...(process.env.HEALTH_MODEL_REASONING_EFFORT
+          ? { reasoning_effort: process.env.HEALTH_MODEL_REASONING_EFFORT }
+          : {}),
         messages: [
           { role: "system", content: system },
           { role: "user", content: question },

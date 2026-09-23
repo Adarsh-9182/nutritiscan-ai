@@ -70,10 +70,6 @@ export function visitQuestions(workspace: Workspace): VisitQuestion[] {
       });
     }
   }
-  if (workspace.profile.medicines.trim()) questions.push({
-    id: "medicines", text: "Could my medicines affect these results or the next steps?",
-    reason: "You have recorded a medicine list. Bring the current list to your visit.",
-  });
   questions.push({ id: "follow-up", text: "What follow-up do you recommend, and when?", reason: "Agree on next steps with your clinician." });
   questions.push({ id: "changes", text: "What changes should prompt me to seek help sooner?", reason: "Ask for advice specific to your situation." });
   return questions;

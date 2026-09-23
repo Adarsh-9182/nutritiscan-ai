@@ -1,4 +1,4 @@
-import { bmi, heightImperial, type HealthProfile } from "../memory/profile";
+import { bmi, heightImperial, isRecorded, type HealthProfile } from "../memory/profile";
 import type { LoggedMeal } from "../memory/meals";
 import { dayTotals } from "../memory/meals";
 import { proteinTarget } from "../nutrition/analyze";
@@ -19,14 +19,34 @@ export type Route =
   | "coach"
   | "supervisor";
 
+// Each domain in English and in the Hinglish people actually type.
+const SYMPTOM = /(fever|cough|headache|pain|symptom|sick|cold|flu|nausea|dizzy|sore|vomit|breath|chest|infection|rash|diarrh|bukhar|bukhaar|dard|khansi|khaansi|zukaam|jukam|ulti|chakkar|dast|sujan|jalan)/;
+const LAB = /(report|blood test|cbc|thyroid|tsh|\bt3\b|\bt4\b|b12|\blab\b|panel|glucose|hba1c|cholesterol|ldl|hdl|triglycer|hemoglobin|haemoglobin|ferritin|creatinine|test result|\d\s*(ng|pg|mg|mmol|µ?iu|miu|g)\s*\/\s*(ml|dl|l)\b)/;
+const NUTRITION = /(protein|calorie|diet|vitamin|deficien|\beat|\bate\b|food|nutrition|macro|meal|hydrat|water|breakfast|lunch|dinner|snack|khana|khaya|khayi|roti|dal|paneer|chawal|rice|sabzi|nashta)/;
+const FITNESS = /(workout|exercise|muscle|gym|training|bmi|body fat|strength|cardio|\bgain|lift|squat|push.?up|run|walk|kasrat|vyayam)/;
+const COACH = /(sleep|habit|goal|routine|remind|stress|recovery|consistency|motivat|neend|thakan|tired|energy)/;
+
 export function routeOf(text: string): Route {
   const t = text.toLowerCase();
-  if (/(fever|cough|headache|pain|symptom|sick|cold|flu|nausea|dizzy|sore|vomit|breath|chest|infection)/.test(t)) return "doctor";
-  if (/(protein|calorie|diet|vitamin|deficien|eat|food|nutrition|macro|meal|hydrat|water)/.test(t)) return "nutrition";
-  if (/(workout|exercise|muscle|gym|training|bmi|body fat|strength|cardio|gain|lift)/.test(t)) return "fitness";
-  if (/(report|blood|cbc|thyroid|tsh|b12|lab|panel|glucose|cholesterol|hemoglobin|test result)/.test(t)) return "lab";
-  if (/(sleep|habit|goal|routine|remind|stress|recovery|consistency|motivat)/.test(t)) return "coach";
+  const hits = [SYMPTOM, LAB, NUTRITION, FITNESS, COACH].filter((r) => r.test(t)).length;
+  if (SYMPTOM.test(t)) return "doctor";
+  // Numbers with units are a report being read, even when the analyte is a vitamin.
+  if (LAB.test(t)) return "lab";
+  // Several domains at once is the supervisor's job: that is where noticing the
+  // link between them matters.
+  if (hits >= 3) return "supervisor";
+  if (NUTRITION.test(t)) return "nutrition";
+  if (FITNESS.test(t)) return "fitness";
+  if (COACH.test(t)) return "coach";
   return "supervisor";
+}
+
+/** A turn with no health content at all — a greeting, thanks, "what can you do". */
+export function isSmallTalk(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  if (t.length > 80) return false;
+  if ([SYMPTOM, LAB, NUTRITION, FITNESS, COACH].some((r) => r.test(t))) return false;
+  return /^(hi+|hello|hey|namaste|namaskar|hola|yo|sup|good (morning|afternoon|evening|night)|thanks?|thank you|thx|shukriya|dhanyavaad|ok(ay)?|cool|nice|great|bye|who are you|what can you do|kaise ho|kya haal|help)\b/.test(t);
 }
 
 const EMERGENCY = /(can't breathe|cannot breathe|chest pain|suicid|kill myself|stroke|severe bleeding|unconscious|passing out)/i;
@@ -93,7 +113,7 @@ export function demoAnswer(
 
   const route = routeOf(text);
   // blankProfile's name is the greeting filler "there" — never address someone by it.
-  const name = p.onboarded && p.name && p.name !== "there" ? p.name : "";
+  const name = isRecorded(p, "name") && p.name && p.name !== "there" ? p.name : "";
   const to = name ? `, ${name}` : "";
 
   /*
@@ -111,7 +131,7 @@ export function demoAnswer(
    * plain question do not need a weight, and blocking those would be an
    * obstacle rather than a safeguard.
    */
-  if (!p.onboarded && (route === "nutrition" || route === "fitness" || route === "supervisor")) {
+  if (!isRecorded(p, "weightKg") && (route === "nutrition" || route === "fitness" || route === "supervisor")) {
     return `I'd rather ask than guess.
 
 To answer that properly I need a couple of things about you — they change the numbers completely, and I don't have them yet.

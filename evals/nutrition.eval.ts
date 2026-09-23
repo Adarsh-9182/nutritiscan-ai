@@ -10,7 +10,7 @@
 // ============================================================
 
 import { expect } from "vitest";
-import { advisory, evalSuite, gate } from "./harness";
+import { evalSuite, gate } from "./harness";
 import { analyzeMeal, parseMeal, proteinTarget, resolveNamed } from "../lib/nutrition/analyze";
 import { foodById } from "../lib/nutrition/foods";
 import { blankProfile, type HealthProfile } from "../lib/memory/profile";
@@ -131,18 +131,10 @@ evalSuite("nutrition: bounds", () => {
     }
   });
 
-  advisory(
-    "portion words are resolved for every food that defines a piece weight",
-    () => {
-      // Known gap: PORTIONS is keyed on generic words ("bowl", "katori"), so a
-      // count against a food with no perPiece falls back to `serving`. Correct
-      // today, but it means "3 dosas" is not 3 × dosa weight unless dosa
-      // declares perPiece. Tracked, not gated.
-      const r = analyze("3 dosas");
-      const item = r.items[0];
-      const food = foodById(item.foodId!)!;
-      expect(item.grams).toBe((food.perPiece ?? food.serving) * 3);
-    },
-    "portion coverage across the food table",
-  );
+  gate("plural countable foods resolve to their piece weight", () => {
+    const r = analyze("3 dosas");
+    const item = r.items[0];
+    const food = foodById(item.foodId!)!;
+    expect(item.grams).toBe((food.perPiece ?? food.serving) * 3);
+  });
 });

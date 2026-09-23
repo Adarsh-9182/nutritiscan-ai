@@ -43,8 +43,11 @@ import {
 } from "../safety/templates";
 import { isClinicalTurn, validateAnswer, withheldResponse } from "../safety/validate";
 import { clinicalBrief } from "../clinical/brief";
-import type { AgentReply } from "./health-agent";
+import { parseEducation, type AgentReply } from "./health-agent";
 import { rangeStatus, type Workspace } from "./types";
+import type { HealthReference } from "./health-library";
+import { safeProfile } from "../memory/schema";
+import { mentionsMedicines } from "./medicine-boundary";
 
 /** Leave headroom under the route's maxDuration so a slow ladder degrades. */
 const BUDGET_MS = 45_000;
@@ -69,7 +72,6 @@ const MAX_BIOMARKERS = 24;
 export const WORKSPACE_SECTIONS: MemorySection[] = [
   "identity",
   "allergies",
-  "medicines",
   "conditions",
   "biomarkers",
 ];
@@ -96,6 +98,9 @@ function biomarkersFrom(workspace: Workspace): Biomarker[] {
     for (const o of report.observations) {
       if (out.length >= MAX_BIOMARKERS) return out;
       const range = rangeStatus(o);
+      // No report range means no defensible status. Keep that result in the
+      // record, but never tell the model it is "normal" by default.
+      if (range === "unknown") continue;
       out.push({
         name: o.name,
         value: `${o.value} ${o.unit}`,
@@ -116,7 +121,7 @@ function biomarkersFrom(workspace: Workspace): Biomarker[] {
  */
 export function workspaceMemory(workspace: Workspace): HealthProfile {
   const p = workspace.profile;
-  return {
+  return safeProfile({
     name: p.name,
     heightCm: 0,
     weightKg: 0,
@@ -124,10 +129,10 @@ export function workspaceMemory(workspace: Workspace): HealthProfile {
     sleepHours: 0,
     exerciseDaysPerWeek: 0,
     allergies: listOf(p.allergies),
-    medicines: listOf(p.medicines),
+    medicines: [],
     conditions: listOf(p.conditions),
     biomarkers: biomarkersFrom(workspace),
-  };
+  });
 }
 
 /** Which specialists the supervisor actually consulted, for the UI trace. */
@@ -148,6 +153,7 @@ function consultedIn(result: unknown): string[] {
 export type ConsultOptions = {
   history?: string[];
   signal?: AbortSignal;
+  references?: HealthReference[];
   /** Shown under the answer, so a reader can weigh what produced it. */
   engineLabel?: string;
 };
@@ -166,6 +172,7 @@ export async function consultSupervisor(
   options: ConsultOptions = {},
 ): Promise<AgentReply | null> {
   if (!hasAnyModel()) return null;
+  if (mentionsMedicines(question, workspace.profile)) return null;
 
   const profile = workspaceMemory(workspace);
 
@@ -193,6 +200,10 @@ export async function consultSupervisor(
   const brief = clinicalBrief(state);
   const route = routeOf(question);
   const clinical = isClinicalTurn(state);
+  const references = options.references ?? [];
+  const evidence = references.length
+    ? `Published reference notes for this turn (use only facts supported here; if they do not answer the question, say so):\n${references.map((r) => `${r.title}: ${r.text}`).join("\n")}`
+    : "";
 
   const signal = options.signal
     ? AbortSignal.any([options.signal, AbortSignal.timeout(BUDGET_MS)])
@@ -211,12 +222,26 @@ export async function consultSupervisor(
     try {
       const agent =
         route === "supervisor"
-          ? buildSupervisor(profile, "", null, directive, brief, tier, WORKSPACE_SECTIONS)
-          : buildSoloist(route, profile, "", null, directive, brief, tier, WORKSPACE_SECTIONS);
+          ? buildSupervisor(profile, "", evidence, directive, brief, tier, WORKSPACE_SECTIONS, false)
+          : buildSoloist(route, profile, "", evidence, directive, brief, tier, WORKSPACE_SECTIONS, false);
 
       const result = await agent.generate({ prompt, abortSignal: signal });
       const text = result.text?.trim();
       if (!text) continue;
+      if (mentionsMedicines(text, workspace.profile)) return null;
+
+      // The model may write fluent unsupported claims even when it was given
+      // notes. Use the same fail-closed prose check as the reference writer.
+      if (!clinical && references.length) {
+        try {
+          parseEducation(
+            JSON.stringify({ explanation: text, sourceIds: references.map((r) => r.id) }),
+            references.map((r) => r.id),
+          );
+        } catch {
+          return null;
+        }
+      }
 
       if (clinical) {
         const verdict = validateAnswer(text, state);
@@ -239,7 +264,7 @@ export async function consultSupervisor(
       return {
         mode: "ai",
         text,
-        sources: [],
+        sources: references.map((r) => ({ title: r.title, url: r.url })),
         steps: [
           "Checked urgent signs",
           ...(consulted.length

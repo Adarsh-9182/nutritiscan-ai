@@ -43,7 +43,7 @@ export function runTriage(state: ClinicalState): TriageOutcome {
   // No findings at all means nothing clinical was said — a nutrition or app
   // question. Findings with no rule match are `routine`, not `self_care`:
   // the patient described a symptom and we simply have no rule for it.
-  let verdict: TriageVerdict = state.findings.length > 0 ? "routine" : "self_care";
+  let verdict: TriageVerdict = state.findings.some((f) => !f.qualifiers.historical) ? "routine" : "self_care";
 
   for (const rule of TRIAGE_RULES) {
     let hit = false;

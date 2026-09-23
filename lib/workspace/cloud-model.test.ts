@@ -37,8 +37,19 @@ describe("hosted engine selection", () => {
     endpoint();
     expect(hostedEngine()?.label).toBe(CLOUD_ENGINE_LABEL);
   });
+  it("does not advertise an expired copied Vercel OIDC token as a working model", () => {
+    const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 })).toString("base64url");
+    vi.stubEnv("VERCEL_OIDC_TOKEN", `header.${payload}.signature`);
+    expect(hostedModelReady()).toBe(false);
+  });
+  it("accepts a fresh OIDC token when it has time for a request", () => {
+    const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url");
+    vi.stubEnv("VERCEL_OIDC_TOKEN", `header.${payload}.signature`);
+    expect(hostedModelReady()).toBe(true);
+  });
   it("falls back to the operator endpoint, and says which engine ran", async () => {
     endpoint();
+    vi.stubEnv("HEALTH_MODEL_REASONING_EFFORT", "none");
     const engine = hostedEngine();
     expect(engine?.label).toBe(ENDPOINT_ENGINE_LABEL);
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -53,6 +64,7 @@ describe("hosted engine selection", () => {
     expect(String(fetch.mock.calls[0][0])).toBe(
       "https://model.example/v1/chat/completions",
     );
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).reasoning_effort).toBe("none");
   });
   it("refuses plaintext transport to a remote endpoint", async () => {
     endpoint();

@@ -29,10 +29,7 @@
 
 ### `POST /api/chat`
 
-Body `{ messages, profile, meals }` → UI message stream.
-Rate limit 20/min per IP, body cap 128 KB, 50 s model budget, transcript capped
-at 40 messages. Falls back to a keyless demo brain when no credential is present
-or the provider fails before any content is emitted.
+Retired. Returns HTTP 410; use the authenticated health workspace instead.
 
 ### `POST /api/scan`
 

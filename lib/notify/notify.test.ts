@@ -213,12 +213,12 @@ describe("companion over Telegram", () => {
   });
 
   it("cancels drafts and saves reminders", async () => {
-    await say("remind me to take vitamin D every day at 9am");
+    await say("remind me to walk every day at 9am");
     const cancel = bot.last().buttons![0][1].data;
     await tap(cancel);
     expect(bot.last().text).toBe("Okay, not saved.");
     expect((await workspaces.workspace(userId)).tasks).toEqual([]);
-    await say("remind me to take vitamin D every day at 9am");
+    await say("remind me to walk every day at 9am");
     await tap(lastButton());
     const tasks = (await workspaces.workspace(userId)).tasks;
     expect(tasks[0]).toMatchObject({ time: "09:00", repeat: "daily" });
@@ -283,7 +283,7 @@ describe("companion over Telegram", () => {
     );
     const nextDay = new Date("2026-09-18T03:40:00Z");
     await notify.runDue(nextDay);
-    expect(bot.last().text).toContain("09:00 — Take vitamin D");
+    expect(bot.last().text).toContain("09:00 — Walk");
     const done = lastButton();
     const current = (await workspaces.workspace(userId)).tasks[0];
     expect(done).toBe(`d:${tasks[0].id}:${current.version}:20260918`);

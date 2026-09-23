@@ -195,9 +195,17 @@ export const PORTIONS: Record<string, number> = {
 };
 
 /** Alias index, longest-first so "brown rice" wins over "rice". */
-const INDEX: { alias: string; food: Food }[] = FOODS.flatMap((food) =>
-  [food.name.toLowerCase(), ...food.aliases].map((alias) => ({ alias: alias.toLowerCase(), food })),
-).sort((a, b) => b.alias.length - a.alias.length);
+const INDEX: { alias: string; food: Food }[] = FOODS.flatMap((food) => {
+  const aliases = new Set([food.name.toLowerCase(), ...food.aliases.map((a) => a.toLowerCase())]);
+  // A countable food accepts ordinary plurals even when the table only lists
+  // the singular ("3 dosas", "2 eggs"). Explicit aliases still cover irregulars.
+  if (food.perPiece) {
+    for (const alias of [...aliases]) {
+      if (/^[a-z]+$/.test(alias) && !alias.endsWith("s")) aliases.add(`${alias}s`);
+    }
+  }
+  return [...aliases].map((alias) => ({ alias, food }));
+}).sort((a, b) => b.alias.length - a.alias.length);
 
 /** Find the food whose alias appears in `text`, preferring the longest match. */
 export function matchFood(text: string): Food | null {

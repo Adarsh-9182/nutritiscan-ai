@@ -23,6 +23,31 @@ describe("report access boundary", () => {
     );
     expect(workspace.reports).toHaveLength(2);
   });
+  it("identifies the exact confirmed reports used by each record tool", () => {
+    expect(recordAnswer("Summarise my latest report", DEMO)?.recordRefs).toEqual([
+      { id: "demo-september", title: "Annual wellness panel", date: "2026-09-10" },
+    ]);
+    expect(recordAnswer("Compare my reports", DEMO)?.recordRefs?.map((report) => report.id)).toEqual([
+      "demo-september",
+      "demo-june",
+    ]);
+    expect(recordAnswer("Prepare questions for my doctor", DEMO)?.recordRefs?.map((report) => report.id)).toEqual([
+      "demo-september",
+    ]);
+  });
+  it("never cites a report excluded from assistant access", () => {
+    const workspace = structuredClone(DEMO);
+    workspace.reports[0].assistantAccess = false;
+    expect(recordAnswer("Summarise my latest report", workspace)?.recordRefs?.map((report) => report.id)).toEqual([
+      "demo-june",
+    ]);
+    expect(recordAnswer("Compare my reports", workspace)?.recordRefs?.map((report) => report.id)).toEqual([
+      "demo-june",
+    ]);
+    expect(recordAnswer("Prepare questions for my doctor", workspace)?.recordRefs?.map((report) => report.id)).toEqual([
+      "demo-june",
+    ]);
+  });
   it("handles all reports disabled without falling back to the latest saved report", () => {
     const workspace = {
       ...DEMO,

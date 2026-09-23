@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 const base = process.env.SMOKE_ORIGIN || "http://127.0.0.1:3100";
 const username = `smoke_${randomBytes(7).toString("hex")}`;
 const password = randomBytes(24).toString("base64url");
+const replacementPassword = randomBytes(24).toString("base64url");
+let currentPassword = password;
 let cookie = "",
   created = false;
 async function call(path, method = "GET", body, expected = 200, origin = base) {
@@ -29,7 +31,7 @@ async function call(path, method = "GET", body, expected = 200, origin = base) {
 }
 try {
   await call("state", "GET", undefined, 401);
-  await call("register", "POST", {
+  const registration = await call("register", "POST", {
     username,
     password,
     name: "Synthetic Smoke Test",
@@ -144,14 +146,26 @@ try {
   await call("state", "GET", undefined, 401);
   await call("login", "POST", { username, password });
   assert.equal((await call("state")).reports.length, 1);
+  const oldSession = cookie;
+  const recovery = await call("recover", "POST", {
+    username,
+    recovery: registration.recovery,
+    password: replacementPassword,
+  });
+  currentPassword = replacementPassword;
+  assert.notEqual(recovery.recovery, registration.recovery);
+  await call("state", "GET", undefined, 401);
+  assert.equal(cookie, oldSession);
+  await call("login", "POST", { username, password }, 401);
+  await call("login", "POST", { username, password: replacementPassword });
+  assert.equal((await call("state")).reports.length, 1);
   console.log(
-    "PASS: signup, empty account, report provenance/access, summary, escalation, follow-up, concurrency, export, CSRF, logout and login.",
+    "PASS: signup, empty account, report provenance/access, summary, escalation, follow-up, concurrency, export, CSRF, logout, login and recovery.",
   );
 } finally {
   if (created) {
-    if (!cookie || cookie === "ns-session=")
-      await call("login", "POST", { username, password });
-    await call("account", "DELETE", { password });
+    await call("login", "POST", { username, password: currentPassword });
+    await call("account", "DELETE", { password: currentPassword });
     await call("state", "GET", undefined, 401);
     console.log(
       "PASS: synthetic account and records removed; session revoked.",

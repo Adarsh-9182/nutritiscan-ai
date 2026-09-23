@@ -7,8 +7,6 @@ import {
   X,
   Check,
   FileText,
-  Activity,
-  Pill,
   Moon,
   Leaf,
   Heart,
@@ -49,12 +47,6 @@ const starters = [
     "Help me understand a balanced vegetarian diet",
     Leaf,
     "Everyday eating, a little clearer",
-  ],
-  [
-    "Medicines",
-    "What should I know about medicine interactions?",
-    Pill,
-    "Understand the questions to ask",
   ],
   [
     "Sleep & energy",
@@ -135,7 +127,7 @@ export default function HealthAgent({
   seed: { text: string; id: number } | null;
   addReport: () => void;
   navigate: (
-    view: "records" | "visit" | "care" | "settings" | "trends" | "sources",
+    view: "records" | "visit" | "care" | "settings" | "sources",
   ) => void;
   saveTask: (task: CareTask) => Promise<void>;
   saveLog?: (entries: LogEntry[]) => Promise<void>;
@@ -504,6 +496,22 @@ export default function HealthAgent({
                 {message.answer?.detail && (
                   <p className="ha-result-note">{message.answer.detail}</p>
                 )}
+                {!!message.answer?.recordRefs?.length && (
+                  <div className="ha-sources">
+                    <span>YOUR CONFIRMED RECORDS · NOT PROVIDER-VERIFIED</span>
+                    {message.answer.recordRefs.map((report) => (
+                      <button
+                        type="button"
+                        key={report.id}
+                        onClick={() => navigate("sources")}
+                      >
+                        <FileText size={13} />
+                        {report.title} · {report.date}
+                        <ArrowRight size={12} />
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {!!message.answer?.sources.length && (
                   <div className="ha-sources">
                     <span>REFERENCE MATERIAL</span>
@@ -759,13 +767,6 @@ export default function HealthAgent({
             <small>
               {workspace.tasks.filter((t) => !t.done).length} open items
             </small>
-          </span>
-          <ArrowUpRight size={14} />
-        </button>
-        <button className="ha-context-row" onClick={() => navigate("trends")}>
-          <Activity size={17} />
-          <span>
-            Your health story<small>Results over time</small>
           </span>
           <ArrowUpRight size={14} />
         </button>

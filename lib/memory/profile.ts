@@ -15,6 +15,14 @@ import { demoJournal, type JournalEntry } from "./journal";
 
 export type Trend = { label: string; delta: string; direction: "up" | "down" | "flat"; good: boolean };
 
+export const RECORDED_FIELDS = ["name", "weightKg", "heightCm", "goal", "sleepHours", "exerciseDaysPerWeek"] as const;
+export type RecordedField = (typeof RECORDED_FIELDS)[number];
+
+/** Whether this field holds something the person gave us, rather than the type's default. */
+export function isRecorded(p: HealthProfile, field: RecordedField): boolean {
+  return Boolean(p.onboarded || p.recorded?.includes(field));
+}
+
 export type HealthProfile = {
   name: string;
   /**
@@ -39,6 +47,12 @@ export type HealthProfile = {
   trends?: Trend[];
   /** set once the user has been through first-run so we never ask twice */
   onboarded?: boolean;
+  /**
+   * Fields the person actually told us, one at a time — in conversation, an
+   * agent records "I'm 68 kg" long before anyone has been through first run.
+   * `onboarded` vouches for all of them at once; this vouches field by field.
+   */
+  recorded?: RecordedField[];
   /** dated, append-only history — the spine of the patient timeline */
   journal?: JournalEntry[];
 };
@@ -225,13 +239,27 @@ export const ALL_MEMORY_SECTIONS: MemorySection[] = ["identity", "vitals", "goal
  * identity renderer already applies the same rule to age and sex.
  */
 export function recordedSections(p: HealthProfile): MemorySection[] {
-  const recorded: MemorySection[] = ["identity", "allergies", "medicines", "conditions", "biomarkers"];
-  return p.onboarded ? ALL_MEMORY_SECTIONS : recorded;
+  if (p.onboarded) return ALL_MEMORY_SECTIONS;
+  const out: MemorySection[] = ["identity"];
+  if (isRecorded(p, "weightKg") || isRecorded(p, "heightCm")) out.push("vitals");
+  if (isRecorded(p, "goal")) out.push("goal");
+  if (isRecorded(p, "sleepHours")) out.push("sleep");
+  if (isRecorded(p, "exerciseDaysPerWeek")) out.push("activity");
+  out.push("allergies", "medicines", "conditions", "biomarkers");
+  return out;
+}
+
+function vitalsLine(p: HealthProfile): string {
+  const w = isRecorded(p, "weightKg");
+  const h = isRecorded(p, "heightCm");
+  const height = h ? `${p.heightCm} cm (${heightImperial(p.heightCm)})` : "not recorded";
+  const weight = w ? `${p.weightKg} kg` : "not recorded";
+  return `Height/Weight: ${height} / ${weight}${w && h ? `  |  BMI ${bmi(p)}` : ""}`;
 }
 
 const SECTION_RENDERERS: Record<MemorySection, (p: HealthProfile) => string> = {
-  identity: (p) => `Name: ${p.name}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,
-  vitals: (p) => `Height/Weight: ${p.heightCm} cm (${heightImperial(p.heightCm)}) / ${p.weightKg} kg  |  BMI ${bmi(p)}`,
+  identity: (p) => `Name: ${isRecorded(p, "name") || p.name !== "there" ? p.name : "not recorded — do not invent one"}\nAge: ${p.age ?? "not recorded — do not assume one"}\nSex: ${p.sex ?? "not recorded — do not assume one"}`,
+  vitals: vitalsLine,
   goal: (p) => `Primary goal: ${p.goal}`,
   sleep: (p) => `Sleep: ~${p.sleepHours} h/night`,
   activity: (p) => `Exercise: ${p.exerciseDaysPerWeek} days/week   Resting HR: ${p.restingHr ? `${p.restingHr} bpm` : "not recorded"}`,
