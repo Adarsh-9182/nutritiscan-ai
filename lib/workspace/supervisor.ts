@@ -47,7 +47,6 @@ import { parseEducation, type AgentReply } from "./health-agent";
 import { rangeStatus, type Workspace } from "./types";
 import type { HealthReference } from "./health-library";
 import { safeProfile } from "../memory/schema";
-import { mentionsMedicines } from "./medicine-boundary";
 
 /** Leave headroom under the route's maxDuration so a slow ladder degrades. */
 const BUDGET_MS = 45_000;
@@ -72,6 +71,7 @@ const MAX_BIOMARKERS = 24;
 export const WORKSPACE_SECTIONS: MemorySection[] = [
   "identity",
   "allergies",
+  "medicines",
   "conditions",
   "biomarkers",
 ];
@@ -129,7 +129,7 @@ export function workspaceMemory(workspace: Workspace): HealthProfile {
     sleepHours: 0,
     exerciseDaysPerWeek: 0,
     allergies: listOf(p.allergies),
-    medicines: [],
+    medicines: listOf(p.medicines),
     conditions: listOf(p.conditions),
     biomarkers: biomarkersFrom(workspace),
   });
@@ -172,7 +172,6 @@ export async function consultSupervisor(
   options: ConsultOptions = {},
 ): Promise<AgentReply | null> {
   if (!hasAnyModel()) return null;
-  if (mentionsMedicines(question, workspace.profile)) return null;
 
   const profile = workspaceMemory(workspace);
 
@@ -228,7 +227,6 @@ export async function consultSupervisor(
       const result = await agent.generate({ prompt, abortSignal: signal });
       const text = result.text?.trim();
       if (!text) continue;
-      if (mentionsMedicines(text, workspace.profile)) return null;
 
       // The model may write fluent unsupported claims even when it was given
       // notes. Use the same fail-closed prose check as the reference writer.

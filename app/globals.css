@@ -3287,8 +3287,8 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .ha-steps ol { list-style:decimal; padding:9px 20px; line-height:1.8; }
 .ha-sources { display:flex; flex-wrap:wrap; gap:6px; margin-top:20px; }
 .ha-sources > span { width:100%; font-size:11px; letter-spacing:1px; color:#969989; margin-bottom:5px; }
-.ha-sources a, .ha-sources button { border:1px solid #292a26; border-radius:5px; display:flex; align-items:center; gap:6px; font-size:12px; padding:6px 8px; color:#b1bea9; background:transparent; cursor:pointer; }
-.ha-sources a:hover, .ha-sources button:hover { background:#131410; }
+.ha-sources a { border:1px solid #292a26; border-radius:5px; display:flex; align-items:center; gap:6px; font-size:12px; padding:6px 8px; color:#b1bea9; }
+.ha-sources a:hover { background:#131410; }
 .ha-follow-question { margin-top:20px; font-size:13px; line-height:1.8; }
 .ha-result-note { margin-top:10px; color:#a5a194; font-size:12px; line-height:1.8; }
 .ha-action { display:flex; align-items:center; gap:7px; padding:9px 12px; border-radius:7px; border:1px solid #292b26; margin-top:18px; font-size:11px; color:#acbda3; }
