@@ -2,9 +2,9 @@
 
 A conversational health companion with source-linked education, a hosted or fully private AI engine, confirmed records, follow-ups and visit preparation. Built with Next.js, TypeScript and Postgres.
 
-The home screen brings together questions about everyday health, nutrition, sleep, medicines and wellbeing. Records remain supporting tools: compare dated values, open their sources and prepare a personalised visit brief. Review any proposed follow-up before saving it.
+The home screen brings together questions about everyday health, nutrition, sleep and wellbeing. Records remain supporting tools: compare dated values, open their sources and prepare a personalised visit brief. Review any proposed follow-up before saving it.
 
-**Early access:** limited educational coverage, not a clinically validated doctor. AI can make mistakes.
+**Early access:** limited educational coverage, not a clinically validated doctor. AI can make mistakes. The companion does not answer medicine, dose, interaction or treatment questions; it directs those questions to a pharmacist or prescribing clinician. People can still maintain their own records and reminders.
 
 ## The AI engine
 
@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000 and choose **Start a conversation**. The account workspace handles sign-up, sign-in, recovery and the health companion. Explore `/workspace?demo=1` for an isolated fictional example. Development uses local PGlite without a database account or model API key. Existing `/chat` links redirect to the workspace; the legacy anonymous chat API is disabled unless `LEGACY_CLINICAL_ENABLED=true` is explicitly set.
+Open http://localhost:3000 and choose **Start a conversation**. The account workspace handles sign-up, sign-in, recovery and the health companion. Explore `/workspace?demo=1` for an isolated fictional example. Development uses local PGlite without a database account or model API key. Existing `/chat` links redirect to the workspace; the legacy anonymous chat API is retired and returns HTTP 410.
 
 ## Checks
 
@@ -39,4 +39,4 @@ npm run verify
 
 See [workspace release and deployment guide](docs/WORKSPACE_RELEASE.md) for configuration, encrypted storage, synthetic end-to-end checks, free-model setup, current limitations and the clinical launch requirements. `.env.example` lists supported variables; never commit real keys or health records.
 
-The existing clinical/nutrition research modules and their tests remain in the repository. Their legacy public endpoints are disabled by default while the account-based workspace is the active product.
+The existing clinical/nutrition research modules and their tests remain in the repository. The legacy chat endpoint is retired; the account-based workspace is the active product.

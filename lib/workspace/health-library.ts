@@ -7,7 +7,7 @@ export const HEALTH_LIBRARY = [
     url: "https://medlineplus.gov/nutrition.html",
     keywords:
       "nutrition food diet protein meal vegetarian vegan eating nutrients khana poshan आहार पोषण",
-    text: "Nutrition is about the nutrients in food and how the body uses them. A varied eating pattern can include vegetables, fruit, whole grains and sources of protein. Individual needs differ with health conditions and life stage. Restrictive diets and supplements are not a substitute for individual advice from a qualified professional.",
+    text: "Nutrition is about the nutrients in food and how the body uses them. A varied eating pattern can include vegetables, fruit, whole grains and sources of protein. Individual needs differ with health conditions and life stage. Restrictive diets are not a substitute for individual advice from a qualified professional.",
     question:
       "What does a usual day of eating look like, and what would you like to understand?",
   },
@@ -16,7 +16,7 @@ export const HEALTH_LIBRARY = [
     title: "Vitamin B12",
     url: "https://ods.od.nih.gov/factsheets/VitaminB12-Consumer/",
     keywords: "b12 cobalamin vitamin vegetarian vegan fortified शाकाहारी विटामिन",
-    text: "Vitamin B12 helps keep blood and nerve cells healthy. It occurs naturally in animal foods; some plant-based foods are fortified with it. People who eat little or no animal foods may not get enough. A clinician can assess an individual's status and discuss whether fortified foods or a supplement are appropriate; this note cannot establish a deficiency or determine a personal dose.",
+    text: "Vitamin B12 helps keep blood and nerve cells healthy. It occurs naturally in animal foods; some plant-based foods are fortified with it. People who eat little or no animal foods may not get enough. A clinician can assess an individual's status; this note cannot establish a deficiency.",
     question: "Are you asking about food sources, a test result, or a concern to discuss with a clinician?",
   },
   {
@@ -29,22 +29,12 @@ export const HEALTH_LIBRARY = [
       "How long has this been happening, and how is it affecting your day?",
   },
   {
-    id: "medicines",
-    title: "Understanding medicines",
-    url: "https://medlineplus.gov/medicines.html",
-    keywords:
-      "medicine medicines medication medications drug drugs tablet tablets pill pills supplement supplements interaction interactions prescription side effects effect antibiotic paracetamol ibuprofen metformin dawai dava दवा",
-    text: "Medicines have benefits and risks. Prescription medicines, non-prescription products and supplements can interact. A pharmacist or prescriber needs the exact product names and your health context to check them. Follow the prescribed instructions and ask your pharmacist about unclear instructions or side effects. This reference cannot establish whether a specific combination is safe for you.",
-    question:
-      "Do you want to understand a medicine label, possible side effects, or what to ask a pharmacist?",
-  },
-  {
     id: "mental",
     title: "Mental health",
     url: "https://medlineplus.gov/mentalhealth.html",
     keywords:
       "mental stress anxious anxiety mood depression depressed overwhelmed wellbeing tension चिंता उदास",
-    text: "Mental health includes emotional, psychological and social wellbeing. It affects how people cope, relate to others and make decisions. Persistent changes in mood, sleep or daily functioning are reasons to speak with a qualified professional. Support and treatment options exist; a conversation here cannot diagnose a mental health condition.",
+    text: "Mental health includes emotional, psychological and social wellbeing. It affects how people cope, relate to others and make decisions. Persistent changes in mood, sleep or daily functioning are reasons to speak with a qualified professional. Support options exist; a conversation here cannot diagnose a mental health condition.",
     question:
       "What has been hardest recently, and is there someone you trust you can talk with?",
   },
@@ -64,15 +54,15 @@ export const HEALTH_LIBRARY = [
     url: "https://medlineplus.gov/womenshealth.html",
     keywords:
       "woman women womens menstrual period pregnancy pregnant menopause reproductive fertility pcos periods mahina गर्भावस्था",
-    text: "Health needs can change across reproductive life stages. Menstrual health, pregnancy, menopause and preventive care can require different kinds of support. Symptoms and concerns deserve individual assessment; chat cannot confirm pregnancy, diagnose a condition or decide which treatment is appropriate.",
+    text: "Health needs can change across reproductive life stages. Menstrual health, pregnancy, menopause and preventive care can require different kinds of support. Symptoms and concerns deserve individual assessment; chat cannot confirm pregnancy or diagnose a condition.",
     question: "What is your concern, and when did you first notice it?",
   },
   {
     id: "diabetes",
     title: "Understanding diabetes",
     url: "https://medlineplus.gov/diabetes.html",
-    keywords: "diabetes diabetic glucose sugar hba1c insulin madhumeh मधुमेह",
-    text: "Diabetes involves blood glucose being too high. There are different types, and diagnosis relies on appropriate clinical testing and interpretation. Food, activity, monitoring and medicines may form part of an individual care plan. Do not change insulin or other medicines based on this chat.",
+    keywords: "diabetes diabetic glucose sugar hba1c madhumeh मधुमेह",
+    text: "Diabetes involves blood glucose being too high. There are different types, and diagnosis relies on appropriate clinical testing and interpretation. Food, activity and monitoring may be discussed as part of an individual care plan with a clinician. This chat cannot determine what applies to a person.",
     question:
       "Are you looking for a general explanation, help reading a report, or questions for your care team?",
   },

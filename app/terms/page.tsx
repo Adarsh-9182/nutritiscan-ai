@@ -28,8 +28,9 @@ export default function Page() {
       </p>
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>
-        This product does not diagnose, prescribe, recommend medication changes,
-        provide individual treatment plans, or replace a clinician. It is not a
+        This product does not diagnose, provide medicine, dose, interaction or
+        treatment advice, or replace a clinician. Questions about medicines
+        should go to a pharmacist or prescribing clinician. It is not a
         clinically validated diagnostic device. A result within a reference
         range does not prove you are healthy; one outside a range does not
         establish a diagnosis. Comparisons across laboratories and methods may

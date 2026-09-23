@@ -7,6 +7,7 @@ export type AssistantAnswer = {
   text: string;
   mode: "record-summary" | "ai" | "unavailable" | "escalation" | "reference";
   sources: { title: string; url: string }[];
+  recordRefs?: { id: string; title: string; date: string }[];
 };
 export function modelConfigured() {
   return Boolean(

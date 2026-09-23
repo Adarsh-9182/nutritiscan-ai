@@ -2,6 +2,10 @@
 
 This release puts a health companion at the centre of the workspace, with account-based health records and visit preparation. It is an early-access product, not a clinically validated autonomous doctor.
 
+## Current medicine boundary — 23 September 2026
+
+The companion no longer answers medicine, dose, interaction or treatment questions or drafts medicine reminders. It directs those questions to a pharmacist or prescribing clinician. It also excludes user-entered medicine tasks from generated next-step summaries and no longer proactively suggests medicine reminders. People may still keep their own medicine records and reminders. The legacy anonymous `/api/chat` endpoint now always returns HTTP 410. Earlier release notes below describe historical behavior, not the current product. Lexical checks and software tests are not a clinical safety guarantee.
+
 ## Implemented
 
 - Responsive public site, workspace, report review, care tasks, assistant, settings and policies.

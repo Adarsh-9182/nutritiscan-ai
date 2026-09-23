@@ -9,13 +9,12 @@ describe("health companion boundaries", () => {
       recordAnswer("I have a question about nutrition", DEMO),
     ).toBeUndefined();
     expect(
-      recordAnswer("What does a doctor mean by medicine interactions?", DEMO),
-    ).toBeUndefined();
+      recordAnswer("What does a doctor mean by medicine interactions?", DEMO)?.mode,
+    ).toBe("unavailable");
   });
   it.each([
     "nutrition protein",
     "sleep",
-    "medicines interactions",
     "mental wellbeing",
     "women menopause",
     "diabetes glucose",
@@ -73,7 +72,7 @@ describe("health companion boundaries", () => {
       DEMO,
       { complete },
     );
-    expect(result.text).toContain("cannot choose a dose");
+    expect(result.mode).toBe("unavailable");
     expect(complete).not.toHaveBeenCalled();
   });
   it("runs a bounded planning and synthesis sequence with allowlisted citations", async () => {
@@ -190,7 +189,7 @@ describe("health companion boundaries", () => {
   });
   it("retrieves Hindi and Hinglish topics", () => {
     expect(findReferences("neend kyu nahi aati")[0].id).toBe("sleep");
-    expect(findReferences("दवा")[0].id).toBe("medicines");
+    expect(findReferences("दवा")).toEqual([]);
     expect(findReferences("Why is B12 important for vegetarians?")[0].id).toBe("b12");
   });
 });

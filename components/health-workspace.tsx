@@ -193,14 +193,16 @@ function AccountGate({
   demo,
   available,
   initialError,
+  initialMode,
 }: {
   onReady: (recovery?: string) => void;
   demo: () => void;
   available: boolean;
   initialError: string;
+  initialMode: "register" | "login";
 }) {
   const [mode, setMode] = useState<"register" | "login" | "recover">(
-    "register",
+    initialMode,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -694,6 +696,7 @@ export default function HealthWorkspace() {
         demo={openDemo}
         available={accounts}
         initialError={error}
+        initialMode={new URLSearchParams(location.search).get("auth") === "login" ? "login" : "register"}
       />
     );
   const reports = [...workspace.reports].sort((a, b) =>

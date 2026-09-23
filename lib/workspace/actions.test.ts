@@ -53,17 +53,10 @@ describe("reminder requests", () => {
     expect(parseTime("subah 8 baje")).toBe("08:00");
     expect(parseTime("no time here")).toBeUndefined();
   });
-  it("drafts a daily medicine reminder in the person's own words", () => {
+  it("does not draft medicine reminders", () => {
     expect(
       proposeReminder("remind me to take vitamin D every day at 9am", T),
-    ).toEqual({
-      title: "Take vitamin D",
-      date: T,
-      done: false,
-      time: "09:00",
-      repeat: "daily",
-      category: "medicine",
-    });
+    ).toBeNull();
   });
   it("handles dates, weekly items and Hinglish", () => {
     expect(
@@ -74,7 +67,7 @@ describe("reminder requests", () => {
     ).toMatchObject({ date: "2026-09-24", category: "appointment" });
     expect(
       proposeReminder("roz raat 10 baje dawai lena yaad dilana", T),
-    ).toMatchObject({ time: "22:00", repeat: "daily", category: "medicine" });
+    ).toBeNull();
   });
   it("ignores other messages and empty titles", () => {
     expect(proposeReminder("how do reminders work?", T)).toBeNull();
@@ -85,7 +78,7 @@ describe("reminder requests", () => {
     for (const text of [
       "remind me to walk every evening at 7:15 pm",
       "remind me to drink water every day",
-      "remind me to refill my inhaler every month",
+      "remind me to review my sleep log every month",
     ])
       expect(TaskSchema.safeParse(proposeReminder(text, T)).success).toBe(true);
   });
@@ -114,30 +107,9 @@ describe("Codex review regressions", () => {
     expect(parseTime("9.30 pm")).toBe("21:30");
     expect(parseTime("raat 9:30 baje")).toBe("21:30");
   });
-  it("keeps a stated medicine frequency and never defaults to daily", () => {
-    const pick = (medicines: string) =>
-      suggestions({ ...base, profile: { ...base.profile, medicines } }, T)[0];
-    expect(pick("Methotrexate once weekly").task.repeat).toBe("weekly");
-    expect(pick("Metformin 500 mg twice daily").why).toContain(
-      "more than once a day",
-    );
-    expect(pick("Vitamin D daily at 9am").task).toMatchObject({
-      repeat: "daily",
-      time: "09:00",
-    });
-    expect(pick("Levothyroxine").task.repeat).toBeUndefined();
-    for (const entry of [
-      "Methotrexate twice weekly",
-      "Vitamin D twice a week",
-      "Iron 3 times a month",
-    ]) {
-      expect(pick(entry).task.repeat, entry).toBeUndefined();
-      expect(pick(entry).why, entry).not.toContain("more than once a day");
-    }
-    expect(pick("Paracetamol 3 times a day").why).toContain(
-      "more than once a day",
-    );
-    expect(pick("Amoxicillin BD").why).toContain("more than once a day");
+  it("does not turn a saved medicines list into agent suggestions", () => {
+    const workspace = { ...base, profile: { ...base.profile, medicines: "Metformin daily, Levothyroxine" } };
+    expect(suggestions(workspace, T)).toEqual([]);
   });
   it("returns monthly reminders to their original day", () => {
     const jan = { ...task({ repeat: "monthly", date: "2026-01-31" }) };
@@ -249,7 +221,7 @@ describe("suggestions", () => {
       false,
     );
   });
-  it("offers reminders for listed medicines, not doses", () => {
+  it("excludes medicine tasks from proactive suggestions", () => {
     const list = suggestions(
       {
         ...base,
@@ -258,12 +230,7 @@ describe("suggestions", () => {
       T,
     );
     const meds = list.filter((s) => s.task.category === "medicine");
-    expect(meds).toHaveLength(2);
-    // No schedule is invented: nothing in the list says how often or when.
-    expect(meds[0].needsSchedule).toBe(true);
-    expect(meds[0].task.title).toBe("Take Thyroxine 50mcg as prescribed");
-    expect(meds[0].task.repeat).toBeUndefined();
-    expect(meds[0].task.time).toBeUndefined();
+    expect(meds).toHaveLength(0);
     const withReminder = suggestions(
       {
         ...base,
@@ -311,7 +278,8 @@ describe("companion actions", () => {
       "remind me to take my BP tablet every day at 8am",
       base,
     );
-    expect(med.text).toContain("don’t set or change medicine schedules");
+    expect(med.mode).toBe("unavailable");
+    expect(med.draftReminder).toBeUndefined();
   });
   it("still escalates emergencies first", async () => {
     const reply = await runHealthAgent(
@@ -336,7 +304,7 @@ describe("companion actions", () => {
       },
       T,
     );
-    expect(answer?.text).toContain("Today 09:00 — Take vitamin D (every day)");
+    expect(answer?.text).not.toContain("Take vitamin D");
     expect(answer?.text).toContain("Ask my clinician about Vitamin D");
     expect(recordAnswer("aage kya karna hai", base)?.text).toContain(
       "care list khaali hai",

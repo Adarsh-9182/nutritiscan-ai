@@ -23,10 +23,14 @@ describe("workspace memory", () => {
   });
 
   it("keeps the fields the workspace does collect", () => {
-    const text = prompt();
+    const workspace = structuredClone(DEMO);
+    workspace.profile.medicines = "Levothyroxine daily";
+    const text = prompt(workspace);
     expect(text).toContain(DEMO.profile.name);
-    for (const kept of ["Allergies:", "Medicines:", "Conditions:", "Recent lab biomarkers:"])
+    for (const kept of ["Allergies:", "Conditions:", "Recent lab biomarkers:"])
       expect(text).toContain(kept);
+    expect(text).not.toContain("Medicines:");
+    expect(text).not.toContain("Levothyroxine");
   });
 
   it("refuses to guess age and sex", () => {
