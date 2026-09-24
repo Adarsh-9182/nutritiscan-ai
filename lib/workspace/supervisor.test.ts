@@ -74,6 +74,27 @@ describe("workspace memory", () => {
 });
 
 describe("consulting the specialists", () => {
+  it("keeps the user's recent topic in specialist follow-up questions", async () => {
+    const complete = vi.fn(async (system: string, question: string) => {
+      expect(system).toContain("NutritiScan");
+      expect(question).toContain("Current question");
+      return JSON.stringify({
+        explanation: "Vitamin B12 supports healthy blood and nerve cells.",
+        sourceIds: ["b12"],
+      });
+    });
+    const reply = await consultSupervisor("And what about that?", structuredClone(DEMO), {
+      history: ["An unrelated older question", "I want to learn about nutrition", "What is vitamin B12?"],
+      references: findReferences("What is vitamin B12?"),
+      complete,
+    });
+    expect(reply?.mode).toBe("ai");
+    const questionContext = complete.mock.calls[0][1];
+    expect(questionContext).toContain("Earlier user message: What is vitamin B12?");
+    expect(questionContext).toContain("Current question: And what about that?");
+    expect(questionContext).not.toContain("An unrelated older question");
+  });
+
   it("routes nutrition and lab education through named specialists without sending saved records", async () => {
     const workspace = structuredClone(DEMO);
     workspace.profile.name = "Private Patient Name";
