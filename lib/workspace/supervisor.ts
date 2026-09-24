@@ -194,6 +194,7 @@ async function consultWithCompletion(
   complete: Completion,
   signal: AbortSignal,
   engineLabel?: string,
+  clinicalState?: ReturnType<typeof assessTurn>,
 ): Promise<AgentReply | null> {
   const allowed = references.map((reference) => reference.id);
   const notes = references.map((reference) => `${reference.id}: ${reference.text}`).join("\n");
@@ -219,7 +220,7 @@ async function consultWithCompletion(
       explanation = reviewed.explanation;
       cited = reviewed.sourceIds;
     }
-    return {
+    const answer: AgentReply = {
       mode: "ai",
       text: explanation,
       sources: references.filter((reference) => cited.includes(reference.id)).map((reference) => ({ title: reference.title, url: reference.url })),
@@ -229,6 +230,11 @@ async function consultWithCompletion(
       ],
       detail: engineLabel,
     };
+    if (clinicalState) {
+      const verdict = validateAnswer(answer.text, clinicalState);
+      if (verdict.blocked) return { mode: "escalation", text: withheldResponse(clinicalState), sources: [], steps: ["Checked urgent signs", "Held back an unsupported answer"] };
+    }
+    return answer;
   } catch (error) {
     if (signal.aborted) throw error;
     return null;
@@ -287,9 +293,9 @@ export async function consultSupervisor(
   // The workspace's hosted Completion is the same model path used by the
   // public chat. It sends the question and published notes, not saved health
   // records, to the provider. The supervisor retains routing and validation.
-  if (options.complete && references.length && !clinical) {
+  if (options.complete && references.length) {
     const result = await consultWithCompletion(
-      question, references, options.complete, signal, options.engineLabel,
+      question, references, options.complete, signal, options.engineLabel, clinical ? state : undefined,
     );
     if (result) return result;
     if (options.signal?.aborted) return null;
