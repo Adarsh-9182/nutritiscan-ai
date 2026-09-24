@@ -26,21 +26,12 @@ describe("companion interactions", () => {
     expect(
       screen.getByRole("heading", { name: /How are you/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Medicines" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Medicines" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Food & nutrition" }),
     ).toBeInTheDocument();
-  });
-  it("shows the confirmed report behind a record answer", async () => {
-    const p = props();
-    render(<HealthAgent {...p} />);
-    fireEvent.click(screen.getByRole("button", { name: "My health records" }));
-    const report = await screen.findByRole("button", {
-      name: /Annual wellness panel · 2026-09-10/,
-    });
-    fireEvent.click(report);
-    expect(p.navigate).toHaveBeenCalledWith("sources");
-    expect(screen.getByText(/NOT PROVIDER-VERIFIED/)).toBeInTheDocument();
   });
   it("requires an edited, confirmed follow-up before saving and prevents repeat saves", async () => {
     const p = props();

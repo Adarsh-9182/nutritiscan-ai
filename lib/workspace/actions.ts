@@ -1,7 +1,6 @@
 import type { AssistantAnswer } from "./assistant";
 import { recentDays, shiftDate, localDate } from "./daily";
 import { say, speaksHinglish } from "./voice";
-import { mentionsMedicines } from "./medicine-boundary";
 import {
   rangeStatus,
   type CareTask,
@@ -106,7 +105,6 @@ export function proposeReminder(
     );
   if (!ask) return null;
   const detail = ask[1];
-  if (mentionsMedicines(detail)) return null;
   const repeat = parseRepeat(detail);
   const time = parseTime(detail);
   // The title keeps the person's own words minus the scheduling phrases.
@@ -187,6 +185,36 @@ export type Suggestion = {
   needsSchedule?: boolean;
 };
 
+/** How often a medicines-list entry says it is taken, if it says so. */
+export function statedFrequency(entry: string): Repeat | "several" | undefined {
+  const many =
+    /\b(twice|thrice|[2-9] ?(times|x)|do baar|teen baar|char baar)\b/i;
+  // “Twice weekly” or “3 times a month” cannot be expressed as one repeating
+  // reminder, so nothing is pre-filled and the person decides.
+  if (
+    new RegExp(
+      `${many.source}.{0,15}\\b(week|weekly|month|monthly|hafte|mahine)\\b`,
+      "i",
+    ).test(entry)
+  )
+    return undefined;
+  if (
+    new RegExp(
+      `${many.source}.{0,12}\\b(a day|per day|daily|every day|din|roz)\\b`,
+      "i",
+    ).test(entry) ||
+    /\b(bd|bid|tds|tid|qid)\b/i.test(entry)
+  )
+    return "several";
+  if (many.test(entry)) return undefined;
+  if (/\b(weekly|once a week|every week|per week|har hafte)\b/i.test(entry))
+    return "weekly";
+  if (/\b(monthly|once a month|every month|har mahine)\b/i.test(entry))
+    return "monthly";
+  if (/\b(daily|once a day|every day|od|qd|roz|rozana)\b/i.test(entry))
+    return "daily";
+}
+
 const mentions = (tasks: Saved<CareTask>[], word: string) =>
   tasks.some(
     (t) => !t.done && t.title.toLowerCase().includes(word.toLowerCase()),
@@ -199,9 +227,7 @@ export function suggestions(
   today = localDate(),
 ): Suggestion[] {
   const found: Suggestion[] = [];
-  const tasks = workspace.tasks.filter(
-    (task) => task.category !== "medicine" && !mentionsMedicines(task.title),
-  );
+  const tasks = workspace.tasks;
   const reports = workspace.reports
     .filter((r) => r.assistantAccess !== false)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -248,6 +274,49 @@ export function suggestions(
         category: "appointment",
       },
     });
+  const medicines = workspace.profile.medicines
+    .split(/[\n,;]+/)
+    .map((m) => m.trim())
+    .filter((m) => m.length > 1)
+    .slice(0, 5);
+  for (const medicine of medicines) {
+    const name = medicine.split(/\s+/)[0];
+    if (
+      tasks.some(
+        (t) =>
+          !t.done &&
+          t.repeat &&
+          t.repeat !== "none" &&
+          t.title.toLowerCase().includes(name.toLowerCase()),
+      )
+    )
+      continue;
+    // Never invent a schedule: only a frequency and time written in the
+    // medicines list are pre-filled, and the person confirms both.
+    const frequency = statedFrequency(medicine);
+    const time = parseTime(medicine);
+    found.push({
+      id: `medicine:${medicine.toLowerCase()}`,
+      title: `Reminder for ${medicine}`,
+      why:
+        frequency === "several"
+          ? "It is in your medicines list and taken more than once a day. Add one reminder for each time your prescriber gave you."
+          : "It is in your medicines list. Choose how often and when, exactly as your prescriber or pharmacist told you.",
+      needsSchedule: true,
+      task: {
+        title: `Take ${medicine} as prescribed`,
+        date: today,
+        done: false,
+        ...(time ? { time } : {}),
+        ...(frequency && frequency !== "several"
+          ? { repeat: frequency }
+          : frequency === "several"
+            ? { repeat: "daily" as const }
+            : {}),
+        category: "medicine",
+      },
+    });
+  }
   const week = recentDays(workspace.days, today);
   const symptomDays = week.filter((d) => d.symptoms.length);
   if (symptomDays.length >= 3 && !mentions(tasks, "symptom"))
@@ -301,7 +370,7 @@ export function nextStepsAnswer(
     return;
   const hi = speaksHinglish(question, workspace.profile);
   const open = workspace.tasks
-    .filter((t) => !t.done && t.category !== "medicine" && !mentionsMedicines(t.title))
+    .filter((t) => !t.done)
     .sort(
       (a, b) =>
         a.date.localeCompare(b.date) ||
@@ -336,8 +405,8 @@ export function nextStepsAnswer(
       "",
       say(
         hi,
-        "Tip: say “remind me to walk every day at 9am” and I’ll draft it for you.",
-        "Tip: bolein “roz subah 9 baje walk yaad dilana” aur main reminder bana dunga.",
+        "Tip: say “remind me to take vitamin D every day at 9am” and I’ll draft it for you.",
+        "Tip: bolein “roz subah 9 baje vitamin D lena yaad dilana” aur main reminder bana dunga.",
       ),
     ].join("\n"),
   };

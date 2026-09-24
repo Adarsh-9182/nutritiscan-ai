@@ -45,7 +45,7 @@ const chatHash = (chat: string) => digest(`telegram:${chat}`);
 const HELP = [
   "I’m your NutritiScan companion. You can:",
   "• Tell me what you ate, drank, how you slept or feel — “had 2 roti and dal, slept 7 hours”",
-  "• Ask for a reminder — “remind me to walk every day at 9am”",
+  "• Ask for a reminder — “remind me to take vitamin D every day at 9am”",
   "• /today — today’s care list and log",
   "• /week — your last 7 days",
   "• /stop — disconnect Telegram",
