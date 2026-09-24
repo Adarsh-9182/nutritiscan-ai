@@ -1,5 +1,11 @@
 # Health workspace release
 
+## Specialist chat restoration — 24 September 2026
+
+The account workspace and fictional demo now route supported educational questions through a bounded supervisor path. The supervisor selects Nutrition, Lab, Doctor, Fitness or Coach specialists from the question and published reference notes. It combines answers when two specialties are relevant, validates note IDs and output, and shows the specialist names in the chat trace. A failed specialist answer falls back to the published notes.
+
+The hosted model receives the current question, recent user messages where applicable, and published notes. Stored reports, profile fields and daily logs do not enter these specialist prompts. Record summaries and symptom intake remain deterministic; urgent and treatment-boundary checks still run before the specialist path. The specialist team is available when a hosted model is configured, while private on-device mode continues to use the local companion path. These agents provide educational support and have not been clinically validated.
+
 This release puts a health companion at the centre of the workspace, with account-based health records and visit preparation. It is an early-access product, not a clinically validated autonomous doctor.
 
 ## Current medicine boundary — 23 September 2026

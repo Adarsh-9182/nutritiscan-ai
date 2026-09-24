@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEMO } from "./demo";
-import { consultSupervisor, WORKSPACE_SECTIONS, workspaceMemory } from "./supervisor";
+import { consultSupervisor, specialistRoutes, WORKSPACE_SECTIONS, workspaceMemory } from "./supervisor";
 import { memoryContext } from "../memory/profile";
+import { findReferences } from "./health-library";
 
 /** What the agents actually read — the prompt, not the object behind it. */
 const prompt = (workspace = structuredClone(DEMO)) =>
@@ -77,6 +78,35 @@ describe("workspace memory", () => {
 });
 
 describe("consulting the specialists", () => {
+  it("routes nutrition and lab education through named specialists without sending saved records", async () => {
+    const workspace = structuredClone(DEMO);
+    workspace.profile.name = "Private Patient Name";
+    const question = "How do nutrition and lab results relate?";
+    const references = findReferences(question);
+    expect(specialistRoutes(question, references)).toEqual(["lab", "nutrition"]);
+    const complete = vi.fn(async (system: string) => {
+      if (system.includes("Lab Agent"))
+        return JSON.stringify({ explanation: "Reference ranges vary between laboratories and need clinical context.", sourceIds: ["lab"] });
+      if (system.includes("Nutrition Agent"))
+        return JSON.stringify({ explanation: "Nutrition concerns nutrients in food and how the body uses them.", sourceIds: ["nutrition"] });
+      return JSON.stringify({ explanation: "Nutrition concerns nutrients in food. Laboratory results need clinical context.", sourceIds: ["nutrition", "lab"] });
+    });
+    const reply = await consultSupervisor(question, workspace, { references, complete });
+    expect(reply?.mode).toBe("ai");
+    expect(reply?.steps?.[0]).toContain("Lab Agent and Nutrition Agent");
+    expect(complete).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(complete.mock.calls)).not.toContain("Private Patient Name");
+    expect(JSON.stringify(complete.mock.calls)).not.toContain(String(DEMO.reports[0].observations[0].value));
+  });
+
+  it("falls back when a specialist invents a citation", async () => {
+    const question = "What is nutrition?";
+    const reply = await consultSupervisor(question, structuredClone(DEMO), {
+      references: findReferences(question),
+      complete: async () => JSON.stringify({ explanation: "Nutrition is about food and nutrients in the body.", sourceIds: ["invented"] }),
+    });
+    expect(reply).toBeNull();
+  });
   it("returns null with no model credential so the caller falls back", async () => {
     // The deployment this ships to has no key yet. A throw here would turn a
     // degraded turn into a failed one; null means "use the reference notes".

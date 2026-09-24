@@ -47,9 +47,9 @@ const BENTO = [
   {
     icon: Sparkles,
     tone: "lime",
-    title: "AI when an engine is connected",
-    body: "Ask in your own words. A connected model can explain the published notes; without one, the notes and record tools still work and the app says so.",
-    tag: "Engine status shown",
+    title: "A supervisor and focused agents",
+    body: "With hosted AI connected, a supervisor routes supported questions to Nutrition, Lab or Doctor agents and checks the answer against published references. The chat shows who contributed.",
+    tag: "Educational support · engine status shown",
   },
   {
     icon: Cpu,

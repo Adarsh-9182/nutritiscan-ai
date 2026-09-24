@@ -90,6 +90,7 @@ async function companionTurn(
         signal: opts.signal,
         references: opts.references,
         engineLabel: engine?.label,
+        complete: engine?.complete,
       }),
   });
 }

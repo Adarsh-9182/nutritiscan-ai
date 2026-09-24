@@ -432,17 +432,24 @@ export default function HealthAgent({
             )}
           </section>
         )}
-        {!messages.length && (
+        {!messages.length && cloudAI && device !== "ready" && (
           <div className="ha-proof-strip" aria-label="Companion principles">
             <span>
-              <Check size={12} /> Published references
+              <Check size={12} /> Supervisor
             </span>
             <span>
-              <FileText size={12} /> Your chosen records
+              <FileText size={12} /> Lab Agent
             </span>
             <span>
-              <Cpu size={12} /> Optional private AI
+              <Cpu size={12} /> Nutrition &amp; Doctor Agents
             </span>
+          </div>
+        )}
+        {!messages.length && (!cloudAI || device === "ready") && (
+          <div className="ha-proof-strip" aria-label="Companion principles">
+            <span><Check size={12} /> Published references</span>
+            <span><FileText size={12} /> Your chosen records</span>
+            <span><Cpu size={12} /> Optional private AI</span>
           </div>
         )}
         {!messages.length && (
