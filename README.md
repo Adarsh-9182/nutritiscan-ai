@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000 and choose **Start a conversation**. The account workspace handles sign-up, sign-in, recovery and the health companion. Explore `/workspace?demo=1` for an isolated fictional example. Development uses local PGlite without a database account or model API key. Existing `/chat` links redirect to the workspace; the legacy anonymous chat API is disabled unless `LEGACY_CLINICAL_ENABLED=true` is explicitly set.
+Open http://localhost:3000 and choose **Start a conversation** for the conversation-first `/chat` interface. Its profile and conversation history are stored in this browser and sent with a question to the public chat route, which does not read account records. Use **Account records** for sign-up, sign-in, recovery and the encrypted `/workspace` companion. Explore `/workspace?demo=1` for an isolated fictional example. Development uses local PGlite without a database account or model API key. `LEGACY_CLINICAL_ENABLED` only controls the retired scan endpoint.
 
 ## Checks
 
@@ -39,4 +39,4 @@ npm run verify
 
 See [workspace release and deployment guide](docs/WORKSPACE_RELEASE.md) for configuration, encrypted storage, synthetic end-to-end checks, free-model setup, current limitations and the clinical launch requirements. `.env.example` lists supported variables; never commit real keys or health records.
 
-The existing clinical/nutrition research modules and their tests remain in the repository. Their legacy public endpoints are disabled by default while the account-based workspace is the active product.
+The conversation-first chat uses the existing clinical and nutrition agents with browser-held context. The account workspace remains the place for encrypted reports and care tools.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
+import PatientChart from "@/components/patient-chart";
 import { newThread, useProfile } from "@/lib/memory/store";
 
 /**
@@ -22,13 +23,16 @@ import { newThread, useProfile } from "@/lib/memory/store";
 export default function ChatWorkspace() {
   const [profile] = useProfile();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // The conversation rail is remembered per browser.
+  const [chartOpen, setChartOpen] = useState(false);
+  // The floating panels on wide screens. Remembered per browser, open by default.
   const [railShown, setRailShown] = usePanelPref("ns-rail", true);
+  const [chartShown, setChartShown] = usePanelPref("ns-chart", true);
   const reduceMotion = useReducedMotion();
 
   // One button per panel: on a wide screen it floats the card in and out, on
   // a narrow one it opens the same panel as a drawer.
   const toggleRail = () => (matchMedia("(min-width: 1024px)").matches ? setRailShown(!railShown) : setDrawerOpen((v) => !v));
+  const toggleChart = () => (matchMedia("(min-width: 1280px)").matches ? setChartShown(!chartShown) : setChartOpen((v) => !v));
 
   /*
    * Keyboard shortcuts, scoped to not steal keys from the composer.
@@ -47,6 +51,7 @@ export default function ChatWorkspace() {
       }
       if (e.key === "Escape") {
         setDrawerOpen(false);
+        setChartOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -63,8 +68,11 @@ export default function ChatWorkspace() {
         could read a single word or ask a single question. That is the wrong
         first thing to do to someone who arrived to find out what this is.
 
-        The agents are told which sections of memory were actually recorded,
-        so an un-onboarded visitor's answers cannot claim an unknown weight.
+        Nothing is lost by dropping it: the agents are told which sections of
+        the memory were actually recorded (recordedSections), so an
+        un-onboarded visitor's answers simply do not claim to know a weight
+        nobody gave — the agent asks instead. Details can be filled in from
+        the chart panel, or in the account workspace.
       */}
 
       {/* Slim top bar — the conversation owns the rest of the screen. */}
@@ -92,6 +100,24 @@ export default function ChatWorkspace() {
           Home
         </Link>
 
+        <Link href="/workspace" className="btn-ghost hidden rounded-full px-3 py-1 t-label sm:inline-flex">
+          Account records
+        </Link>
+
+        {/*
+          There is no primary nav any more, because there is nowhere else to
+          go. Dashboard, Scan and Timeline were three destinations holding
+          one patient's record between them; the record now sits in the panel
+          on the right, and this button is how it opens on a narrower screen.
+        */}
+        <button
+          type="button"
+          onClick={toggleChart}
+          aria-label="Show or hide your chart"
+          className="btn-ghost rounded-full px-3 py-1 t-label"
+        >
+          Chart
+        </button>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -154,6 +180,60 @@ export default function ChatWorkspace() {
           </div>
         </main>
 
+        {/*
+          The record, beside the note.
+
+          This was three routes — /dashboard, /scan, /timeline — which made
+          the chart something you left the consultation to go and read. A
+          clinician does not do that, and neither should this: the panel is
+          open while you talk, and what the conversation changes shows up in
+          it without a navigation.
+
+          Hidden below xl, where there is no room for a third column and the
+          conversation has the stronger claim on the width.
+        */}
+        <AnimatePresence initial={false}>
+          {chartShown && (
+            <motion.aside
+              key="chart"
+              initial={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: 24 }}
+              animate={reduceMotion ? { opacity: 1 } : { width: 332, opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0, x: 24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              className="hidden shrink-0 overflow-hidden xl:block"
+            >
+              <div className="ns-float my-3 mr-3 h-[calc(100%-24px)] w-[320px]">
+                <PatientChart />
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
+        {/* The same chart as a right-hand drawer below xl. */}
+        <AnimatePresence>
+          {chartOpen && (
+            <>
+              <motion.button
+                type="button"
+                aria-label="Close chart"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setChartOpen(false)}
+                className="fixed inset-0 z-40 bg-[rgba(28,25,20,.28)] xl:hidden"
+              />
+              <motion.aside
+                initial={reduceMotion ? { opacity: 0 } : { x: 320 }}
+                animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { x: 320 }}
+                transition={{ type: "spring", stiffness: 380, damping: 36 }}
+                className="ns-float ns-float-solid fixed bottom-3 right-3 top-3 z-50 w-[320px] max-w-[calc(100vw-24px)] xl:hidden"
+              >
+                <PatientChart />
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

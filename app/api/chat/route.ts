@@ -363,26 +363,13 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /*
- * This route was retired behind LEGACY_CLINICAL_ENABLED to stop an older
- * anonymous endpoint from bypassing the account workspace. It is open again,
- * because the thing it was accused of is not something it does.
- *
- * It reads no workspace. `profile` and `meals` come from the caller's own
- * browser storage, are sanitised by safeProfile/safeMeals before they reach an
- * instruction block, and never touch the database — so there is no account
- * boundary here to go around. The account path has its own supervisor now
- * (lib/workspace/supervisor.ts), reached with a session and the person's own
- * encrypted records; this is the anonymous one, and the two do not meet.
- *
- * What it is exposed to is cost and abuse, which is what the rate limiter
- * below is for. /api/scan stays behind the flag: that one takes uploads.
+ * The public, browser-storage conversation. It reads no account workspace or
+ * database records. The supplied profile and meals are sanitized before use;
+ * account-scoped conversations still use /api/workspace/assistant. The bounded
+ * request body and rate limiter below protect this anonymous model endpoint.
+ * Legacy /api/scan remains separately disabled unless explicitly enabled.
  */
 export async function POST(req: Request) {
-  // The browser-storage chat is retained for development only. Patient
-  // conversations use the authenticated, account-scoped workspace endpoint.
-  if (process.env.LEGACY_CLINICAL_ENABLED !== "true") {
-    return Response.json({ error: "Use the signed-in health workspace." }, { status: 410 });
-  }
   const rate = checkRate(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "You're sending messages faster than I can think. Give me a few seconds.");

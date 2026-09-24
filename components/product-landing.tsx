@@ -122,7 +122,7 @@ export default function ProductLanding() {
           <Link href="/privacy">Privacy</Link>
         </nav>
         <div className="nl-nav-actions">
-          <Link className="nl-cta" href="/workspace">
+          <Link className="nl-cta" href="/chat">
             Start a conversation <ArrowRight size={15} />
           </Link>
         </div>
@@ -145,7 +145,7 @@ export default function ProductLanding() {
             a search bar at 2am.
           </p>
           <div className="nl-hero-actions">
-            <Link href="/workspace" className="nl-cta nl-cta-lg">
+            <Link href="/chat" className="nl-cta nl-cta-lg">
               Start a conversation <ArrowRight size={17} />
             </Link>
           </div>
@@ -320,7 +320,7 @@ export default function ProductLanding() {
           <h2>
             One question is <em>a good beginning.</em>
           </h2>
-          <Link className="nl-cta nl-cta-lg" href="/workspace">
+          <Link className="nl-cta nl-cta-lg" href="/chat">
             Meet your health companion <ArrowRight size={17} />
           </Link>
           <p>Free early access · no card · your records stay yours.</p>
@@ -333,7 +333,7 @@ export default function ProductLanding() {
         <div>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms & limitations</Link>
-          <Link href="/workspace">Start a conversation</Link>
+          <Link href="/chat">Start a conversation</Link>
         </div>
       </footer>
     </div>
