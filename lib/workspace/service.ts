@@ -243,6 +243,94 @@ export class WorkspaceService {
     );
     if (!rows.length) throw new ApiError(404, "Record not found.");
   }
+  async sources(id: string) {
+    return this.db.query(
+      `SELECT c.id,c.provider,c.label,c.state,c.created_at,c.updated_at,
+        g.id AS consent_id,g.purpose,g.categories,g.date_from,g.date_to,g.granted_at,g.expires_at,g.revoked_at
+      FROM ns_source_connections c LEFT JOIN ns_consent_grants g
+        ON g.connection_id=c.id AND g.user_id=c.user_id
+      WHERE c.user_id=$1 ORDER BY c.created_at DESC,g.granted_at DESC`,
+      [id],
+    );
+  }
+  async grantSourceConsent(
+    id: string,
+    grant: {
+      connectionId: string;
+      purpose: "retrieve_records" | "keep_records_current";
+      categories: string[];
+      dateFrom?: string;
+      dateTo?: string;
+      expiresAt: string;
+    },
+  ) {
+    const consentId = randomUUID();
+    const rows = await this.db.query<{ id: string }>(
+      `WITH granted AS (INSERT INTO ns_consent_grants
+        (id,user_id,connection_id,purpose,categories,date_from,date_to,expires_at)
+      SELECT $1,$2,c.id,$4,$5,$6,$7,$8::timestamptz FROM ns_source_connections c
+      WHERE c.id=$3 AND c.user_id=$2 AND c.state='connected' AND $8::timestamptz > now()
+      RETURNING id,connection_id), logged AS (
+        INSERT INTO ns_source_audit (id,user_id,connection_id,consent_id,action,detail)
+        SELECT $9,$2,connection_id,id,'consent_granted',$10::jsonb FROM granted RETURNING id
+      ) SELECT granted.id FROM granted,logged`,
+      [consentId,id,grant.connectionId,grant.purpose,grant.categories,grant.dateFrom ?? null,grant.dateTo ?? null,grant.expiresAt,randomUUID(),JSON.stringify({purpose:grant.purpose,categories:grant.categories,dateFrom:grant.dateFrom ?? null,dateTo:grant.dateTo ?? null,expiresAt:grant.expiresAt})],
+    );
+    if (!rows.length) throw new ApiError(409, "This source is not connected and verified, so it cannot receive access yet.");
+    return consentId;
+  }
+  async revokeSourceConsent(id: string, consentId: string) {
+    const rows = await this.db.query<{ id: string }>(
+      `WITH revoked AS (
+        UPDATE ns_consent_grants SET revoked_at=now()
+        WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL RETURNING id,connection_id
+      ), cancelled AS (
+        UPDATE ns_retrieval_jobs SET state='cancelled',updated_at=now(),finished_at=now()
+        WHERE consent_id IN (SELECT id FROM revoked) AND user_id=$2
+          AND state IN ('queued','running','needs_user') RETURNING id
+      )
+      INSERT INTO ns_source_audit (id,user_id,connection_id,consent_id,action)
+      SELECT $3,$2,connection_id,id,'consent_revoked' FROM revoked RETURNING consent_id AS id`,
+      [consentId,id,randomUUID()],
+    );
+    if (!rows.length) throw new ApiError(404, "Active consent was not found.");
+  }
+  async requestRetrieval(id: string, consentId: string, idempotencyKey: string) {
+    const jobId = randomUUID();
+    const rows = await this.db.query<{ id: string }>(
+      `INSERT INTO ns_retrieval_jobs (id,user_id,consent_id,idempotency_key,state)
+      SELECT $1,$2,g.id,$4,'queued' FROM ns_consent_grants g
+      JOIN ns_source_connections c ON c.id=g.connection_id AND c.user_id=g.user_id
+      WHERE g.id=$3 AND g.user_id=$2 AND g.revoked_at IS NULL AND g.expires_at>now() AND c.state='connected'
+      ON CONFLICT (user_id,idempotency_key) DO NOTHING RETURNING id`,
+      [jobId,id,consentId,idempotencyKey],
+    );
+    if (rows[0]) {
+      await this.db.query(
+        `INSERT INTO ns_source_audit (id,user_id,consent_id,job_id,action) VALUES ($1,$2,$3,$4,'retrieval_requested')`,
+        [randomUUID(),id,consentId,rows[0].id],
+      );
+      return { id: rows[0].id, created: true };
+    }
+    const existing = await this.db.query<{ id: string; consent_id: string }>(
+      "SELECT id,consent_id FROM ns_retrieval_jobs WHERE user_id=$1 AND idempotency_key=$2",
+      [id,idempotencyKey],
+    );
+    if (existing[0]?.consent_id === consentId) return { id: existing[0].id, created: false };
+    throw new ApiError(403, "Active consent is required before requesting records.");
+  }
+  /** Workers must call this immediately before each provider request and retry. */
+  async retrievalAuthorized(id: string, jobId: string) {
+    const rows = await this.db.query<{ id: string }>(
+      `SELECT j.id FROM ns_retrieval_jobs j
+      JOIN ns_consent_grants g ON g.id=j.consent_id AND g.user_id=j.user_id
+      JOIN ns_source_connections c ON c.id=g.connection_id AND c.user_id=g.user_id
+      WHERE j.id=$1 AND j.user_id=$2 AND j.state='running'
+        AND g.revoked_at IS NULL AND g.expires_at>now() AND c.state='connected'`,
+      [jobId,id],
+    );
+    return rows.length > 0;
+  }
   async deleteAccount(id: string, password: string) {
     const users = await this.db.query<UserRow>(
       "SELECT * FROM ns_users WHERE id=$1",

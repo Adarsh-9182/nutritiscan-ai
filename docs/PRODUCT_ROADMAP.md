@@ -203,9 +203,8 @@ No model fine-tuning is planned before evidence retrieval, provenance and evalua
 | Order | Milestone | Completion evidence |
 | --- | --- | --- |
 | Now | Finish companion/design release and push this roadmap | CI/build, real-browser checks, Git SHA and live deployment |
-| Next | Health-source/provenance schema and versioned migrations | Isolated schema tests and no regressions in existing records |
-| Then | Consent lifecycle and durable retrieval job service | Expiry/revocation, retry and restart tests |
-| Then | Sources UI and synthetic connector | End-to-end authorized synthetic retrieval with a visible receipt |
+| Done (28 Sep 2026) | Health-source/provenance schema and versioned migrations | Added in `migrations/workspace/0001_sources_consent.sql`; deployment migration and isolated schema checks remain to be run |
+| Next | Connect Sources & access UI to consent lifecycle and add a synthetic connector worker | Expiry/revocation, idempotent retry and restart checks; visible retrieval receipt |
 | Then | FHIR upload and extraction review | Correct source links, subject matching and deduplication fixtures |
 | Then | Broader evidence ingestion and clinical evaluation set | Reproducible source snapshot and reviewed evaluation results |
 | After prerequisites | First live regional connector | Real integration access and verified consent/retrieval/revocation |

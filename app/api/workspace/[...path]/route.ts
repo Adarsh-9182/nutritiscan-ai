@@ -248,6 +248,28 @@ async function handle(
       await service.remove(id, z.object({ id: z.uuid() }).parse(body).id);
       return json({ ok: true });
     }
+    if (route === "sources" && req.method === "GET")
+      return json({ sources: await service.sources(id), retrieval: "unavailable" });
+    if (route === "sources/consent" && req.method === "POST") {
+      const consent = z.object({
+        connectionId: z.uuid(),
+        purpose: z.enum(["retrieve_records", "keep_records_current"]),
+        categories: z.array(z.enum(["observation", "report", "medication", "allergy", "condition", "encounter", "procedure", "document"])).min(1).max(8),
+        dateFrom: z.iso.date().optional(),
+        dateTo: z.iso.date().optional(),
+        expiresAt: z.iso.datetime({ offset: true }),
+      }).parse(body);
+      const expiresAt = Date.parse(consent.expiresAt);
+      if (expiresAt <= Date.now() || expiresAt > Date.now() + 366 * 24 * 60 * 60 * 1000)
+        throw new ApiError(400, "Consent must expire within the next 12 months.");
+      if (consent.dateFrom && consent.dateTo && consent.dateFrom > consent.dateTo)
+        throw new ApiError(400, "The consent date range is invalid.");
+      return json({ id: await service.grantSourceConsent(id, consent) }, 201);
+    }
+    if (route === "sources/consent/revoke" && req.method === "POST") {
+      await service.revokeSourceConsent(id, z.object({ consentId: z.uuid() }).parse(body).consentId);
+      return json({ ok: true });
+    }
     if (route.startsWith("notify")) {
       const notify = new NotifyService(await database(), telegram());
       const timeZone = z.string().min(1).max(64);

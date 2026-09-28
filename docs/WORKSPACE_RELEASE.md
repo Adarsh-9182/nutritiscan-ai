@@ -51,6 +51,13 @@ This release puts a health companion at the centre of the workspace, with accoun
 - “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
 - Migration: the `ns_records` kind check is widened to include `day`, the quota recount excludes day logs, and a unique `day_key` (a hash of account and date) makes concurrent first writes for one date fail instead of duplicating it. Export returns all stored days (up to 400); the workspace shows the latest 120. A failed save keeps what the person typed. Run `node scripts/workspace-migrate.mjs` before deploying.
 
+## Source consent foundation — 28 September 2026
+
+- Added a versioned workspace migration for user-owned source connections, scoped consent grants, retrieval-job state and metadata-only audit events. Each grant records purpose, record categories, optional date bounds, expiry and revocation. Database constraints bind grants and jobs to the same account as their source; idempotency keys prevent duplicate retrieval requests.
+- Added authenticated APIs to inspect a user's source metadata, grant time-limited consent only to a verified connected source, and revoke consent. Revocation cancels queued, running and waiting jobs. A retrieval worker must re-check `retrievalAuthorized` before every provider request and retry; no worker or provider connector is enabled yet.
+- No provider appears connected by default, credentials are not stored in these tables, and retrieval reports `unavailable` until an approved connector and worker exist. Hospital retrieval remains unavailable.
+- Apply with `npm run migrate:workspace`. The runner applies ordered SQL files transactionally and records SHA-256 checksums in `ns_workspace_migrations`; an applied file cannot be edited. Existing workspace schema setup remains additive and idempotent.
+
 ## Reminders and suggestions — 17 September 2026
 
 - Care items can have a time, a repeat rule (daily, weekly, monthly) and a category (medicine, test, appointment, other). These are optional fields on the existing encrypted task record, so no migration is needed. Marking a repeating reminder done moves it to its next future date.
