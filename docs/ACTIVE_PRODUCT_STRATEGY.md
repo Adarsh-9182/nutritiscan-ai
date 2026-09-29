@@ -14,6 +14,8 @@ Sources: [Safdarjung Hospital manual](https://vmmc-sjh.mohfw.gov.in/sites/defaul
 
 **Buyer and operating owner:** a hospital or care team. **Daily users:** discharge coordinator, nurse, treating clinician, and the patient after discharge. A pilot must identify the actual owner of each task in the hospital's workflow.
 
+**First release within this product:** close the loop on test results still pending at discharge. Identify the test from an approved source, assign the responsible clinician and review deadline, detect when the result arrives, request clinical review, record the approved patient communication, and verify closure. Medication reconciliation and appointment coordination are the next workflows after this loop works. An overdue or unreviewed result remains open and escalates to a person; the agent never marks it clinically resolved by itself.
+
 1. Import an authorized discharge packet: discharge note, current medicine list, orders, results and follow-up plan. Begin with synthetic packets, then consented files or a read-only hospital integration.
 2. Extract structured facts with source document, page or record reference, timestamp, confidence, and an explicit `unknown` state. Never silently turn model inference into a recorded fact.
 3. Produce a clinician review screen: medicine changes to reconcile, pending results, appointments to arrange, patient instructions, and missing or conflicting information. The agent can draft, but a qualified person confirms the plan.
@@ -53,12 +55,12 @@ Sources: [ABDM interoperability overview](https://abdm.gov.in/static/media/Sessi
 | Milestone | Exit condition |
 | --- | --- |
 | Discovery | Observe the discharge process at a partner site; map who owns results, medicines, appointments and patient contact. |
-| Synthetic prototype | Given a fixed packet, the review screen identifies all seeded pending items and preserves every source; a reviewer can correct and approve them. |
+| Synthetic prototype | Given a fixed packet, the review screen identifies every seeded pending test, preserves its source, and lets a reviewer assign an owner and deadline. |
 | Shadow pilot | On consented or institutionally authorized cases, compare agent drafts with the team's normal process. No unsupervised writes or messages. |
 | Assisted pilot | Approved tasks can be sent through one agreed channel; delivery and completion are recorded and exceptions have a human owner. |
 | Expansion | Demonstrate useful time saved and fewer missed handoffs without unacceptable omissions, false alerts or extra clinician work. Then add more sources or workflows. |
 
-Track time from discharge decision to approved plan; proportion of pending results with an assigned owner; proportion of follow-up tasks acknowledged and completed; clinician edit time; extraction omissions; false alerts; delivery failures; and patient understanding. Do not claim reduced readmissions without an appropriately designed evaluation.
+For the first release, the primary measure is the proportion of pending results that receive documented clinical review and an appropriate follow-up within the agreed time window. Track time to assignment and review; extraction omissions; false alerts; clinician correction burden; delivery failures; and unresolved exceptions. Expand measurement to appointment completion, medicine discrepancies, patient understanding and time to an approved discharge plan as those workflows are added. Do not claim reduced readmissions without an appropriately designed evaluation.
 
 ## Boundaries
 
