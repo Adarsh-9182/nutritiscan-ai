@@ -14,6 +14,8 @@ export type WorkflowEvent =
   | { type: "confirm-source"; source: PendingTestCandidate; testName: string }
   | { type: "assign"; owner: string; deadline: string }
   | { type: "result-arrived"; testName: string }
+  | { type: "escalate-deadline"; observedOn: string }
+  | { type: "acknowledge-escalation"; note: string }
   | { type: "review"; decision: ReviewDecision; note: string }
   | { type: "approve-message"; message: string }
   | { type: "record-delivery" };
@@ -25,6 +27,7 @@ export type PendingResultCase = {
   owner: string | null;
   deadline: string | null;
   resultArrived: boolean;
+  escalation: { observedOn: string; acknowledgedBy: string | null; note: string | null } | null;
   review: { clinician: string; decision: ReviewDecision; note: string } | null;
   approvedMessage: string | null;
   delivered: boolean;
@@ -36,6 +39,7 @@ export const INITIAL_CASE: PendingResultCase = {
   owner: null,
   deadline: null,
   resultArrived: false,
+  escalation: null,
   review: null,
   approvedMessage: null,
   delivered: false,
@@ -46,7 +50,9 @@ export type WorkflowStatus =
   | "needs-source-review"
   | "needs-owner"
   | "awaiting-result"
+  | "escalated-awaiting-result"
   | "needs-review"
+  | "needs-escalation-ack"
   | "needs-message"
   | "needs-delivery"
   | "closed";
@@ -54,8 +60,9 @@ export type WorkflowStatus =
 export function workflowStatus(state: PendingResultCase): WorkflowStatus {
   if (!state.source) return "needs-source-review";
   if (!state.owner) return "needs-owner";
-  if (!state.resultArrived) return "awaiting-result";
+  if (!state.resultArrived) return state.escalation ? "escalated-awaiting-result" : "awaiting-result";
   if (!state.review) return "needs-review";
+  if (state.escalation && !state.escalation.acknowledgedBy) return "needs-escalation-ack";
   if (state.review.decision === "no-contact-needed" || state.delivered) return "closed";
   if (!state.approvedMessage) return "needs-message";
   return "needs-delivery";
@@ -114,6 +121,29 @@ export function applyWorkflowEvent(
       }
       next = { ...state, resultArrived: true };
       description = "Lab result arrived; clinician review requested.";
+      break;
+    }
+    case "escalate-deadline": {
+      if (actor.role !== "coordinator" && actor.role !== "nurse") throw new Error("A coordinator or nurse must record the escalation.");
+      if (!state.owner || !state.deadline) throw new Error("Assign an owner and deadline before escalation.");
+      if (state.review) throw new Error("The result has already been reviewed.");
+      if (state.escalation) throw new Error("This deadline has already been escalated.");
+      const observed = new Date(`${event.observedOn}T00:00:00.000Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(event.observedOn) || Number.isNaN(observed.getTime()) ||
+          observed.toISOString().slice(0, 10) !== event.observedOn || event.observedOn <= state.deadline) {
+        throw new Error("Choose a valid date after the review deadline.");
+      }
+      next = { ...state, escalation: { observedOn: event.observedOn, acknowledgedBy: null, note: null } };
+      description = `${actor.name} escalated the missed review deadline on ${event.observedOn}.`;
+      break;
+    }
+    case "acknowledge-escalation": {
+      if (actor.role !== "coordinator" && actor.role !== "nurse") throw new Error("A coordinator or nurse must acknowledge the escalation.");
+      if (!state.escalation || state.escalation.acknowledgedBy) throw new Error("There is no open escalation to acknowledge.");
+      const note = event.note.trim();
+      if (!note || note.length > 500) throw new Error("Record the human follow-up plan (1 to 500 characters).");
+      next = { ...state, escalation: { ...state.escalation, acknowledgedBy: actor.name, note } };
+      description = `${actor.name} acknowledged the missed deadline and recorded a follow-up plan.`;
       break;
     }
     case "review": {

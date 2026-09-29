@@ -3,8 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, FileText, RotateCcw } from "lucide-react";
-import { extractPendingTests, SYNTHETIC_DISCHARGE_NOTE, SYNTHETIC_LAB_RESULT } from "@/lib/discharge/extract";
-import { DEMO_ACTORS, DEMO_STORAGE_KEY, recordDemoEvent, restoreDemo, type RecordedEvent } from "@/lib/discharge/demo-store";
+import { extractPendingTests, SYNTHETIC_CASES } from "@/lib/discharge/extract";
+import { DEMO_ACTORS, demoStorageKey, recordDemoEvent, restoreDemo, type RecordedEvent } from "@/lib/discharge/demo-store";
 import {
   INITIAL_CASE,
   workflowStatus,
@@ -17,7 +17,9 @@ const STATUS_TEXT = {
   "needs-source-review": "Needs source review",
   "needs-owner": "Needs an owner",
   "awaiting-result": "Waiting for the lab",
+  "escalated-awaiting-result": "Escalated · waiting for result",
   "needs-review": "Needs clinician review",
+  "needs-escalation-ack": "Needs escalation acknowledgement",
   "needs-message": "Needs an approved update",
   "needs-delivery": "Ready to record delivery",
   closed: "Closed with a review trail",
@@ -26,17 +28,20 @@ const STATUS_TEXT = {
 const field = "mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--emerald)]";
 const card = "rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6";
 const action = "rounded-xl bg-[var(--emerald)] px-4 py-2.5 text-sm font-semibold text-[#07130c] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--emerald)]";
-const candidates = extractPendingTests(SYNTHETIC_DISCHARGE_NOTE);
-const candidate = candidates[0];
-
 export default function DischargeDemo() {
+  const [caseId, setCaseId] = useState(SYNTHETIC_CASES[0].id);
+  const demoCase = SYNTHETIC_CASES.find((item) => item.id === caseId) ?? SYNTHETIC_CASES[0];
+  const candidates = extractPendingTests(demoCase.document);
+  const candidate = candidates[0];
   const [caseState, setCaseState] = useState<PendingResultCase>(INITIAL_CASE);
   const [events, setEvents] = useState<RecordedEvent[]>([]);
   const [ready, setReady] = useState(false);
-  const [testName, setTestName] = useState(candidate?.testName ?? "");
+  const [testName, setTestName] = useState(extractPendingTests(SYNTHETIC_CASES[0].document)[0]?.testName ?? "");
   const [sourceReviewer, setSourceReviewer] = useState("");
   const [owner, setOwner] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [observedOn, setObservedOn] = useState("");
+  const [escalationNote, setEscalationNote] = useState("");
   const [decision, setDecision] = useState<ReviewDecision>("contact-patient");
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("Your test result is available. Please contact the care team using the number on your discharge papers to discuss the reviewed result and next steps.");
@@ -45,24 +50,24 @@ export default function DischargeDemo() {
 
   useEffect(() => {
     try {
-      const restored = restoreDemo(localStorage.getItem(DEMO_STORAGE_KEY));
+      const restored = restoreDemo(localStorage.getItem(demoStorageKey(caseId)), caseId);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- restore browser-only fictional state after hydration
       setCaseState(restored.state);
       setEvents(restored.events);
       setError(restored.error ?? "");
-      if (restored.error) localStorage.removeItem(DEMO_STORAGE_KEY);
+      if (restored.error) localStorage.removeItem(demoStorageKey(caseId));
     } catch {
       setError("Browser storage is unavailable. This demo will reset when you leave.");
     }
     setReady(true);
-  }, []);
+  }, [caseId]);
 
   function act(event: WorkflowEvent, actorId: string) {
     if (!ready) return;
     try {
-      const next = recordDemoEvent(events, event, actorId, new Date().toISOString());
+      const next = recordDemoEvent(events, event, actorId, new Date().toISOString(), caseId);
       try {
-        localStorage.setItem(DEMO_STORAGE_KEY, next.serialized);
+        localStorage.setItem(demoStorageKey(caseId), next.serialized);
         setError("");
       } catch {
         setError("Browser storage is unavailable. Your simulated steps will last only until this page closes.");
@@ -98,6 +103,34 @@ export default function DischargeDemo() {
     act({ type: "approve-message", message }, caseState.owner ?? "");
   }
 
+  function submitEscalation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    act({ type: "escalate-deadline", observedOn }, caseState.source?.reviewedBy ?? "");
+  }
+
+  function submitEscalationAck(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    act({ type: "acknowledge-escalation", note: escalationNote }, caseState.source?.reviewedBy ?? "");
+  }
+
+  function selectCase(nextCaseId: string) {
+    const nextCase = SYNTHETIC_CASES.find((item) => item.id === nextCaseId);
+    if (!nextCase || nextCaseId === caseId) return;
+    setReady(false);
+    setCaseId(nextCaseId);
+    setCaseState(INITIAL_CASE);
+    setEvents([]);
+    setTestName(extractPendingTests(nextCase.document)[0]?.testName ?? "");
+    setSourceReviewer("");
+    setOwner("");
+    setDeadline("");
+    setObservedOn("");
+    setEscalationNote("");
+    setDecision("contact-patient");
+    setNote("");
+    setError("");
+  }
+
   function reset() {
     setCaseState(INITIAL_CASE);
     setEvents([]);
@@ -105,10 +138,12 @@ export default function DischargeDemo() {
     setSourceReviewer("");
     setOwner("");
     setDeadline("");
+    setObservedOn("");
+    setEscalationNote("");
     setDecision("contact-patient");
     setNote("");
     setError("");
-    try { localStorage.removeItem(DEMO_STORAGE_KEY); }
+    try { localStorage.removeItem(demoStorageKey(caseId)); }
     catch { setError("Browser storage could not be cleared. The demo may return after a refresh."); }
   }
 
@@ -128,17 +163,31 @@ export default function DischargeDemo() {
           <p className="text-sm font-semibold uppercase tracking-widest text-[var(--emerald)]">Discharge follow-up · first product slice</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">Close the loop on a pending result.</h1>
           <p className="mt-5 text-base leading-7 text-[var(--text-muted)]">
-            Review a pending test found in a fictional discharge note, then follow it through assignment, clinical review and a documented outcome. Extraction uses a simple rule. Demo steps are saved in this browser so you can resume after a refresh. No hospital system is connected and no patient message is sent.
+            Work through fictional discharge cases from source review to a documented outcome. One case also demonstrates a missed deadline and human escalation. Extraction uses a simple rule, and demo steps are saved in this browser. No hospital system is connected and no patient message is sent.
           </p>
           <p className="mt-3 text-sm text-[var(--amber)]">Use fictional information only. Review notes and draft messages are saved in this browser.</p>
         </section>
 
-        <div className="mt-9 grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
+        <section className={`${card} mt-9`} aria-label="Choose fictional case">
+          <h2 className="text-lg font-semibold">Choose a fictional case</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {SYNTHETIC_CASES.map((item) => (
+              <button key={item.id} type="button" onClick={() => selectCase(item.id)} aria-pressed={caseId === item.id}
+                className={`rounded-xl border p-4 text-left ${caseId === item.id ? "border-[var(--emerald)] bg-[var(--emerald)]/10" : "border-[var(--border-strong)] hover:border-[var(--emerald)]"}`}>
+                <span className="text-xs font-semibold text-[var(--emerald)]">{item.id}</span>
+                <strong className="mt-1 block text-sm">{item.label}</strong>
+                <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{item.scenario}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
           <div className="space-y-5">
             <section className={card} aria-labelledby="case-heading">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-dim)]">Fictional case · SYN-2047</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-dim)]">Fictional case · {demoCase.id}</p>
                   <h2 id="case-heading" className="mt-2 text-xl font-semibold">A test candidate was found at discharge</h2>
                 </div>
                 <span className={`rounded-full border border-[var(--border-strong)] px-3 py-1 text-xs ${status === "closed" ? "text-[var(--emerald)]" : "text-[var(--amber)]"}`} role="status">
@@ -147,17 +196,17 @@ export default function DischargeDemo() {
               </div>
               <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
                 <div><dt className="text-[var(--text-dim)]">Patient</dt><dd className="mt-1 font-medium">Fictional adult patient</dd></div>
-                <div><dt className="text-[var(--text-dim)]">Discharged</dt><dd className="mt-1 font-medium">28 Sep 2026</dd></div>
+                <div><dt className="text-[var(--text-dim)]">Discharged</dt><dd className="mt-1 font-medium">{demoCase.dischargedOn}</dd></div>
                 <div><dt className="text-[var(--text-dim)]">Pending test</dt><dd className="mt-1 font-medium">{caseState.source?.testName ?? "Awaiting source review"}</dd></div>
               </dl>
               <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {SYNTHETIC_DISCHARGE_NOTE.title}, page {candidate?.page ?? "?"}, line {candidate?.line ?? "?"}</p>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {demoCase.document.title}, page {candidate?.page ?? "?"}, line {candidate?.line ?? "?"}</p>
                 <p className="mt-2 text-sm leading-6">“{candidate?.excerpt ?? "No pending-test line found."}”</p>
                 <p className="mt-2 text-xs text-[var(--text-dim)]">Rule match · {caseState.source ? `reviewed by ${caseState.source.reviewedBy}${caseState.source.testName !== caseState.source.extractedTestName ? ` · corrected from ${caseState.source.extractedTestName}` : ""}` : "unconfirmed extraction"}</p>
                 <details className="mt-4 border-t border-[var(--border)] pt-3 text-sm">
                   <summary className="cursor-pointer text-[var(--emerald)]">Read the full fictional source page</summary>
                   <ol className="mt-3 list-decimal space-y-1 pl-7 text-[var(--text-muted)]">
-                    {SYNTHETIC_DISCHARGE_NOTE.pages[0].split("\n").map((line, index) => (
+                    {demoCase.document.pages[0].split("\n").map((line, index) => (
                       <li key={`${index}-${line}`} className={index + 1 === candidate?.line ? "font-semibold text-[var(--text)]" : ""}>{line}</li>
                     ))}
                   </ol>
@@ -165,8 +214,8 @@ export default function DischargeDemo() {
               </div>
               {caseState.resultArrived && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {SYNTHETIC_LAB_RESULT.title} {SYNTHETIC_LAB_RESULT.documentId}</p>
-                  <p className="mt-2 text-sm leading-6">{SYNTHETIC_LAB_RESULT.testName}: {SYNTHETIC_LAB_RESULT.text}</p>
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {demoCase.result.title} {demoCase.result.documentId}</p>
+                  <p className="mt-2 text-sm leading-6">{demoCase.result.testName}: {demoCase.result.text}</p>
                 </div>
               )}
             </section>
@@ -213,10 +262,12 @@ export default function DischargeDemo() {
                 </form>
               )}
 
-              {status === "awaiting-result" && (
+              {(status === "awaiting-result" || status === "escalated-awaiting-result") && (
                 <div className="mt-6 space-y-4">
                   <Step number="03" title="Wait for the lab result" description={`${caseState.owner} owns review by ${caseState.deadline}. A live integration would detect the result; this demo matches a fictional lab report to the reviewed test.`} />
-                  <button type="button" disabled={!ready} onClick={() => act({ type: "result-arrived", testName: SYNTHETIC_LAB_RESULT.testName }, DEMO_ACTORS["Fictional lab feed"].id)} className={action}>Match simulated lab result</button>
+                  {status === "escalated-awaiting-result" && <p className="rounded-xl border border-[var(--amber)] p-3 text-sm text-[var(--amber)]">The deadline was missed. This case stays open while the result is pending, even after a coordinator acknowledges the escalation.</p>}
+                  {demoCase.requiresEscalation && !caseState.escalation && <p className="text-sm text-[var(--amber)]">In this fictional case, record the missed deadline below before the result appears.</p>}
+                  <button type="button" disabled={!ready || (demoCase.requiresEscalation && !caseState.escalation)} onClick={() => act({ type: "result-arrived", testName: demoCase.result.testName }, DEMO_ACTORS["Fictional lab feed"].id)} className={`${action} disabled:cursor-not-allowed disabled:opacity-50`}>Match simulated lab result</button>
                 </div>
               )}
 
@@ -246,6 +297,13 @@ export default function DischargeDemo() {
                 </form>
               )}
 
+              {status === "needs-escalation-ack" && (
+                <div className="mt-6 space-y-4">
+                  <Step number="05" title="Acknowledge the missed deadline" description="The clinical decision is recorded. A coordinator must document a human follow-up plan for the escalated exception before this case can close." />
+                  <p className="text-sm text-[var(--amber)]">Complete the escalation form below to continue.</p>
+                </div>
+              )}
+
               {status === "needs-delivery" && (
                 <div className="mt-6 space-y-4">
                   <Step number="06" title="Verify delivery" description="This button records a fictional delivery receipt. It does not send a message." />
@@ -261,6 +319,37 @@ export default function DischargeDemo() {
                 </div>
               )}
             </section>
+
+            {caseState.owner && !caseState.review && !caseState.escalation && (
+              <section className={card} aria-labelledby="escalation-heading">
+                <h2 id="escalation-heading" className="text-lg font-semibold">Deadline exception</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">If the agreed review deadline passes without clinical review, record a fictional escalation. The hospital must define the real escalation policy.</p>
+                <form onSubmit={submitEscalation} className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="min-w-48 flex-1 text-sm">Simulated date the miss was noticed
+                    <input type="date" value={observedOn} onChange={(event) => setObservedOn(event.target.value)} className={field} min={caseState.deadline ?? undefined} required />
+                  </label>
+                  <button type="submit" disabled={!ready} className={action}>Escalate missed deadline</button>
+                </form>
+                <p className="mt-2 text-xs text-[var(--text-dim)]">Choose a date after {caseState.deadline}; this does not run an automatic clock or contact anyone.</p>
+              </section>
+            )}
+
+            {caseState.escalation && (
+              <section className={card} aria-labelledby="escalation-heading">
+                <h2 id="escalation-heading" className="text-lg font-semibold">Escalation record</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Missed review deadline recorded on {caseState.escalation.observedOn}. The case remains open until a result is reviewed and all required follow-up is documented.</p>
+                {caseState.escalation.acknowledgedBy ? (
+                  <p className="mt-4 rounded-xl border border-[var(--border-strong)] p-4 text-sm">Acknowledged by {caseState.escalation.acknowledgedBy}: {caseState.escalation.note}</p>
+                ) : (
+                  <form onSubmit={submitEscalationAck} className="mt-4 space-y-3">
+                    <label className="block text-sm">Human follow-up plan
+                      <textarea value={escalationNote} onChange={(event) => setEscalationNote(event.target.value)} className={field} rows={3} maxLength={500} required placeholder="For this fictional case, record who will check the delayed result and how the team will follow up." />
+                    </label>
+                    <button type="submit" disabled={!ready} className={action}>Acknowledge in demo</button>
+                  </form>
+                )}
+              </section>
+            )}
           </div>
 
           <aside className="space-y-5">
@@ -278,7 +367,7 @@ export default function DischargeDemo() {
             </section>
             <section className={card}>
               <h2 className="text-lg font-semibold">What this proves</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">The workflow requires source review, an assigned owner and documented clinical review. Patient contact needs an approved message and a delivery record.</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">The workflow requires source review, an assigned owner and documented clinical review. A missed deadline creates an exception that a person must acknowledge. Patient contact needs an approved message and a delivery record.</p>
               <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Roles here are simulated and browser storage can be edited or cleared. Verified identities, server audit, PDF/OCR extraction, hospital access, messaging and clinical validation are future milestones.</p>
             </section>
           </aside>

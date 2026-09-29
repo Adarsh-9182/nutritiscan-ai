@@ -31,7 +31,8 @@ export default function Page() {
         steps, review notes and draft messages in this browser so a page
         refresh can restore them. They are not sent to NutritiScan&apos;s server.
         Use fictional information only in that demo. Its Start over control
-        clears the saved demo steps.
+        clears the saved steps for the selected fictional case. Clear site data
+        to remove every saved demo case.
       </p>
 
       <h2>What is sent when you chat</h2>
