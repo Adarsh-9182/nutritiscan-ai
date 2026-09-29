@@ -661,7 +661,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. How are you feeling?` : "How are you feeling?"}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                A Supervisor and five specialist agents — Doctor, Nutrition, Fitness, Lab and Coach — work every message together.
+                Explore our public health chat prototype. A Supervisor can route supported questions to Doctor, Nutrition, Fitness, Lab or Coach agents.
               </p>
             </div>
 
@@ -701,7 +701,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
             role="log"
             aria-live="polite"
             aria-busy={busy}
-            aria-label="Conversation with your health companion"
+            aria-label="Public health chat conversation"
           >
             <div className="mx-auto max-w-2xl space-y-5">
               {messages.map((m, idx) => {

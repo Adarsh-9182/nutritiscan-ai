@@ -21,6 +21,12 @@ export default function Page() {
         availability depends on deployment configuration. Answers can be
         inaccurate or incomplete.
       </p>
+      <p>
+        Hospital documentation, handoffs, discharge and follow-up workflows
+        described on the home page are a product direction. The current chat
+        has no hospital record or medicine app integration and does not act on
+        behalf of a care team.
+      </p>
 
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>
