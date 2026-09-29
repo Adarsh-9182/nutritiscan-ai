@@ -36,6 +36,8 @@ The agent's loop is **observe → prepare → request approval → act → verif
 
 This is a hypothesis about a promising first market, not proof of willingness to pay. Interview discharge coordinators, nurses, doctors, hospital IT and patients before committing to a pilot contract or broad integration.
 
+Use the [pending-result pilot discovery guide](PILOT_DISCOVERY.md) for the interview script, workflow map, selection criteria, and measures. Its field questions are open; desk research does not answer them.
+
 ## What changes in the current codebase
 
 **Available now:** `/chat`, a supervisor with specialist routing, educational references, triage checks, and browser-local history/profile. The old account workspace is retired. Some source, extraction, provenance and task modules remain in the repository, but they are not a live hospital product.

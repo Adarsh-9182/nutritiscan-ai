@@ -4,7 +4,7 @@ NutritiScan is a conversational health companion. Its public site explains the p
 
 The product is educational early access for adults 18+. It is not a diagnosis, prescription, emergency service or replacement for a clinician. Agent availability depends on the configured model and reference coverage is limited.
 
-The next product direction is a supervised discharge-to-home agent for hospital teams. The researched problem, proposed workflow and milestones are in [the active product strategy](docs/ACTIVE_PRODUCT_STRATEGY.md). These hospital capabilities are not part of the current public chat.
+The next product direction is a supervised discharge-to-home agent for hospital teams. The researched problem, proposed workflow and milestones are in [the active product strategy](docs/ACTIVE_PRODUCT_STRATEGY.md). The [pilot discovery guide](docs/PILOT_DISCOVERY.md) covers hospital interviews and pilot criteria. These hospital capabilities are not part of the current public chat.
 
 ## Start locally
 
