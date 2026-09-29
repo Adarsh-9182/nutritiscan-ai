@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import ChatWorkspace from "@/components/chat-workspace";
 
 export const metadata: Metadata = {
-  title: "Chat with your health agents",
-  description: "Ask anything — a Supervisor and five specialist agents (Doctor, Nutrition, Fitness, Lab, Coach) answer together.",
+  title: "Try the public health chat",
+  description: "Explore NutritiScan's current educational health chat prototype with a supervisor and specialist agents. Hospital workflows are in development.",
   alternates: { canonical: "/chat" },
 };
 
