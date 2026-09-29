@@ -21,6 +21,7 @@ To enable hosted agent responses, configure `GOOGLE_GENERATIVE_AI_API_KEY` or an
 
 - `/` — marketing page
 - `/chat` — supervisor and specialist-agent conversation
+- `/discharge-demo` — synthetic pending-result workflow simulator; no real records or messages
 - `/privacy` and `/terms` — current product notices
 
 The former account workspace, report-management screens, and their APIs have been removed from the active app. Existing database files or hosted records are not erased by this code change. Historical implementation and deployment notes remain under `docs/` for reference.
