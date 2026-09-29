@@ -72,7 +72,7 @@ export default function ChatWorkspace() {
         the memory were actually recorded (recordedSections), so an
         un-onboarded visitor's answers simply do not claim to know a weight
         nobody gave — the agent asks instead. Details can be filled in from
-        the chart panel, or in the account workspace.
+        the chart panel.
       */}
 
       {/* Slim top bar — the conversation owns the rest of the screen. */}
@@ -96,12 +96,8 @@ export default function ChatWorkspace() {
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
-        <Link href="/?home" className="btn-ghost rounded-full px-3 py-1 t-label">
+        <Link href="/" className="btn-ghost rounded-full px-3 py-1 t-label">
           Home
-        </Link>
-
-        <Link href="/workspace" className="btn-ghost hidden rounded-full px-3 py-1 t-label sm:inline-flex">
-          Account records
         </Link>
 
         {/*

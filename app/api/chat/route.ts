@@ -363,10 +363,9 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /*
- * The public, browser-storage conversation. It reads no account workspace or
- * database records. The supplied profile and meals are sanitized before use;
- * account-scoped conversations still use /api/workspace/assistant. The bounded
- * request body and rate limiter below protect this anonymous model endpoint.
+ * The product's browser-storage conversation. It reads no server-side
+ * account or database records. The supplied profile and meals are sanitized
+ * before use. The bounded request body and rate limiter protect this endpoint.
  * Legacy /api/scan remains separately disabled unless explicitly enabled.
  */
 export async function POST(req: Request) {

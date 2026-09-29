@@ -1,4 +1,6 @@
-# Health workspace release
+# Archived: health workspace release
+
+> This document records a former product version. The account workspace, report screens and workspace APIs are no longer part of the active app. The current product keeps the public marketing page and the `/chat` supervisor-agent experience. Existing stored records were not deleted by the route removal.
 
 ## Specialist chat restoration — 24 September 2026
 

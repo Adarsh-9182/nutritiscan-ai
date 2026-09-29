@@ -1,42 +1,33 @@
 # NutritiScan
 
-A conversational health companion with source-linked education, a hosted or fully private AI engine, confirmed records, follow-ups and visit preparation. Built with Next.js, TypeScript and Postgres.
+NutritiScan is a conversational health companion. Its public site explains the product, and `/chat` is the agent experience: a supervisor can route supported questions to Doctor, Nutrition, Lab, Fitness and Coach specialists, then show the activity and references used.
 
-The home screen brings together questions about everyday health, nutrition, sleep, medicines and wellbeing. Records remain supporting tools: compare dated values, open their sources and prepare a personalised visit brief. Review any proposed follow-up before saving it.
+The product is educational early access for adults 18+. It is not a diagnosis, prescription, emergency service or replacement for a clinician. Agent availability depends on the configured model and reference coverage is limited.
 
-**Early access:** limited educational coverage, not a clinically validated doctor. AI can make mistakes.
-
-## The AI engine
-
-The companion's agent decides urgency, retrieves references and computes record summaries without a model; only the written explanation is generated. That generation step takes whichever engine is available, in this order:
-
-1. **Hosted** — `GOOGLE_GENERATIVE_AI_API_KEY` or an AI Gateway credential. Answers are written on the server; the model receives the question, the published reference notes and up to two earlier user messages — never stored profiles, reports or log entries. Use synthetic data on a free Gemini tier; check provider processing terms before real health questions.
-2. **Operator endpoint** — `HEALTH_MODEL_BASE_URL` / `HEALTH_MODEL_NAME` with `HEALTH_MODEL_APPROVED=true`, for a self-hosted OpenAI-compatible model such as Ollama.
-3. **On-device** — optional Qwen2.5 through WebLLM, after an explicit ~1 GB download in a WebGPU-capable browser. Chosen in the app, it overrides the hosted engine so the question never leaves the tab.
-
-With none of them configured the companion answers from its reference notes and says so. Every answer carries the engine that produced it.
-
-For local hosted AI, set a working `GOOGLE_GENERATIVE_AI_API_KEY` or `AI_GATEWAY_API_KEY` in the ignored `.env.local`. A copied `VERCEL_OIDC_TOKEN` expires and is ignored once stale. The account workspace still works without a model, but its answers are limited to the covered reference notes and confirmed records.
-
-## Delivery roadmap
-
-See the [phased product roadmap](docs/PRODUCT_ROADMAP.md): frontend → health-data backend → connected records → evidence-based AI → agent workflows → pilot and subscriptions. It includes Hubble-inspired patient-authorized record retrieval, build-versus-partner constraints and a completion gate for every phase. Live provider retrieval, voice agents and billing are future work.
-
-## Start
+## Start locally
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000 and choose **Start a conversation** for the conversation-first `/chat` interface. Its profile and conversation history are stored in this browser and sent with a question to the public chat route, which does not read account records. Use **Account records** for sign-up, sign-in, recovery and the encrypted `/workspace` companion. Explore `/workspace?demo=1` for an isolated fictional example. Development uses local PGlite without a database account or model API key. `LEGACY_CLINICAL_ENABLED` only controls the retired scan endpoint.
+Open http://localhost:3000 for the marketing page and choose **Start a conversation**, or open http://localhost:3000/chat directly. Chat history, the optional health profile and meal notes are stored in this browser. Messages and that context are sent to `/api/chat` when you submit a turn.
+
+To enable hosted agent responses, configure `GOOGLE_GENERATIVE_AI_API_KEY` or an AI Gateway credential in the ignored `.env.local`. Without a working model credential, the chat can fall back to its limited demonstration behavior. Review provider data terms before using sensitive information.
+
+## Product surfaces
+
+- `/` — marketing page
+- `/chat` — supervisor and specialist-agent conversation
+- `/privacy` and `/terms` — current product notices
+
+The former account workspace, report-management screens, and their APIs have been removed from the active app. Existing database files or hosted records are not erased by this code change. Historical implementation and deployment notes remain under `docs/` for reference.
 
 ## Checks
 
 ```sh
-npm run verify
+npm run lint
+npx tsc --noEmit
 ```
 
-See [workspace release and deployment guide](docs/WORKSPACE_RELEASE.md) for configuration, encrypted storage, synthetic end-to-end checks, free-model setup, current limitations and the clinical launch requirements. `.env.example` lists supported variables; never commit real keys or health records.
-
-The conversation-first chat uses the existing clinical and nutrition agents with browser-held context. The account workspace remains the place for encrypted reports and care tools.
+Do not commit API keys or real health information.

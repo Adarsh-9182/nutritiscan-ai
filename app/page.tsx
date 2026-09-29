@@ -41,7 +41,7 @@ const STRUCTURED_DATA = {
       operatingSystem: "Web",
       url: SITE_URL,
       description:
-        "A health companion that answers questions in plain words, shows the published reference behind every answer, keeps your confirmed reports in one place and helps you prepare for a clinical visit.",
+        "A conversational health companion with a supervisor and specialist agents for source-linked educational answers.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },
