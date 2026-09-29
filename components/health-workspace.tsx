@@ -231,36 +231,6 @@ function AccountGate({
   }
   return (
     <div className="ns-auth">
-      <section className="ns-auth-story">
-        <Link href="/">
-          <Brand />
-        </Link>
-        <span className="ns-eyebrow">YOUR NEXT CHAPTER STARTS HERE</span>
-        <h1>
-          A little more
-          <br />
-          clarity.
-          <br />
-          <em>A lot more you.</em>
-        </h1>
-        <p>
-          Your reports, your questions, your health story.
-          <br />
-          One thoughtful space to bring them together.
-        </p>
-        <div className="ns-auth-quote">
-          <ShieldCheck size={24} />
-          <p>
-            Your account starts empty.
-            <br />
-            <strong>Every record comes from you.</strong>
-          </p>
-        </div>
-        <small>
-          For adults 18+. Education and visit preparation, not medical
-          diagnosis.
-        </small>
-      </section>
       <section className="ns-auth-form">
         <Link href="/" className="ns-back">
           ← Back to NutritiScan

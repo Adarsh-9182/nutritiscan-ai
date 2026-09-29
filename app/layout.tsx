@@ -20,16 +20,16 @@ import "./globals.css";
  */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
 
-const TITLE = "NutritiScan — AI health agent";
+const TITLE = "NutritiScan — AI health agents";
 const DESCRIPTION =
-  "A personal health companion for your questions, daily wellbeing, medicines and records. Source-linked education, private on-device AI and tools to prepare for care.";
+  "Ask health questions in plain language. NutritiScan's supervisor can bring specialist agents together for source-linked educational answers.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: TITLE, template: "%s — NutritiScan AI" },
   description: DESCRIPTION,
   applicationName: "NutritiScan AI",
-  keywords: ["AI health", "health OS", "nutrition AI", "health records", "lab reports", "visit preparation"],
+  keywords: ["AI health", "health agents", "nutrition AI", "health questions", "medical education"],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",

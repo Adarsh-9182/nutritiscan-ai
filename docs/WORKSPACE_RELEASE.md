@@ -1,4 +1,6 @@
-# Health workspace release
+# Archived: health workspace release
+
+> This document records a former product version. The account workspace, report screens and workspace APIs are no longer part of the active app. The current product keeps the public marketing page and the `/chat` supervisor-agent experience. Existing stored records were not deleted by the route removal.
 
 ## Specialist chat restoration — 24 September 2026
 
@@ -50,6 +52,13 @@ This release puts a health companion at the centre of the workspace, with accoun
 - Questions about the log (“what did I eat today”, “how did I sleep this week”, “weekly summary”) are answered deterministically from the record. General education questions such as “how can I understand my sleep?” are not redirected to the log.
 - “What stands out” lists observations only from logged data, each with its sample size: short average sleep, lower mood after short nights, repeated symptom days, estimated protein and logging consistency. These are not diagnoses and do not imply causes.
 - Migration: the `ns_records` kind check is widened to include `day`, the quota recount excludes day logs, and a unique `day_key` (a hash of account and date) makes concurrent first writes for one date fail instead of duplicating it. Export returns all stored days (up to 400); the workspace shows the latest 120. A failed save keeps what the person typed. Run `node scripts/workspace-migrate.mjs` before deploying.
+
+## Source consent foundation — 28 September 2026
+
+- Added a versioned workspace migration for user-owned source connections, scoped consent grants, retrieval-job state and metadata-only audit events. Each grant records purpose, record categories, optional date bounds, expiry and revocation. Database constraints bind grants and jobs to the same account as their source; idempotency keys prevent duplicate retrieval requests.
+- Added authenticated APIs to inspect a user's source metadata, grant time-limited consent only to a verified connected source, and revoke consent. Revocation cancels queued, running and waiting jobs. A retrieval worker must re-check `retrievalAuthorized` before every provider request and retry; no worker or provider connector is enabled yet.
+- No provider appears connected by default, credentials are not stored in these tables, and retrieval reports `unavailable` until an approved connector and worker exist. Hospital retrieval remains unavailable.
+- Apply with `npm run migrate:workspace`. The runner applies ordered SQL files transactionally and records SHA-256 checksums in `ns_workspace_migrations`; an applied file cannot be edited. Existing workspace schema setup remains additive and idempotent.
 
 ## Reminders and suggestions — 17 September 2026
 

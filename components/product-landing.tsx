@@ -12,15 +12,12 @@ import {
   LockKeyhole,
   Check,
   Sparkles,
-  Cpu,
   Languages,
-  Bell,
-  Activity,
   ShieldCheck,
   MessageCircle,
 } from "lucide-react";
 
-/** Shared with the workspace header — its styling stays with the app theme. */
+/** Shared wordmark for the public site and chat. */
 export function Brand() {
   return (
     <span className="ns-brand">
@@ -40,9 +37,7 @@ const TOPICS = [
   [Leaf, "Nutrition"],
   [Moon, "Sleep"],
   [Heart, "Wellbeing"],
-  [FileText, "Lab reports"],
-  [Bell, "Reminders"],
-  [Activity, "Trends"],
+  [FileText, "Lab results"],
 ] as const;
 
 const BENTO = [
@@ -54,11 +49,11 @@ const BENTO = [
     tag: "Educational support · engine status shown",
   },
   {
-    icon: Cpu,
+    icon: Stethoscope,
     tone: "plain",
-    title: "Or keep it entirely on your device",
-    body: "Switch on the on-device model and the question never leaves the tab. Open weights, no API charges, one download.",
-    tag: "WebGPU · optional",
+    title: "Doctor and specialist agents",
+    body: "Supported questions can be routed to Doctor, Nutrition, Lab, Fitness or Coach specialists, then brought together by the supervisor.",
+    tag: "Specialists · supervised response",
   },
   {
     icon: Languages,
@@ -70,23 +65,23 @@ const BENTO = [
   {
     icon: ShieldCheck,
     tone: "plain",
-    title: "Your records, your call",
-    body: "Import a report, confirm the values, and pick which of them the companion is allowed to read. Nothing is shared on your behalf.",
-    tag: "You hold the switch",
+    title: "Urgent signs checked first",
+    body: "Deterministic checks run before agent reasoning and can stop the response when an urgent-care pattern is detected.",
+    tag: "Safety checks · not a guarantee",
   },
   {
-    icon: Bell,
+    icon: MessageCircle,
     tone: "plain",
-    title: "Reminders that actually reach you",
-    body: "Draft a follow-up in chat, review it, then take it to your calendar or connect Telegram for a nudge at the right hour.",
-    tag: "Calendar · Telegram",
+    title: "A conversation that keeps context",
+    body: "Your recent chat, profile and meal notes can help the agents follow what you mean across turns.",
+    tag: "Saved in this browser",
   },
   {
     icon: MessageCircle,
     tone: "wide",
-    title: "Walk in ready for the appointment",
-    body: "Turn a month of notes, values and half-remembered worries into one brief you can hand over — or read off your phone.",
-    tag: "Visit preparation",
+    title: "References alongside the answer",
+    body: "When published references are used, the chat shows the source notes that informed its explanation.",
+    tag: "Source-linked education",
   },
 ] as const;
 
@@ -98,8 +93,8 @@ const STEPS = [
   ],
   [
     "02",
-    "Add only the context you choose",
-    "Confirmed reports, daily notes and trends stay yours. You decide what the companion may read before it answers.",
+    "Add context when it helps",
+    "Share relevant details in your message or add context to your local profile. Avoid information you do not want processed.",
   ],
   [
     "03",
@@ -139,10 +134,10 @@ export default function ProductLanding() {
             answered like <em>a friend who did the reading.</em>
           </h1>
           <p>
-            NutritiScan is a health companion that explains things properly,
-            keeps your reports in one place and shows you exactly where every
-            answer came from. Not a doctor — a much better starting point than
-            a search bar at 2am.
+            NutritiScan is an AI health companion for questions about symptoms,
+            nutrition, medicines and everyday wellbeing. A supervisor can bring
+            focused health agents together and show reference notes used in an
+            answer. It is not a doctor, but can be a clearer place to start.
           </p>
           <div className="nl-hero-actions">
             <Link href="/chat" className="nl-cta nl-cta-lg">
@@ -204,34 +199,34 @@ export default function ProductLanding() {
                   </span>
                 </div>
               </div>
-              <aside className="nl-context" aria-label="Preview of record access">
-                <span className="nl-eyebrow">YOUR CONTEXT</span>
-                <p className="nl-context-title">Every source visible.</p>
+              <aside className="nl-context" aria-label="Preview of agent activity">
+                <span className="nl-eyebrow">AGENT ACTIVITY</span>
+                <p className="nl-context-title">A bounded workflow.</p>
+                <div>
+                  <ShieldCheck size={15} />
+                  <span>
+                    <b>Checked urgent signs</b>
+                    <small>Deterministic checks run first</small>
+                  </span>
+                  <Check size={13} />
+                </div>
+                <div>
+                  <Stethoscope size={15} />
+                  <span>
+                    <b>Supervisor selected agents</b>
+                    <small>Doctor · Nutrition · Lab</small>
+                  </span>
+                  <Check size={13} />
+                </div>
                 <div>
                   <FileText size={15} />
                   <span>
-                    <b>Annual wellness panel</b>
-                    <small>PDF import · confirmed by you</small>
+                    <b>Added source notes</b>
+                    <small>References shown when used</small>
                   </span>
                   <Check size={13} />
                 </div>
-                <div>
-                  <Moon size={15} />
-                  <span>
-                    <b>Sleep & energy</b>
-                    <small>Reference notes · MedlinePlus</small>
-                  </span>
-                  <Check size={13} />
-                </div>
-                <div>
-                  <LockKeyhole size={15} />
-                  <span>
-                    <b>Companion access</b>
-                    <small>You pick what it reads</small>
-                  </span>
-                  <Check size={13} />
-                </div>
-                <p>Illustrative preview. No provider connection is implied.</p>
+                <p>Illustrative preview · agent availability depends on the configured model.</p>
               </aside>
             </div>
           </div>
@@ -257,8 +252,8 @@ export default function ProductLanding() {
             </h2>
             <p>
               An answer you can’t trace is just a rumour with better grammar.
-              NutritiScan keeps the model, the reference notes and your own
-              records visibly apart.
+              NutritiScan shows agent activity and reference notes when they
+              contribute to an answer.
             </p>
           </div>
           <div className="nl-bento-grid">
@@ -294,11 +289,11 @@ export default function ProductLanding() {
             <LockKeyhole size={24} strokeWidth={1.4} />
             <h2>Personal questions deserve a private space.</h2>
             <p>
-              Hosted answers send your question and the published reference
-              notes to the model provider — never your stored reports. Prefer
-              nothing to leave the tab? Turn on the on-device model instead.
-              Saved records are encrypted on the server, which can decrypt them
-              to run the service.
+              Chat history, profile details and meal notes are stored in this
+              browser. When you send a message, recent chat and the profile or
+              meal context you provided are sent to NutritiScan’s server and
+              may be processed by its configured AI provider. Don’t enter data
+              you are not comfortable sharing.
             </p>
             <Link href="/privacy">
               Read how your data is handled <ArrowUpRight size={14} />
@@ -323,7 +318,7 @@ export default function ProductLanding() {
           <Link className="nl-cta nl-cta-lg" href="/chat">
             Meet your health companion <ArrowRight size={17} />
           </Link>
-          <p>Free early access · no card · your records stay yours.</p>
+          <p>Free early access · no account required · for adults 18+.</p>
         </section>
       </main>
 

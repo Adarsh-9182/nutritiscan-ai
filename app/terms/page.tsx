@@ -1,74 +1,60 @@
 import Link from "next/link";
+
 export const metadata = {
   title: "Terms & product scope",
-  description:
-    "What NutritiScan is and is not: educational support with sources, not diagnosis, prescribing or emergency care. Early access, limited coverage, adults 18+.",
+  description: "NutritiScan is educational health chat, not diagnosis, prescribing or emergency care.",
   alternates: { canonical: "/terms" },
 };
+
 export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">EARLY ACCESS · 16 SEPTEMBER 2026</span>
-      <h1>
-        A clearer picture.
-        <br />
-        An honest scope.
-      </h1>
+      <span className="ns-eyebrow">EARLY ACCESS · 29 SEPTEMBER 2026</span>
+      <h1>A clearer picture. An honest scope.</h1>
+
       <h2>What NutritiScan does</h2>
       <p>
-        NutritiScan helps adults organise confirmed report values, compare them
-        with the reference ranges printed on those reports, maintain their own
-        follow-up list and prepare information for a clinician. It may provide
-        source-linked general education. Explanations are written by a general-purpose
-        AI model — hosted by default where this deployment has one, or entirely on your
-        own device after an optional download — and can be inaccurate. Educational
-        coverage is limited; source links are reference material, not clinical
-        verification.
+        NutritiScan is a conversational health companion. A supervisor may
+        route supported questions to specialist agents and use published
+        reference notes to prepare an educational response. Agent and model
+        availability depends on deployment configuration. Answers can be
+        inaccurate or incomplete.
       </p>
+
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>
-        This product does not diagnose, prescribe, recommend medication changes,
-        provide individual treatment plans, or replace a clinician. It is not a
-        clinically validated diagnostic device. A result within a reference
-        range does not prove you are healthy; one outside a range does not
-        establish a diagnosis. Comparisons across laboratories and methods may
-        be invalid.
+        NutritiScan does not diagnose, prescribe, recommend medication changes,
+        provide an individual treatment plan, or replace a clinician. It is not
+        a clinically validated diagnostic device. Safety checks may miss
+        symptoms or misunderstand your language.
       </p>
+
       <h2>Urgent concerns</h2>
       <p>
-        This is not an emergency service and does not monitor your health.
-        Automated checks may miss symptoms or misunderstand your language. If
+        This is not an emergency service and does not monitor your health. If
         you think you or another person needs urgent help, contact local
         emergency services or a qualified clinician without waiting for this
         app.
       </p>
+
       <h2>Your responsibilities</h2>
       <p>
-        Check extracted test names, values, units, dates and reference ranges
-        against the original report. Only submit information you have the right
-        to use. Keep your password and recovery key private. Do not rely on the
-        app to remind you of care: email and push notifications are not enabled.
+        Check health information with a qualified professional. Only share
+        information you have the right to use, and avoid entering details you
+        do not want processed by NutritiScan or a configured AI provider. This
+        early-access service is for adults 18+.
       </p>
-      <h2>Availability and price</h2>
+
+      <h2>Availability and feedback</h2>
       <p>
-        This release is free early access, with no subscription purchase or
-        charge. Account storage is limited to 500 records. Future paid plans,
-        consultations and additional features are not included or promised. You
-        can export your records at any time. Service interruptions are possible.
+        The chat is currently offered as free early access. Service
+        interruptions and changes are possible. Contact{" "}
+        <a href="mailto:adarshbhardwaj9182@gmail.com">adarshbhardwaj9182@gmail.com</a>
+        {" "}for product questions; do not include sensitive health data in
+        public feedback.
       </p>
-      <h2>Feedback</h2>
-      <p>
-        Contact{" "}
-        <a href="mailto:adarshbhardwaj9182@gmail.com">
-          adarshbhardwaj9182@gmail.com
-        </a>{" "}
-        for product questions. Share no sensitive health data in public
-        feedback.
-      </p>
-      <Link className="ns-button ns-dark" href="/workspace">
-        Open workspace
-      </Link>
+      <Link className="ns-button ns-dark" href="/chat">Open chat</Link>
     </main>
   );
 }

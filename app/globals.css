@@ -683,8 +683,7 @@ textarea:focus-visible {
   margin: 25px 0;
 }
 .ns-hero-copy h1 em,
-.ns-manifesto h2 em,
-.ns-auth-story h1 em {
+.ns-manifesto h2 em {
   font-family: var(--ns-serif);
   font-weight: 400;
 }
@@ -1001,46 +1000,8 @@ textarea:focus-visible {
 /* Account */
 .ns-auth {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100svh;
-}
-.ns-auth-story {
-  background: #12130f;
-  padding: 50px 10%;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.ns-auth-story > a {
-  position: absolute;
-  top: 35px;
-}
-.ns-auth-story h1 {
-  font-size: clamp(40px, 4.4vw, 70px);
-  line-height: 1.1;
-  letter-spacing: -2px;
-  margin: 25px 0;
-}
-.ns-auth-story > p {
-  font-size: 14px;
-  line-height: 1.8;
-  color: #a2aea0;
-}
-.ns-auth-quote {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 40px;
-  font-size: 12px;
-  line-height: 1.8;
-}
-.ns-auth-story > small {
-  font-size: 10px;
-  position: absolute;
-  bottom: 30px;
-  max-width: 80%;
-  color: #a4afa1;
 }
 .ns-auth-form {
   align-self: center;
@@ -2586,13 +2547,6 @@ textarea:focus-visible {
   .ns-public-footer > span {
     display: none;
   }
-  .ns-auth-story h1 {
-    font-size: 48px;
-  }
-  .ns-auth-story {
-    padding-left: 35px;
-    padding-right: 25px;
-  }
   .ns-auth-form {
     padding: 45px 30px;
   }
@@ -2719,12 +2673,6 @@ textarea:focus-visible {
   }
   .ns-public-footer .ns-brand {
     font-size: 20px;
-  }
-  .ns-auth {
-    grid-template-columns: 1fr;
-  }
-  .ns-auth-story {
-    display: none;
   }
   .ns-auth-form {
     padding: 30px 26px 45px;
@@ -3438,7 +3386,7 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .ns-companion-app .ns-demo-bar { padding:8px 30px; flex:none; }
 .ns-companion-app .ns-main.assistant-view { width:100%; max-width:none; margin:0; background:#141412; }
 .ns-companion-app .ns-app-footer { padding-left:30px; padding-right:30px; }
-.ha-layout { grid-template-columns:minmax(0,1fr) 238px; gap:12px; padding:12px; min-height:calc(100svh - 133px); }
+.ha-layout { grid-template-columns:minmax(0,1fr); gap:12px; padding:12px; min-height:calc(100svh - 133px); }
 .ha-layout:not(.ha-has-messages) .ha-conversation,.ha-has-messages .ha-conversation { border:1px solid #292927; border-radius:18px; background:#191818; }
 .ha-conversation { padding:20px 42px 26px; }
 .ha-context { border:1px solid #2a2b28; border-radius:18px; padding:27px 17px; background:#161615; }

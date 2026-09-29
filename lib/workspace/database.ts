@@ -1,6 +1,6 @@
 import postgres from "postgres";
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, readdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { workspaceSchema } from "./schema";
 
 export interface Database {
@@ -13,6 +13,12 @@ export async function createLocalDatabase(path?: string): Promise<Database> {
   const { PGlite } = await import("@electric-sql/pglite");
   const instance = new PGlite(path);
   await instance.exec(workspaceSchema);
+  const migrationsDir = join(process.cwd(), "migrations", "workspace");
+  const migrations = (await readdir(migrationsDir))
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+  for (const migration of migrations)
+    await instance.exec(await readFile(join(migrationsDir, migration), "utf8"));
   return {
     query: async <T>(sql: string, values: unknown[] = []) =>
       (await instance.query<T>(sql, values)).rows,
