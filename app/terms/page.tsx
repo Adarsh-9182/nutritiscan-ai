@@ -21,6 +21,11 @@ export default function Page() {
         availability depends on deployment configuration. Answers can be
         inaccurate or incomplete.
       </p>
+      <p>
+        The discharge workflow demo uses fictional records and simulated
+        roles. It does not connect to a hospital, identify a clinician, send a
+        patient message or provide a real clinical audit record.
+      </p>
 
       <h2>Medical decisions stay with qualified professionals</h2>
       <p>

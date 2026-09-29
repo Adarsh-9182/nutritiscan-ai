@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, FileText, RotateCcw } from "lucide-react";
 import { extractPendingTests, SYNTHETIC_DISCHARGE_NOTE, SYNTHETIC_LAB_RESULT } from "@/lib/discharge/extract";
+import { DEMO_ACTORS, DEMO_STORAGE_KEY, recordDemoEvent, restoreDemo, type RecordedEvent } from "@/lib/discharge/demo-store";
 import {
-  applyWorkflowEvent,
   INITIAL_CASE,
   workflowStatus,
   type PendingResultCase,
@@ -31,6 +31,8 @@ const candidate = candidates[0];
 
 export default function DischargeDemo() {
   const [caseState, setCaseState] = useState<PendingResultCase>(INITIAL_CASE);
+  const [events, setEvents] = useState<RecordedEvent[]>([]);
+  const [ready, setReady] = useState(false);
   const [testName, setTestName] = useState(candidate?.testName ?? "");
   const [sourceReviewer, setSourceReviewer] = useState("");
   const [owner, setOwner] = useState("");
@@ -41,11 +43,32 @@ export default function DischargeDemo() {
   const [error, setError] = useState("");
   const status = workflowStatus(caseState);
 
-  function act(event: WorkflowEvent) {
+  useEffect(() => {
     try {
-      const next = applyWorkflowEvent(caseState, event, new Date().toISOString());
-      setCaseState(next);
-      setError("");
+      const restored = restoreDemo(localStorage.getItem(DEMO_STORAGE_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore browser-only fictional state after hydration
+      setCaseState(restored.state);
+      setEvents(restored.events);
+      setError(restored.error ?? "");
+      if (restored.error) localStorage.removeItem(DEMO_STORAGE_KEY);
+    } catch {
+      setError("Browser storage is unavailable. This demo will reset when you leave.");
+    }
+    setReady(true);
+  }, []);
+
+  function act(event: WorkflowEvent, actorId: string) {
+    if (!ready) return;
+    try {
+      const next = recordDemoEvent(events, event, actorId, new Date().toISOString());
+      try {
+        localStorage.setItem(DEMO_STORAGE_KEY, next.serialized);
+        setError("");
+      } catch {
+        setError("Browser storage is unavailable. Your simulated steps will last only until this page closes.");
+      }
+      setCaseState(next.state);
+      setEvents(next.events);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This step could not be completed.");
     }
@@ -53,7 +76,7 @@ export default function DischargeDemo() {
 
   function submitAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    act({ type: "assign", owner, deadline });
+    act({ type: "assign", owner, deadline }, caseState.source?.reviewedBy ?? "");
   }
 
   function submitSourceReview(event: FormEvent<HTMLFormElement>) {
@@ -62,21 +85,22 @@ export default function DischargeDemo() {
       setError("This demo needs exactly one pending-test candidate. Review all candidates before creating a case.");
       return;
     }
-    act({ type: "confirm-source", source: candidate, testName, reviewedBy: sourceReviewer });
+    act({ type: "confirm-source", source: candidate, testName }, sourceReviewer);
   }
 
   function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    act({ type: "review", clinician: caseState.owner ?? "", decision, note });
+    act({ type: "review", decision, note }, caseState.owner ?? "");
   }
 
   function submitMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    act({ type: "approve-message", approvedBy: caseState.owner ?? "", message });
+    act({ type: "approve-message", message }, caseState.owner ?? "");
   }
 
   function reset() {
     setCaseState(INITIAL_CASE);
+    setEvents([]);
     setTestName(candidate?.testName ?? "");
     setSourceReviewer("");
     setOwner("");
@@ -84,6 +108,8 @@ export default function DischargeDemo() {
     setDecision("contact-patient");
     setNote("");
     setError("");
+    try { localStorage.removeItem(DEMO_STORAGE_KEY); }
+    catch { setError("Browser storage could not be cleared. The demo may return after a refresh."); }
   }
 
   return (
@@ -102,8 +128,9 @@ export default function DischargeDemo() {
           <p className="text-sm font-semibold uppercase tracking-widest text-[var(--emerald)]">Discharge follow-up · first product slice</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">Close the loop on a pending result.</h1>
           <p className="mt-5 text-base leading-7 text-[var(--text-muted)]">
-            Review a pending test found in a fictional discharge note, then follow it through assignment, clinical review and a documented outcome. Extraction uses a simple rule. Every step stays in this browser; no hospital system is connected and no patient message is sent.
+            Review a pending test found in a fictional discharge note, then follow it through assignment, clinical review and a documented outcome. Extraction uses a simple rule. Demo steps are saved in this browser so you can resume after a refresh. No hospital system is connected and no patient message is sent.
           </p>
+          <p className="mt-3 text-sm text-[var(--amber)]">Use fictional information only. Review notes and draft messages are saved in this browser.</p>
         </section>
 
         <div className="mt-9 grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
@@ -155,7 +182,7 @@ export default function DischargeDemo() {
                 <form onSubmit={submitSourceReview} className="mt-6 space-y-4">
                   <Step number="01" title="Review the extracted test" description="Check the exact source line and correct the test name if the rule got it wrong. Assignment stays locked until you confirm." />
                   <label className="block text-sm">Extracted test name
-                    <input value={testName} onChange={(event) => setTestName(event.target.value)} className={field} required />
+                    <input value={testName} onChange={(event) => setTestName(event.target.value)} className={field} maxLength={120} required />
                     <span className="mt-2 block text-xs leading-5 text-[var(--text-dim)]">A corrected name must match the lab result before this demo can advance. Use Start over to review the source again.</span>
                   </label>
                   <label className="block text-sm">Reviewing coordinator
@@ -165,7 +192,7 @@ export default function DischargeDemo() {
                       <option value="Ravi, discharge nurse">Ravi, discharge nurse</option>
                     </select>
                   </label>
-                  <button type="submit" className={action}>Confirm source in demo</button>
+                  <button type="submit" disabled={!ready} className={action}>Confirm source in demo</button>
                 </form>
               )}
 
@@ -182,14 +209,14 @@ export default function DischargeDemo() {
                   <label className="block text-sm">Review deadline
                     <input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={field} required />
                   </label>
-                  <button type="submit" className={action}>Confirm assignment</button>
+                  <button type="submit" disabled={!ready} className={action}>Confirm assignment</button>
                 </form>
               )}
 
               {status === "awaiting-result" && (
                 <div className="mt-6 space-y-4">
                   <Step number="03" title="Wait for the lab result" description={`${caseState.owner} owns review by ${caseState.deadline}. A live integration would detect the result; this demo matches a fictional lab report to the reviewed test.`} />
-                  <button type="button" onClick={() => act({ type: "result-arrived", testName: SYNTHETIC_LAB_RESULT.testName })} className={action}>Match simulated lab result</button>
+                  <button type="button" disabled={!ready} onClick={() => act({ type: "result-arrived", testName: SYNTHETIC_LAB_RESULT.testName }, DEMO_ACTORS["Fictional lab feed"].id)} className={action}>Match simulated lab result</button>
                 </div>
               )}
 
@@ -203,9 +230,9 @@ export default function DischargeDemo() {
                     </select>
                   </label>
                   <label className="block text-sm">Clinical review note
-                    <textarea value={note} onChange={(event) => setNote(event.target.value)} className={field} rows={3} required placeholder="Record why this follow-up decision was made in the synthetic case." />
+                    <textarea value={note} onChange={(event) => setNote(event.target.value)} className={field} rows={3} maxLength={1000} required placeholder="Record why this follow-up decision was made in the synthetic case." />
                   </label>
-                  <button type="submit" className={action}>Confirm fictional review</button>
+                  <button type="submit" disabled={!ready} className={action}>Confirm fictional review</button>
                 </form>
               )}
 
@@ -213,9 +240,9 @@ export default function DischargeDemo() {
                 <form onSubmit={submitMessage} className="mt-6 space-y-4">
                   <Step number="05" title="Approve the patient update" description="Review the wording before the workflow can record any delivery." />
                   <label className="block text-sm">Draft message
-                    <textarea value={message} onChange={(event) => setMessage(event.target.value)} className={field} rows={4} required />
+                    <textarea value={message} onChange={(event) => setMessage(event.target.value)} className={field} rows={4} maxLength={600} required />
                   </label>
-                  <button type="submit" className={action}>Approve draft in demo</button>
+                  <button type="submit" disabled={!ready} className={action}>Approve draft in demo</button>
                 </form>
               )}
 
@@ -223,7 +250,7 @@ export default function DischargeDemo() {
                 <div className="mt-6 space-y-4">
                   <Step number="06" title="Verify delivery" description="This button records a fictional delivery receipt. It does not send a message." />
                   <blockquote className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm leading-6 text-[var(--text-muted)]">{caseState.approvedMessage}</blockquote>
-                  <button type="button" onClick={() => act({ type: "record-delivery" })} className={action}>Record simulated delivery</button>
+                  <button type="button" disabled={!ready} onClick={() => act({ type: "record-delivery" }, DEMO_ACTORS["Fictional delivery feed"].id)} className={action}>Record simulated delivery</button>
                 </div>
               )}
 
@@ -244,7 +271,7 @@ export default function DischargeDemo() {
                 <li className="border-l-2 border-[var(--emerald)] pl-4"><b>Candidate extracted</b><p className="mt-1 text-[var(--text-muted)]">Rule found {candidates.length} pending test{candidates.length === 1 ? "" : "s"} in a synthetic discharge note. No fact is confirmed yet.</p></li>
                 {caseState.history.map((entry, index) => (
                   <li key={`${entry.at}-${index}`} className="border-l-2 border-[var(--border-strong)] pl-4">
-                    <b>{entry.description}</b><p className="mt-1 text-xs text-[var(--text-dim)]">{new Date(entry.at).toLocaleString()}</p>
+                    <b>{entry.description}</b><p className="mt-1 text-xs text-[var(--text-dim)]">{entry.actor.role} · {new Date(entry.at).toLocaleString()}</p>
                   </li>
                 ))}
               </ol>
@@ -252,7 +279,7 @@ export default function DischargeDemo() {
             <section className={card}>
               <h2 className="text-lg font-semibold">What this proves</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">The workflow requires source review, an assigned owner and documented clinical review. Patient contact needs an approved message and a delivery record.</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">PDF/OCR extraction, user identity, durable storage, hospital access, messaging and clinical validation are future milestones.</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Roles here are simulated and browser storage can be edited or cleared. Verified identities, server audit, PDF/OCR extraction, hospital access, messaging and clinical validation are future milestones.</p>
             </section>
           </aside>
         </div>

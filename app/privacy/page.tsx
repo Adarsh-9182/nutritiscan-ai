@@ -26,6 +26,13 @@ export default function Page() {
         profile may be able to view them. Use your browser&apos;s site-data
         controls to remove locally saved information.
       </p>
+      <p>
+        The separate synthetic discharge demo saves its fictional workflow
+        steps, review notes and draft messages in this browser so a page
+        refresh can restore them. They are not sent to NutritiScan&apos;s server.
+        Use fictional information only in that demo. Its Start over control
+        clears the saved demo steps.
+      </p>
 
       <h2>What is sent when you chat</h2>
       <p>
