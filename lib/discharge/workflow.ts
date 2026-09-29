@@ -1,8 +1,13 @@
+import type { PendingTestCandidate } from "./extract";
+
 export type ReviewDecision = "contact-patient" | "no-contact-needed";
 
+export type ReviewedSource = PendingTestCandidate & { extractedTestName: string; reviewedBy: string };
+
 export type WorkflowEvent =
+  | { type: "confirm-source"; source: PendingTestCandidate; testName: string; reviewedBy: string }
   | { type: "assign"; owner: string; deadline: string }
-  | { type: "result-arrived" }
+  | { type: "result-arrived"; testName: string }
   | { type: "review"; clinician: string; decision: ReviewDecision; note: string }
   | { type: "approve-message"; approvedBy: string; message: string }
   | { type: "record-delivery" };
@@ -10,6 +15,7 @@ export type WorkflowEvent =
 export type HistoryEntry = { at: string; description: string };
 
 export type PendingResultCase = {
+  source: ReviewedSource | null;
   owner: string | null;
   deadline: string | null;
   resultArrived: boolean;
@@ -20,6 +26,7 @@ export type PendingResultCase = {
 };
 
 export const INITIAL_CASE: PendingResultCase = {
+  source: null,
   owner: null,
   deadline: null,
   resultArrived: false,
@@ -30,6 +37,7 @@ export const INITIAL_CASE: PendingResultCase = {
 };
 
 export type WorkflowStatus =
+  | "needs-source-review"
   | "needs-owner"
   | "awaiting-result"
   | "needs-review"
@@ -38,6 +46,7 @@ export type WorkflowStatus =
   | "closed";
 
 export function workflowStatus(state: PendingResultCase): WorkflowStatus {
+  if (!state.source) return "needs-source-review";
   if (!state.owner) return "needs-owner";
   if (!state.resultArrived) return "awaiting-result";
   if (!state.review) return "needs-review";
@@ -57,7 +66,21 @@ export function applyWorkflowEvent(
   let description: string;
 
   switch (event.type) {
+    case "confirm-source": {
+      if (state.source) throw new Error("The source has already been reviewed.");
+      const testName = event.testName.trim();
+      const reviewedBy = event.reviewedBy.trim();
+      if (!testName || !reviewedBy || !event.source.documentId || !event.source.excerpt ||
+          !Number.isInteger(event.source.page) || event.source.page < 1 ||
+          !Number.isInteger(event.source.line) || event.source.line < 1) {
+        throw new Error("Confirm the test, reviewer and source location.");
+      }
+      next = { ...state, source: { ...event.source, extractedTestName: event.source.testName, testName, reviewedBy } };
+      description = `${reviewedBy} ${testName === event.source.testName ? "confirmed" : `corrected ${event.source.testName} to`} ${testName} from ${event.source.documentTitle}, page ${event.source.page}, line ${event.source.line}.`;
+      break;
+    }
     case "assign": {
+      if (!state.source) throw new Error("Review the document source before assignment.");
       if (state.resultArrived) throw new Error("Assign an owner before the result arrives.");
       const owner = event.owner.trim();
       const parsedDeadline = new Date(`${event.deadline}T00:00:00.000Z`);
@@ -74,6 +97,9 @@ export function applyWorkflowEvent(
     case "result-arrived": {
       if (!state.owner) throw new Error("Assign an owner before the result arrives.");
       if (state.resultArrived) throw new Error("The result has already arrived.");
+      if (event.testName.trim().toLowerCase() !== state.source?.testName.toLowerCase()) {
+        throw new Error("The arriving result does not match the reviewed pending test.");
+      }
       next = { ...state, resultArrived: true };
       description = "Lab result arrived; clinician review requested.";
       break;

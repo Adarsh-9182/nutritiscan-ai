@@ -42,7 +42,7 @@ This is a hypothesis about a promising first market, not proof of willingness to
 
 **Build next:**
 
-1. A synthetic discharge case and review screen with source-linked facts, missing fields and proposed actions. The first local simulator is at `/discharge-demo`; it uses one fixed fictional case, manual result-arrival simulation and no persistence or real data. Extend it to multiple synthetic cases and extraction review before a pilot.
+1. A synthetic discharge case and review screen with source-linked facts, missing fields and proposed actions. The local simulator at `/discharge-demo` uses one fixed fictional case, strict line-based pending-test extraction with page/line provenance, reviewer confirmation or correction, manual result-arrival simulation and no persistence or real data. Extend it to multiple synthetic cases, PDF/OCR extraction and a missing-information review before a pilot.
 2. A durable case model: patient and encounter identity, document versions, facts and provenance, proposed tasks, approvals, owner, deadline, status, and audit events. Use role-scoped access and explicit consent or institutional authorization.
 3. A workflow engine with idempotent task creation, retries, delivery receipts, escalation rules, and human takeover. Clinical decisions and outgoing messages require the appropriate review and authorization.
 4. A clinician review experience and a patient-facing approved plan. Only then add a hospital or ABDM-compatible connector where access is actually granted. ABDM describes consent-based exchange and FHIR-aligned interoperability; availability of a standard is not access to every hospital.

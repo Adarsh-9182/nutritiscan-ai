@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, FileText, RotateCcw } from "lucide-react";
+import { extractPendingTests, SYNTHETIC_DISCHARGE_NOTE, SYNTHETIC_LAB_RESULT } from "@/lib/discharge/extract";
 import {
   applyWorkflowEvent,
   INITIAL_CASE,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/discharge/workflow";
 
 const STATUS_TEXT = {
+  "needs-source-review": "Needs source review",
   "needs-owner": "Needs an owner",
   "awaiting-result": "Waiting for the lab",
   "needs-review": "Needs clinician review",
@@ -24,9 +26,13 @@ const STATUS_TEXT = {
 const field = "mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--emerald)]";
 const card = "rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6";
 const action = "rounded-xl bg-[var(--emerald)] px-4 py-2.5 text-sm font-semibold text-[#07130c] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--emerald)]";
+const candidates = extractPendingTests(SYNTHETIC_DISCHARGE_NOTE);
+const candidate = candidates[0];
 
 export default function DischargeDemo() {
   const [caseState, setCaseState] = useState<PendingResultCase>(INITIAL_CASE);
+  const [testName, setTestName] = useState(candidate?.testName ?? "");
+  const [sourceReviewer, setSourceReviewer] = useState("");
   const [owner, setOwner] = useState("");
   const [deadline, setDeadline] = useState("");
   const [decision, setDecision] = useState<ReviewDecision>("contact-patient");
@@ -50,6 +56,15 @@ export default function DischargeDemo() {
     act({ type: "assign", owner, deadline });
   }
 
+  function submitSourceReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (candidates.length !== 1 || !candidate) {
+      setError("This demo needs exactly one pending-test candidate. Review all candidates before creating a case.");
+      return;
+    }
+    act({ type: "confirm-source", source: candidate, testName, reviewedBy: sourceReviewer });
+  }
+
   function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     act({ type: "review", clinician: caseState.owner ?? "", decision, note });
@@ -62,6 +77,8 @@ export default function DischargeDemo() {
 
   function reset() {
     setCaseState(INITIAL_CASE);
+    setTestName(candidate?.testName ?? "");
+    setSourceReviewer("");
     setOwner("");
     setDeadline("");
     setDecision("contact-patient");
@@ -85,7 +102,7 @@ export default function DischargeDemo() {
           <p className="text-sm font-semibold uppercase tracking-widest text-[var(--emerald)]">Discharge follow-up · first product slice</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">Close the loop on a pending result.</h1>
           <p className="mt-5 text-base leading-7 text-[var(--text-muted)]">
-            Follow a fictional test from discharge to an assigned owner, clinical review and a documented outcome. Every step below is a local simulation. No hospital system is connected and no patient message is sent.
+            Review a pending test found in a fictional discharge note, then follow it through assignment, clinical review and a documented outcome. Extraction uses a simple rule. Every step stays in this browser; no hospital system is connected and no patient message is sent.
           </p>
         </section>
 
@@ -95,7 +112,7 @@ export default function DischargeDemo() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-dim)]">Fictional case · SYN-2047</p>
-                  <h2 id="case-heading" className="mt-2 text-xl font-semibold">One test is pending at discharge</h2>
+                  <h2 id="case-heading" className="mt-2 text-xl font-semibold">A test candidate was found at discharge</h2>
                 </div>
                 <span className={`rounded-full border border-[var(--border-strong)] px-3 py-1 text-xs ${status === "closed" ? "text-[var(--emerald)]" : "text-[var(--amber)]"}`} role="status">
                   {STATUS_TEXT[status]}
@@ -104,16 +121,25 @@ export default function DischargeDemo() {
               <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
                 <div><dt className="text-[var(--text-dim)]">Patient</dt><dd className="mt-1 font-medium">Fictional adult patient</dd></div>
                 <div><dt className="text-[var(--text-dim)]">Discharged</dt><dd className="mt-1 font-medium">28 Sep 2026</dd></div>
-                <div><dt className="text-[var(--text-dim)]">Pending test</dt><dd className="mt-1 font-medium">Urine culture</dd></div>
+                <div><dt className="text-[var(--text-dim)]">Pending test</dt><dd className="mt-1 font-medium">{caseState.source?.testName ?? "Awaiting source review"}</dd></div>
               </dl>
               <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · synthetic discharge note, item 4</p>
-                <p className="mt-2 text-sm leading-6">“Urine culture collected before discharge. Result pending; treating team to review when available.”</p>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {SYNTHETIC_DISCHARGE_NOTE.title}, page {candidate?.page ?? "?"}, line {candidate?.line ?? "?"}</p>
+                <p className="mt-2 text-sm leading-6">“{candidate?.excerpt ?? "No pending-test line found."}”</p>
+                <p className="mt-2 text-xs text-[var(--text-dim)]">Rule match · {caseState.source ? `reviewed by ${caseState.source.reviewedBy}${caseState.source.testName !== caseState.source.extractedTestName ? ` · corrected from ${caseState.source.extractedTestName}` : ""}` : "unconfirmed extraction"}</p>
+                <details className="mt-4 border-t border-[var(--border)] pt-3 text-sm">
+                  <summary className="cursor-pointer text-[var(--emerald)]">Read the full fictional source page</summary>
+                  <ol className="mt-3 list-decimal space-y-1 pl-7 text-[var(--text-muted)]">
+                    {SYNTHETIC_DISCHARGE_NOTE.pages[0].split("\n").map((line, index) => (
+                      <li key={`${index}-${line}`} className={index + 1 === candidate?.line ? "font-semibold text-[var(--text)]" : ""}>{line}</li>
+                    ))}
+                  </ol>
+                </details>
               </div>
               {caseState.resultArrived && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · synthetic lab report SYN-LAB-102</p>
-                  <p className="mt-2 text-sm leading-6">Result: no growth at 48 hours. This fictional value is for workflow demonstration only.</p>
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><FileText size={14} /> Source · {SYNTHETIC_LAB_RESULT.title} {SYNTHETIC_LAB_RESULT.documentId}</p>
+                  <p className="mt-2 text-sm leading-6">{SYNTHETIC_LAB_RESULT.testName}: {SYNTHETIC_LAB_RESULT.text}</p>
                 </div>
               )}
             </section>
@@ -125,9 +151,27 @@ export default function DischargeDemo() {
               </div>
               {error && <p role="alert" className="mt-4 rounded-lg border border-[var(--rose)] p-3 text-sm text-[var(--rose)]">{error}</p>}
 
+              {status === "needs-source-review" && (
+                <form onSubmit={submitSourceReview} className="mt-6 space-y-4">
+                  <Step number="01" title="Review the extracted test" description="Check the exact source line and correct the test name if the rule got it wrong. Assignment stays locked until you confirm." />
+                  <label className="block text-sm">Extracted test name
+                    <input value={testName} onChange={(event) => setTestName(event.target.value)} className={field} required />
+                    <span className="mt-2 block text-xs leading-5 text-[var(--text-dim)]">A corrected name must match the lab result before this demo can advance. Use Start over to review the source again.</span>
+                  </label>
+                  <label className="block text-sm">Reviewing coordinator
+                    <select value={sourceReviewer} onChange={(event) => setSourceReviewer(event.target.value)} className={field} required>
+                      <option value="">Choose a fictional reviewer</option>
+                      <option value="Anika, discharge coordinator">Anika, discharge coordinator</option>
+                      <option value="Ravi, discharge nurse">Ravi, discharge nurse</option>
+                    </select>
+                  </label>
+                  <button type="submit" className={action}>Confirm source in demo</button>
+                </form>
+              )}
+
               {status === "needs-owner" && (
                 <form onSubmit={submitAssignment} className="mt-6 space-y-4">
-                  <Step number="01" title="Assign a responsible clinician" description="A test cannot be followed up without an owner and review deadline." />
+                  <Step number="02" title="Assign a responsible clinician" description="A test cannot be followed up without an owner and review deadline." />
                   <label className="block text-sm">Responsible clinician
                     <select value={owner} onChange={(event) => setOwner(event.target.value)} className={field} required>
                       <option value="">Choose a fictional clinician</option>
@@ -144,14 +188,14 @@ export default function DischargeDemo() {
 
               {status === "awaiting-result" && (
                 <div className="mt-6 space-y-4">
-                  <Step number="02" title="Wait for the lab result" description={`${caseState.owner} owns review by ${caseState.deadline}. A live integration would detect the result; this demo simulates arrival.`} />
-                  <button type="button" onClick={() => act({ type: "result-arrived" })} className={action}>Simulate result arrival</button>
+                  <Step number="03" title="Wait for the lab result" description={`${caseState.owner} owns review by ${caseState.deadline}. A live integration would detect the result; this demo matches a fictional lab report to the reviewed test.`} />
+                  <button type="button" onClick={() => act({ type: "result-arrived", testName: SYNTHETIC_LAB_RESULT.testName })} className={action}>Match simulated lab result</button>
                 </div>
               )}
 
               {status === "needs-review" && (
                 <form onSubmit={submitReview} className="mt-6 space-y-4">
-                  <Step number="03" title="Record the clinician's review" description="The agent can surface the result; only the assigned clinician decides the follow-up." />
+                  <Step number="04" title="Record the clinician's review" description="The agent can surface the result; only the assigned clinician decides the follow-up." />
                   <label className="block text-sm">Decision
                     <select value={decision} onChange={(event) => setDecision(event.target.value as ReviewDecision)} className={field}>
                       <option value="contact-patient">Patient contact required</option>
@@ -167,7 +211,7 @@ export default function DischargeDemo() {
 
               {status === "needs-message" && (
                 <form onSubmit={submitMessage} className="mt-6 space-y-4">
-                  <Step number="04" title="Approve the patient update" description="Review the wording before the workflow can record any delivery." />
+                  <Step number="05" title="Approve the patient update" description="Review the wording before the workflow can record any delivery." />
                   <label className="block text-sm">Draft message
                     <textarea value={message} onChange={(event) => setMessage(event.target.value)} className={field} rows={4} required />
                   </label>
@@ -177,7 +221,7 @@ export default function DischargeDemo() {
 
               {status === "needs-delivery" && (
                 <div className="mt-6 space-y-4">
-                  <Step number="05" title="Verify delivery" description="This button records a fictional delivery receipt. It does not send a message." />
+                  <Step number="06" title="Verify delivery" description="This button records a fictional delivery receipt. It does not send a message." />
                   <blockquote className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm leading-6 text-[var(--text-muted)]">{caseState.approvedMessage}</blockquote>
                   <button type="button" onClick={() => act({ type: "record-delivery" })} className={action}>Record simulated delivery</button>
                 </div>
@@ -197,7 +241,7 @@ export default function DischargeDemo() {
               <h2 id="trail-heading" className="text-lg font-semibold">Review trail</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Every transition has a reason and an actor. In this demo, you are simulating those actors.</p>
               <ol className="mt-5 space-y-4 text-sm">
-                <li className="border-l-2 border-[var(--emerald)] pl-4"><b>Source received</b><p className="mt-1 text-[var(--text-muted)]">Synthetic discharge note identifies one pending test.</p></li>
+                <li className="border-l-2 border-[var(--emerald)] pl-4"><b>Candidate extracted</b><p className="mt-1 text-[var(--text-muted)]">Rule found {candidates.length} pending test{candidates.length === 1 ? "" : "s"} in a synthetic discharge note. No fact is confirmed yet.</p></li>
                 {caseState.history.map((entry, index) => (
                   <li key={`${entry.at}-${index}`} className="border-l-2 border-[var(--border-strong)] pl-4">
                     <b>{entry.description}</b><p className="mt-1 text-xs text-[var(--text-dim)]">{new Date(entry.at).toLocaleString()}</p>
@@ -207,8 +251,8 @@ export default function DischargeDemo() {
             </section>
             <section className={card}>
               <h2 className="text-lg font-semibold">What this proves</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">The workflow cannot close merely because a model saw a result. It needs an assigned owner and documented clinical review. Patient contact needs an approved message and a delivery record.</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Actual record extraction, user identity, durable storage, hospital access, messaging and clinical validation are future milestones.</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">The workflow requires source review, an assigned owner and documented clinical review. Patient contact needs an approved message and a delivery record.</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">PDF/OCR extraction, user identity, durable storage, hospital access, messaging and clinical validation are future milestones.</p>
             </section>
           </aside>
         </div>
