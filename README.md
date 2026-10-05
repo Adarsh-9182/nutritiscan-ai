@@ -1,10 +1,10 @@
 # NutritiScan
 
-NutritiScan is a conversational health companion. Its public site explains the product, and `/chat` is the agent experience: a supervisor can route supported questions to Doctor, Nutrition, Lab, Fitness and Coach specialists, then show the activity and references used.
+NutritiScan is an agentic AI health agent for a person managing their health. It should use a source-linked health history as context, help with supported health tasks, ask before important changes, verify completed actions, and hand off when a task exceeds its safe scope. History organization is a core capability, not the whole product. The proposed target design is in [PRODUCT_SYSTEM_DESIGN.md](docs/PRODUCT_SYSTEM_DESIGN.md).
 
 The product is educational early access for adults 18+. It is not a diagnosis, prescription, emergency service or replacement for a clinician. Agent availability depends on the configured model and reference coverage is limited.
 
-The next product direction is a supervised discharge-to-home agent for hospital teams. The researched problem, proposed workflow and milestones are in [the active product strategy](docs/ACTIVE_PRODUCT_STRATEGY.md). The [pilot discovery guide](docs/PILOT_DISCOVERY.md) covers hospital interviews and pilot criteria. These hospital capabilities are not part of the current public chat.
+The active web app is still an educational chat prototype; the agentic workflows, server-backed health history, and user-approved action loop in the system design are target capabilities, not shipped features. A supervised hospital discharge workflow is a possible later extension; its problem research is retained in [the hospital workflow research note](docs/ACTIVE_PRODUCT_STRATEGY.md).
 
 ## Start locally
 

@@ -2,7 +2,7 @@
 
 Reviewed: 5 October 2026
 
-This review describes the web application in this repository. It is a working prototype, not a hospital-ready product. The intended first product direction is a supervised discharge follow-up workflow, but the current public `/chat` experience is an educational health companion and `/discharge-demo` is a fictional workflow simulator.
+This review describes the web application in this repository. It is a working prototype, not a production health agent. NutritiScan's target is a patient-facing agentic AI health agent; the current public `/chat` experience is an educational conversation and `/discharge-demo` is a fictional workflow simulator. See [the proposed product system design](PRODUCT_SYSTEM_DESIGN.md) for the target agent loop and architecture.
 
 ## What works today
 
@@ -36,11 +36,11 @@ In Python terms, `/api/chat/route.ts` is similar to a FastAPI route, Zod request
 
 | Priority | Gap | Why it matters | Next implementation step |
 | --- | --- | --- | --- |
-| P0 | No sign-in, verified identity, organization boundary, or server-side case store | Browser storage is tied to one device and is not a safe shared medical record. | Add authenticated users, hospital/tenant scoping, and a server database before accepting real records. |
+| P0 | No sign-in, verified identity, owner boundary, or server-side health record | Browser storage is tied to one device and is not a safe shared medical record. | Add authenticated patient accounts, owner-scoped storage, and server-side access checks before accepting real records. |
 | P0 | No approved source-system integration or real document intake | The demo uses fixed fictional text and a rule-based extractor. | Keep synthetic fixtures; define an authorized import boundary and source provenance before implementing PDF/OCR ingestion. |
 | P0 | Demo actors are selectable labels, not authenticated people | A role check in a local simulator demonstrates workflow rules but cannot enforce real permissions. | Bind every action to a verified identity and server-enforced role/assignment. |
 | P1 | No durable server audit, job retries, or delivery receipt integration | Browser history can be cleared or edited; simulated delivery does not reach a patient. | Persist append-only workflow events and add idempotent integration jobs with explicit human approval. |
-| P1 | Public chat and discharge workflow are separate product surfaces | The current conversation does not create or track a hospital discharge case. | Keep the boundary explicit; build a clinician case review screen as the next vertical slice. |
+| P1 | The chat is turn-based; there is no general run/approval/execute/verify lifecycle for agent tasks | Multi-step tasks can appear successful before durable work is saved or verified. | Add a bounded run state machine and one synthetic read → propose → approve → execute → verify journey. |
 | P1 | No real browser end-to-end test of the product in Safari/Chrome | Component tests prove UI logic but not real navigation, scrolling, responsive layout, or browser behavior. | Add a small browser smoke journey after the first server-backed slice. |
 
 Do not enter real patient data into this prototype. A synthetic workflow proves software behavior only; it does not prove clinical safety, legal readiness, hospital access, or useful outcomes.

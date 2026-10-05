@@ -1,6 +1,6 @@
-# NutritiScan: active product strategy
+# NutritiScan: hospital workflow research candidate
 
-Research snapshot: 29 September 2026. India-first is a working assumption until a pilot partner and target market are confirmed. This document describes product direction, not features available in the public chat.
+Research snapshot: 29 September 2026. This is a researched hospital-workflow candidate, **not the active product direction**. The current product intent is a patient-facing agentic AI health agent; see [the proposed web system design](PRODUCT_SYSTEM_DESIGN.md). Keep this research as a possible later workflow until user discovery and product strategy justify building it. India-first was only an assumption for this candidate; no launch geography is confirmed.
 
 ## The job to solve
 
@@ -10,7 +10,7 @@ India's Safdarjung Hospital manual calls for a signed discharge summary containi
 
 Sources: [Safdarjung Hospital manual](https://vmmc-sjh.mohfw.gov.in/sites/default/files/Hospital%20Manual%2C%20April%202025%2C%20DGHS%2C%20MoHFW%20-%2001.04.2025.pdf), [WHO medication safety at transitions](https://www.who.int/publications/i/item/WHO-UHC-SDS-2019.9), [AHRQ pending results](https://www.ahrq.gov/patient-safety/settings/hospital/red/toolkit/redtool3a.html).
 
-## First product: discharge-to-home agent
+## Candidate workflow: discharge-to-home agent
 
 **Buyer and operating owner:** a hospital or care team. **Daily users:** discharge coordinator, nurse, treating clinician, and the patient after discharge. A pilot must identify the actual owner of each task in the hospital's workflow.
 
