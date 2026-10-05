@@ -125,6 +125,7 @@ export default function ProductLanding() {
 
       <main>
         <section className="nl-hero" id="top">
+          <p className="nl-positioning">Agentic layer on medical data</p>
           <span className="nl-badge">
             <i /> Reference-backed help · free early access
           </span>

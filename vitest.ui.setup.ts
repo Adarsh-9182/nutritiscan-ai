@@ -2,9 +2,24 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+// Node 26 exposes its own localStorage accessor. Vitest's jsdom bridge can
+// leave that accessor in front of jsdom's storage, so use deterministic
+// browser storage for component tests.
+const values = new Map<string, string>();
+const storage = {
+  get length() { return values.size; },
+  clear: () => values.clear(),
+  getItem: (key: string) => values.get(key) ?? null,
+  key: (index: number) => [...values.keys()][index] ?? null,
+  removeItem: (key: string) => values.delete(key),
+  setItem: (key: string, value: string) => values.set(key, String(value)),
+};
+Object.defineProperty(window, "localStorage", { configurable: true, value: storage });
+vi.stubGlobal("localStorage", storage);
+
 afterEach(() => {
   cleanup();
-  localStorage.clear();
+  storage.clear();
 });
 
 /**

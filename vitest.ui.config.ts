@@ -15,6 +15,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Give origin-scoped browser APIs a stable URL in the test environment.
+    environmentOptions: { jsdom: { url: "http://localhost/" } },
     maxWorkers: 1,
     globals: true,
     include: ["components/**/*.test.tsx"],
