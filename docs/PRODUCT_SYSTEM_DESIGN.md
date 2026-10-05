@@ -6,9 +6,9 @@ Updated: 5 October 2026
 
 ## 1. Product decision
 
-**NutritiScan is a chat-first, agentic AI health agent for a person managing their health.** Chat is the main product surface: the user asks, clarifies, sees the agent's plan and plugin/tool activity, reviews approvals, and gets verified results in one conversation. The agent helps the person understand health information, organize medical history, prepare for care, and follow through on approved next steps. Health history is trusted context and memory; plugins are capabilities the agent can use. Neither is the product by itself.
+**NutritiScan is a chat-first, agentic health workspace: a Claude Code-like interface for health questions, evidence, records, and carefully approved actions.** Chat is the control room: the user asks, clarifies, sees the agent's concise plan and plugin/tool activity, reviews approvals, and gets verified results in one conversation. The same bounded runtime can support three distinct workspaces: Personal Health (people organizing their own health), Clinical (care professionals working within an authorized care context), and Research (researchers analyzing public or explicitly authorized data). Each workspace has separate identity, tools, data scope, retention, and evaluations. A role switch must never silently widen access to another person's records.
 
-It is not an autonomous doctor. It must not independently diagnose, prescribe, change treatment, or make a clinical decision. The initial user is an adult patient acting for themself. Hospital-team workflows remain a possible later extension, once the patient-facing agent and a real workflow need are validated. Before any real-data pilot, validate the agent's first job with users and decide the launch geography, data-processing arrangement, and model provider policy.
+It is not an autonomous doctor or an unsupervised research authority. It must not independently diagnose, prescribe, change treatment, make clinical decisions, or present a literature summary as clinical consensus. The long-term product serves different health roles, but the first build should use synthetic patient records and public research sources; clinician access to real patient data comes only after identity, authorization, governance, and validation are in place. Before any real-data pilot, validate the first job with users and decide the launch geography, data-processing arrangement, and model provider policy.
 
 ### Agent behavior
 
@@ -18,22 +18,22 @@ Every agent task follows this loop:
 
 The agent may autonomously read and organize information the person authorized it to use, retrieve approved educational sources, ask clarifying questions, and prepare drafts. It must get explicit approval before saving a new health fact, creating a persistent reminder or care task, exporting/sharing information, or contacting another person. Clinical decisions stay with the person and their qualified care team.
 
-### Recommended first agent job: prepare for a care conversation inside chat
+### Recommended first build: a public-evidence research assistant inside chat
 
-Use appointment preparation as the first end-to-end test of the chat agent, not as the whole product. It proves memory, scoped retrieval, planning, clarification, source-grounded drafting, approval, and a verified export without pretending the agent can make a clinical decision. Report explanation and follow-up organization become more skills in the same chat after the agent foundation works. Validate this first job in user interviews before real health data is involved.
+Start with a researcher workflow over public sources: ask a question, retrieve relevant PubMed articles and ClinicalTrials.gov studies, compare evidence, and create a cited brief with clear limits and gaps. In parallel, use a fixed synthetic patient profile to test health-history tools without real patient data. This lets us build and evaluate the shared agent foundation before account integrations or sensitive clinical data. Personal appointment preparation and report explanation then become skills in the same chat; they are examples, not the product boundary. Clinician workflows follow only when a real partner and governance path exist.
 
 ### First complete user journey
 
-1. A person opens one conversation and asks for help with a health question, report, symptom, or upcoming appointment.
+1. A user opens the appropriate Personal Health, Clinical, or Research workspace and asks a question. The active workspace is explicit in the conversation.
 2. The agent checks for urgent signals, states its scope, and explains a short plan when tools are needed. For an urgent signal it stops ordinary planning and provides configured escalation guidance.
-3. It invokes only enabled plugins/tools, reads only relevant confirmed history the person has allowed it to use, and asks about missing information rather than inferring it.
+3. It invokes only workspace-enabled plugins/tools, reads only sources that the user is authorized to access, and asks about missing information rather than inferring it.
 4. It replies in the conversation with source cards and a clear split between record facts, the person's current report, and general information.
 5. If the task needs a write, the chat shows the exact proposed action. The person edits, confirms, or rejects it in context.
 6. After approval, the server executes once, verifies the saved result/receipt, and reports success or failure back in the same conversation. External sharing has a separate recipient and consent check.
 
 Document intake, lab explanation, symptom organization and follow-up tasks are agent skills using the same trust boundaries. The first release should prove one complete task before broadening the skill set.
 
-**First release success measure:** the share of supported agent journeys that end in a user-verified outcome (a source-grounded answer, approved brief, or confirmed task), with no unsupported fact or duplicate action. Track time to outcome, user corrections, extraction omissions, unanswered requests, approval/rejection rates, tool failures, and safe escalations. These are product measures, not evidence of improved health outcomes.
+**First release success measure:** the share of supported agent journeys that end in a user-verified outcome (a source-grounded research brief, synthetic-history answer, or confirmed task), with no unsupported fact or duplicate action. Track citation correctness, source coverage, evidence omissions, user corrections, unanswered requests, approval/rejection rates, tool failures, and safe escalations. These are product measures, not evidence of improved health or research outcomes.
 
 ## 2. What exists and what does not
 
@@ -112,6 +112,22 @@ flowchart TD
 | Tool gateway and action executor | Validate plugin/tool call, authorize each read/write; require approval, idempotency, expiry and verification for writes | Let the model call arbitrary SQL, URLs, or external actions directly |
 | Safety service | Triage rules, policy checks, output validation, fixed escalation responses | Depend only on prompts or model self-assessment |
 | Audit and operations | Record actor/action/resource/result metadata; latency and failure metrics | Put prompt text, report contents, or secrets in standard logs |
+
+### Workspaces and data boundaries
+
+| Workspace | First useful jobs | Data and access boundary |
+| --- | --- | --- |
+| Personal Health | Explain a selected report, organize history, prepare questions for a care visit | The person's own confirmed records and explicitly connected sources; the person controls writes and sharing |
+| Research | Search public literature and trials, compare study designs/results, draft a cited evidence brief | Public sources by default; private datasets require a separately authorized, governed project context |
+| Clinical | Summarize authorized records, prepare a chart-grounded draft or literature brief for clinician review | Verified professional and organization context, patient authorization, audit, and human sign-off; unavailable in the first release |
+
+These are product workspaces, not three agents with unrestricted shared memory. The active workspace fixes the permitted tools and data; every run carries that scope. Keep public research questions and patient records in separate contexts unless the user deliberately asks for a permitted synthesis and policy allows it.
+
+### Connector strategy
+
+Build a connector interface, but do not assume every consumer app exposes its data. Cal AI's public FAQ documents Apple Health/Google Fit synchronization for steps; it does not establish a public meal-log API. MyFitnessPal describes its developer API as private and approval-based. Do not scrape either app or rely on undocumented endpoints. Apple HealthKit and Android Health Connect are native, permission-scoped mobile platforms; because this product is web-first, direct support requires a companion mobile bridge or an export/import path. Apple clinical-record access has extra entitlement and participating-provider constraints. Begin with user-selected uploads/FHIR files or clearly specified manual entry, then add connectors only after permission, scopes, revocation, and provenance work end to end.
+
+For Research mode, start with public, stable interfaces such as [PubMed E-utilities](https://pubmed.ncbi.nlm.nih.gov/download/) and the [ClinicalTrials.gov API](https://www.nlm.nih.gov/pubs/techbull/ma24/ma24_clinicaltrials_api.html). Store source IDs, retrieval time, query, and exact cited claims; label abstracts separately from full-text review and avoid implying that search ranking equals evidence quality. For clinical systems, prefer standards-based, authorized FHIR exchange over bespoke scraping.
 
 ## 4. Request flows
 
@@ -228,10 +244,10 @@ The host owns installation, validation, permission prompts, tool dispatch, and a
 
 Initial first-party plugin set:
 
-1. **Health history:** read selected, confirmed facts and return fact IDs with provenance.
-2. **Reports and labs:** read a person-selected report, explain extracted fields, and flag missing units/ranges without changing the record.
-3. **Trusted references:** retrieve approved educational material with stable source IDs and links.
-4. **Care tasks:** propose a reminder or task; create it only after the person approves the exact text and due time.
+1. **Public evidence search:** search PubMed and ClinicalTrials.gov; return stable identifiers, metadata, retrieval time, and source links.
+2. **Synthetic health history:** read fixed test facts and return fact IDs with provenance; keep this plugin available for development/evaluation without real patient data.
+3. **Reports and labs:** later read a person-selected report, explain extracted fields, and flag missing units/ranges without changing the record.
+4. **Care tasks:** later propose a reminder or task; create it only after the person approves the exact text and due time.
 
 The chat should show concise progress (“Checking the report you selected”), plugin/tool name, source/result, and any approval request. Do not expose hidden chain-of-thought; show the plan and evidence the person needs to understand and control the action.
 
@@ -270,11 +286,11 @@ Evaluation layers:
 
 ### M0 — Product and data decisions
 
-Validate the recommended appointment-preparation job with a few target users. Decide one launch geography, accepted first document type, explicit retention, and whether model processing is on-device or through a reviewed provider. Until decided, use synthetic records only.
+Validate the research brief workflow with researchers and the Personal Health jobs with people managing records. Decide one launch geography, explicit retention, and whether model processing is on-device or through a reviewed provider. Until decided, use public sources and synthetic records only.
 
-### M1 — Synthetic agent vertical slice
+### M1 — Research-first agent vertical slice
 
-Inside one conversation, the person asks for visit preparation → agent explains its short plan → first-party history/reference plugins read a fixed synthetic profile → agent asks for missing details → drafts a source-linked brief and optional reminder → chat shows the exact proposed action → person approves/rejects → action runs once → app verifies and shows the result. The transcript includes concise tool activity, source cards, approval cards, and recovery states. Include cancellation, timeout, retry, unsupported and urgent paths. No account sync, real uploads or external messages yet. This proves that the chat is an agent interface, not only a prompt box.
+Inside one Research conversation, the user asks an answerable health question → agent states its plan → public-evidence plugins search PubMed/ClinicalTrials.gov → agent identifies coverage limits and asks a clarifying question when needed → drafts a cited evidence brief → citation validator checks every reference → user reviews/exports the brief. In parallel, synthetic-history fixtures test scoped health-memory tools. Include tool traces, source cards, cancellation, timeout, retry, empty-search and prompt-injection cases. No real patient records or app-account sync. This proves the shared chat runtime and evidence discipline before sensitive integrations.
 
 ### M2 — Secure backend foundation
 
@@ -284,20 +300,20 @@ Authentication, migrations, owner-scoped record API, private object storage, aud
 
 Allowed PDF/text input, size/type checks, malware scanning, asynchronous extraction, review and correction, deduplication, retries and browser end-to-end coverage.
 
-### M4 — Health agent skills
+### M4 — Personal Health workspace
 
-Scoped read tools, curated source retrieval, typed answers and visit briefs, deterministic validation, run/step trace UI, bounded follow-up tasks, AI evaluations, and explicit save/share confirmation. Add a skill only with an end-to-end evaluation set and defined failure behavior.
+Add user-controlled document import, reviewed facts, report explanation, appointment preparation, narrow read tools, run/step trace UI, bounded follow-up tasks, AI evaluations, and explicit save/share confirmation. Then evaluate native HealthKit/Health Connect bridging or approved APIs against user demand and platform constraints. Add a skill only with an end-to-end evaluation set and defined failure behavior.
 
 ### M5 — Pilot readiness
 
-Accessibility, failure drills, security review, data export/deletion rehearsal, provider and region review, support/incident ownership, and a consented pilot plan. Only then consider an approved live record connector or the hospital discharge workflow.
+Accessibility, failure drills, security review, data export/deletion rehearsal, provider and region review, support/incident ownership, and a consented pilot plan. Only then begin a Clinical workspace pilot with verified professionals and an authorized data partner.
 
 ## 10. Deliberately postponed
 
-- Hospital user roles, organization tenancy, discharge queues and lab-system polling.
+- Clinical workspace, organization tenancy, discharge queues and lab-system polling until a real partner and governance plan exist.
 - Automatic patient messaging, appointment booking, medication changes, diagnosis or treatment plans.
 - Multi-agent debates, unbounded autonomous action loops, vector database and model fine-tuning.
-- Broad EHR/ABDM integrations, voice agents, payments and clinician marketplace.
+- Broad EHR/ABDM integrations, unapproved app scraping, voice agents, payments and clinician marketplace.
 
 These are postponed to keep the first system understandable, testable and useful. They can be added when user evidence and the required operational approvals justify them.
 
