@@ -6,7 +6,7 @@ Updated: 5 October 2026
 
 ## 1. Product decision
 
-**NutritiScan is an agentic AI health agent for a person managing their health.** Its job is to help the person understand relevant health information, organize their medical history, prepare for care, and follow through on user-approved next steps. Health history is the agent's trusted context and memory; it is a core platform capability, not the whole product. The agent should make progress on a task, show what it used, ask before important writes or sharing, verify completed actions, and hand off when a task exceeds its safe scope.
+**NutritiScan is a chat-first, agentic AI health agent for a person managing their health.** Chat is the main product surface: the user asks, clarifies, sees the agent's plan and plugin/tool activity, reviews approvals, and gets verified results in one conversation. The agent helps the person understand health information, organize medical history, prepare for care, and follow through on approved next steps. Health history is trusted context and memory; plugins are capabilities the agent can use. Neither is the product by itself.
 
 It is not an autonomous doctor. It must not independently diagnose, prescribe, change treatment, or make a clinical decision. The initial user is an adult patient acting for themself. Hospital-team workflows remain a possible later extension, once the patient-facing agent and a real workflow need are validated. Before any real-data pilot, validate the agent's first job with users and decide the launch geography, data-processing arrangement, and model provider policy.
 
@@ -18,18 +18,18 @@ Every agent task follows this loop:
 
 The agent may autonomously read and organize information the person authorized it to use, retrieve approved educational sources, ask clarifying questions, and prepare drafts. It must get explicit approval before saving a new health fact, creating a persistent reminder or care task, exporting/sharing information, or contacting another person. Clinical decisions stay with the person and their qualified care team.
 
-### Recommended first agent job: prepare for a care conversation
+### Recommended first agent job: prepare for a care conversation inside chat
 
-Start with **appointment preparation from a patient-selected set of health records**. It naturally proves the core loop—memory, scoped retrieval, planning, clarification, source-grounded drafting, approval, and a verified export—without pretending the agent can make a clinical decision. Report explanation and follow-up organization become the next skills after this journey works. Validate the choice in user interviews before real health data is involved.
+Use appointment preparation as the first end-to-end test of the chat agent, not as the whole product. It proves memory, scoped retrieval, planning, clarification, source-grounded drafting, approval, and a verified export without pretending the agent can make a clinical decision. Report explanation and follow-up organization become more skills in the same chat after the agent foundation works. Validate this first job in user interviews before real health data is involved.
 
 ### First complete user journey
 
-1. A person asks for help with a health question or starts from a report, symptom, or upcoming appointment.
-2. The agent checks for urgent signals and states its scope. For an urgent signal it stops ordinary planning and provides configured escalation guidance.
-3. It reads only relevant, confirmed history the person has allowed it to use. It asks about important missing information instead of filling gaps from inference.
-4. It prepares a source-linked answer or plan: facts to understand, questions to ask, and any follow-up the person requested. It separates record facts from the person's current report and from general information.
-5. It shows the answer, plan, sources, and proposed actions. The person edits, confirms, or rejects each persistent action.
-6. After approval, the server saves the brief/task, verifies the saved result, and shows what changed. External sharing is a separate action with a separate recipient and consent check.
+1. A person opens one conversation and asks for help with a health question, report, symptom, or upcoming appointment.
+2. The agent checks for urgent signals, states its scope, and explains a short plan when tools are needed. For an urgent signal it stops ordinary planning and provides configured escalation guidance.
+3. It invokes only enabled plugins/tools, reads only relevant confirmed history the person has allowed it to use, and asks about missing information rather than inferring it.
+4. It replies in the conversation with source cards and a clear split between record facts, the person's current report, and general information.
+5. If the task needs a write, the chat shows the exact proposed action. The person edits, confirms, or rejects it in context.
+6. After approval, the server executes once, verifies the saved result/receipt, and reports success or failure back in the same conversation. External sharing has a separate recipient and consent check.
 
 Document intake, lab explanation, symptom organization and follow-up tasks are agent skills using the same trust boundaries. The first release should prove one complete task before broadening the skill set.
 
@@ -41,6 +41,7 @@ Document intake, lab explanation, symptom organization and follow-up tasks are a
 
 - `/` is the product landing page; `/chat` is an educational supervisor/specialist chat.
 - `/api/chat` has request limits, deterministic safety triage, specialist routing, and answer validation for supported clinical turns.
+- The existing chat already has agent/tool activity traces and several bounded capabilities. Reuse its tested routing and safety logic; the target adds a general run lifecycle and explicit plugin contract rather than replacing the chat with another product surface.
 - Chat threads, profile, and meal notes are browser-local. The submitted message and relevant context go to the configured model provider when hosted inference is enabled.
 - `/discharge-demo` is a fictional, browser-local workflow demonstration. It is not a patient-record service.
 
@@ -55,7 +56,7 @@ Some older documents describe a removed account workspace or a hospital-first ta
 
 ## 3. System boundaries
 
-Use a **modular monolith** for the first release. Keep the Next.js web app and API in one deployable application, organize code into explicit domains, and add one background worker only when document processing needs durable retries. Do not begin with microservices, an agent framework migration, or a separate vector database.
+Use a **modular monolith** for the first release. Keep the Next.js chat, API, agent runtime, plugin registry, and domain services in one deployable application, organized into explicit modules. Add a background worker for durable document/follow-up jobs when needed. Adopt the useful agentic-chat pattern—visible tool activity, contextual references, approvals and resumable tasks—without copying coding-agent powers such as arbitrary file/shell execution. Do not begin with microservices, arbitrary third-party code execution, an agent framework migration, or a separate vector database.
 
 ```mermaid
 flowchart TD
@@ -64,27 +65,37 @@ flowchart TD
   Web --> API[Versioned API boundary]
   API --> Access[Authorization + consent + rate limits]
   Access --> App[Application services]
-  App --> Record[Health record domain]
-  App --> Docs[Document intake + review]
-  App --> Consult[Agent runs + consultations]
+  App --> Chat[Chat + conversation state]
+  Chat --> Runtime[Bounded agent runtime]
+  Runtime --> Consult[Agent runs + consultations]
+  Runtime --> Safety[Deterministic safety + policy]
+  Safety --> Model[Model provider adapter]
+  Model --> OutputCheck[Validate typed model output]
+  OutputCheck -->|tool request| ToolGate[Permission + approval gate]
+  ToolGate -->|permitted read or approved write| Registry[First-party plugin registry]
+  ToolGate -->|write needs approval| Approval[Exact approval card]
+  Approval --> Chat
+  Person -->|approve exact action| Executor[Idempotent action executor]
+  Executor -->|recheck scope + consent| ToolGate
+  Registry --> Record[Health record plugin]
+  Registry --> Docs[Report/document plugin]
+  Registry --> Evidence[Evidence/reference plugin]
+  Registry --> Tasks[Care task plugin]
+  Record --> ToolResult[Normalize untrusted tool result]
+  Docs --> ToolResult
+  Evidence --> ToolResult
+  Tasks --> ToolResult
+  ToolResult -->|observation; bounded loop| Runtime
+  OutputCheck -->|final answer/action proposal| FinalCheck[Source + safety validator]
+  FinalCheck --> Chat
   Record --> DB[(PostgreSQL\nstructured facts + audit events)]
   Docs --> Blob[(Private encrypted object storage\noriginal files)]
   Docs --> Queue[Durable processing job]
   Queue --> Extract[Text extraction / OCR]
   Extract --> Review[Unconfirmed fact proposals]
   Review --> Person
-  Consult --> Safety[Deterministic safety + policy]
-  Safety --> Planner[Bounded agent planner]
-  Planner --> Tools[Permission-checked tool gateway]
-  Tools --> Context[Scoped confirmed record context]
-  Context --> Evidence[Approved reference retrieval]
-  Evidence --> Model[Model provider adapter]
-  Model --> Validate[Schema + source + policy validation]
-  Validate --> Draft[Answer or proposed action]
-  Draft --> Person
-  Person -->|explicit approval| Executor[Idempotent action executor]
-  Executor --> Verify[Verify saved result / receipt]
-  Verify --> Person
+  Tasks --> Verify[Verify saved result / receipt]
+  Verify --> Chat
   App --> Audit[Append-only audit trail\nno raw health content in routine logs]
 ```
 
@@ -92,12 +103,13 @@ flowchart TD
 
 | Module | Responsibility | Must not do |
 | --- | --- | --- |
-| Web experience | Timeline, document review, chat, visit-brief editor, privacy controls | Treat browser state as canonical medical history |
+| Chat experience | Main conversation, tool trace, source cards, approval cards, run status; secondary panels for history/settings | Hide tool use, approval needs, or partial failures in prose |
 | Identity and access | Sign-in, account recovery, session, access decisions | Trust a patient or role ID supplied in request JSON |
 | Record service | Store confirmed facts, provenance, corrections, timeline | Accept model output as a confirmed fact |
 | Document service | Private upload, malware/type/size checks, extraction job, review queue | Expose original files publicly or auto-commit OCR output |
-| Agent runtime | Understand request, build a bounded plan, call scoped tools, draft typed output, resume/stop runs | Diagnose, prescribe, invent tool permissions, or treat its plan as an approved action |
-| Tool gateway and action executor | Authorize every read/write; require approval, idempotency, expiry and verification for writes | Let the model call arbitrary SQL, URLs, or external actions directly |
+| Agent runtime | Understand request, build a bounded plan, call enabled plugins, draft typed output, resume/stop runs | Diagnose, prescribe, invent tool permissions, or treat its plan as an approved action |
+| Plugin registry | Publish first-party capability manifests, versions, schemas, scopes, data handling and status | Load arbitrary third-party code or grant broad data access by default |
+| Tool gateway and action executor | Validate plugin/tool call, authorize each read/write; require approval, idempotency, expiry and verification for writes | Let the model call arbitrary SQL, URLs, or external actions directly |
 | Safety service | Triage rules, policy checks, output validation, fixed escalation responses | Depend only on prompts or model self-assessment |
 | Audit and operations | Record actor/action/resource/result metadata; latency and failure metrics | Put prompt text, report contents, or secrets in standard logs |
 
@@ -177,6 +189,8 @@ Use `/api/v1` for new resource APIs. The browser sends a message or an upload; t
 | `GET /api/v1/agent-runs/{id}` | Read the owner's agent run, progress, approvals needed and result |
 | `POST /api/v1/agent-runs/{id}/actions/{actionId}/approve` | Approve one exact proposed action; server rechecks identity and policy |
 | `POST /api/v1/agent-runs/{id}/cancel` | Cancel a queued/running task and prevent stale proposals from executing |
+| `GET /api/v1/plugins` | List available first-party plugins, status, and requested data scopes |
+| `POST /api/v1/plugins/{id}/permissions` | Grant or revoke the user's selected scopes for a plugin |
 | `POST /api/v1/consultations/{id}/visit-brief` | Generate a draft from an explicit date range and selected sources |
 | `GET /api/v1/care-tasks` | List confirmed user-owned follow-up tasks and their status |
 | `POST /api/v1/visit-briefs/{id}/approve` | Record the person's reviewed final brief |
@@ -198,6 +212,28 @@ Start with one user-facing agent and bounded task skills, not a free-roaming aut
 7. The person approves gated actions. The executor rechecks policy, executes once, verifies persisted state/receipt, and ends the run as succeeded, needs approval, needs human, failed, cancelled, or expired.
 
 Use one model call first. Add a second critic or specialist only if evaluations show a specific failure the extra latency/cost improves. Keep the provider behind an adapter so a hosted API can be disabled in favor of a local or approved model without moving domain rules into the prompt. Persist enough run metadata to explain what the agent tried, without retaining raw sensitive content in operational logs.
+
+### Plugin contract
+
+A **tool** is one typed operation, such as `search_health_history` or `draft_visit_brief`. A **plugin** packages related tools with a manifest that the host can inspect and enforce. The model sees the tool name, short description, and input schema; it never receives a plugin's secret credentials or direct implementation access.
+
+Each manifest should declare:
+
+- stable plugin ID, version, owner, description, and enabled/disabled/needs-permission/unavailable status;
+- tools with input and output schemas, timeout, retry policy, and whether the operation is read-only or writes state;
+- minimum data scopes (for example, selected lab reports, medication list, or care tasks) and whether hosted-model processing is involved;
+- risk tier, required approval, idempotency behavior, and stop/undo behavior where possible.
+
+The host owns installation, validation, permission prompts, tool dispatch, and audit. Tool output is untrusted input: a PDF, connected service, or plugin response may contain prompt injection, so normalize it, preserve provenance, and never let its text change agent policy. Start with **first-party plugins implemented in this repository**; do not run user-uploaded or arbitrary third-party plugin code. A later external plugin protocol must run through a server-side sandbox/adapter and the same per-user permission gate.
+
+Initial first-party plugin set:
+
+1. **Health history:** read selected, confirmed facts and return fact IDs with provenance.
+2. **Reports and labs:** read a person-selected report, explain extracted fields, and flag missing units/ranges without changing the record.
+3. **Trusted references:** retrieve approved educational material with stable source IDs and links.
+4. **Care tasks:** propose a reminder or task; create it only after the person approves the exact text and due time.
+
+The chat should show concise progress (“Checking the report you selected”), plugin/tool name, source/result, and any approval request. Do not expose hidden chain-of-thought; show the plan and evidence the person needs to understand and control the action.
 
 ### Run and action lifecycle
 
@@ -238,7 +274,7 @@ Validate the recommended appointment-preparation job with a few target users. De
 
 ### M1 — Synthetic agent vertical slice
 
-Person asks for visit preparation → agent explains its plan → reads a fixed synthetic history through tools → asks for missing details → drafts a source-linked brief and optional reminder → person approves/rejects → action runs once → app verifies and shows the result. Include cancellation, timeout, retry, unsupported and urgent paths. No account sync, real uploads or external messages yet. This establishes the agent loop with safe data.
+Inside one conversation, the person asks for visit preparation → agent explains its short plan → first-party history/reference plugins read a fixed synthetic profile → agent asks for missing details → drafts a source-linked brief and optional reminder → chat shows the exact proposed action → person approves/rejects → action runs once → app verifies and shows the result. The transcript includes concise tool activity, source cards, approval cards, and recovery states. Include cancellation, timeout, retry, unsupported and urgent paths. No account sync, real uploads or external messages yet. This proves that the chat is an agent interface, not only a prompt box.
 
 ### M2 — Secure backend foundation
 
@@ -271,8 +307,19 @@ These are postponed to keep the first system understandable, testable and useful
 - Zod schemas are like **Pydantic models**: they validate data at runtime; TypeScript types alone disappear when code runs.
 - A database transaction is like making a set of Python updates atomically: either the fact plus audit event both save, or neither does.
 - Provenance is a **receipt for each health fact**: it answers where the fact came from and who checked it.
-- An agent tool is a narrow function the model may request. The app still checks access and confirms important writes, just as a backend service would for any user.
+- A tool is one narrow function; a plugin is a reviewed package of tools plus permissions. The model may request a tool, but the app checks access and confirms important writes, just like a backend service would for any user.
 - An evaluation set is a repeatable exam for the AI. Unit tests check exact rules; AI evals check whether varied model answers stay within the product's boundaries.
+
+### Learning sequence while we implement
+
+1. **Agent loop:** compare a Python `async` loop (`plan → call function → observe result → decide whether to continue`) with the TypeScript runtime and streamed chat events.
+2. **Tool contracts:** write one tool schema and handler; learn JSON Schema/Zod, tool-call IDs, runtime validation, and why a TypeScript type does not validate a model response.
+3. **Health memory:** model facts, dates, sources and corrections in SQL; then retrieve only the records relevant to the current conversation.
+4. **Plugins:** package tools with a manifest and least-privilege scopes; learn how permissions, revocation, secrets and untrusted plugin results work.
+5. **Safe actions:** build an approval card, run state machine, idempotency key, retry and verification receipt; learn how to resume after a server restart without duplicating work.
+6. **AI quality:** create synthetic conversations, expected tool traces and adversarial cases; compare model variants with repeatable evaluations before adding more agents or capabilities.
+
+For each milestone, first walk through the request/data flow, map the idea to Python, implement one small slice, run its tests, and review failures together. The chat should show the agent's concise plan, plugin activity, evidence, and approval needs; its private internal reasoning stays hidden.
 
 ## 12. Decisions still open for review
 

@@ -1,6 +1,6 @@
 # NutritiScan
 
-NutritiScan is an agentic AI health agent for a person managing their health. It should use a source-linked health history as context, help with supported health tasks, ask before important changes, verify completed actions, and hand off when a task exceeds its safe scope. History organization is a core capability, not the whole product. The proposed target design is in [PRODUCT_SYSTEM_DESIGN.md](docs/PRODUCT_SYSTEM_DESIGN.md).
+NutritiScan is a chat-first, agentic AI health agent for a person managing their health. The chat is the main interface; a bounded agent uses permissioned plugins/tools, source-linked history, and user-approved actions to help with supported health tasks. It verifies completed actions and hands off when a task exceeds its safe scope. History organization is a core capability, not the whole product. The proposed target design is in [PRODUCT_SYSTEM_DESIGN.md](docs/PRODUCT_SYSTEM_DESIGN.md).
 
 The product is educational early access for adults 18+. It is not a diagnosis, prescription, emergency service or replacement for a clinician. Agent availability depends on the configured model and reference coverage is limited.
 
