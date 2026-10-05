@@ -292,6 +292,8 @@ Validate the research brief workflow with researchers and the Personal Health jo
 
 Inside one Research conversation, the user asks an answerable health question → agent states its plan → public-evidence plugins search PubMed/ClinicalTrials.gov → agent identifies coverage limits and asks a clarifying question when needed → drafts a cited evidence brief → citation validator checks every reference → user reviews/exports the brief. In parallel, synthetic-history fixtures test scoped health-memory tools. Include tool traces, source cards, cancellation, timeout, retry, empty-search and prompt-injection cases. No real patient records or app-account sync. This proves the shared chat runtime and evidence discipline before sensitive integrations.
 
+**First slice delivered:** `/research` now searches PubMed and ClinicalTrials.gov together, displays linked paper/registry source cards, and states search limits. `/api/research` validates and bounds the query, rate-limits calls, and sends no patient history. The AI-generated cited synthesis, citation-claim validator, saved runs, and synthetic history plugin are still outstanding parts of M1; the current page deliberately presents retrieved source material rather than pretending it is a completed systematic brief.
+
 ### M2 — Secure backend foundation
 
 Authentication, migrations, owner-scoped record API, private object storage, audit events, export/delete path and cross-account tests. Keep model processing disabled for real data until its data boundary is reviewed.

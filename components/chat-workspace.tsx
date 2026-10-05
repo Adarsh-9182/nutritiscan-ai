@@ -100,6 +100,10 @@ export default function ChatWorkspace() {
           Home
         </Link>
 
+        <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
+          Research
+        </Link>
+
         {/*
           There is no primary nav any more, because there is nowhere else to
           go. Dashboard, Scan and Timeline were three destinations holding

@@ -117,6 +117,9 @@ export default function ProductLanding() {
           <Link href="/privacy">Privacy</Link>
         </nav>
         <div className="nl-nav-actions">
+          <Link className="nl-cta" href="/research">
+            Research
+          </Link>
           <Link className="nl-cta" href="/chat">
             Start a conversation <ArrowRight size={15} />
           </Link>
