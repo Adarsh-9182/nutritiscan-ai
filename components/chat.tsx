@@ -5,6 +5,7 @@ import { dictationSupport, startDictation } from "@/lib/http/dictation";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Plus } from "lucide-react";
 import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
 import { attachedHealthFileFromMessage, questionWithoutHealthFile, withHealthFile, type AttachedHealthFile } from "@/lib/chat/file-context";
@@ -692,7 +693,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 <AgentConstellation onPick={(id) => send(AGENT_PROMPTS[id] ?? SUGGESTIONS[0])} />
               </div>
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xl text-white sm:hidden">
-                ✦
+                <Plus size={24} strokeWidth={2.5} aria-hidden="true" />
               </div>
               {/* blankProfile's name is "there", which greets a first-time
                   visitor as "Hi there." — fine as a greeting, wrong as a name.
@@ -823,7 +824,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                   <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group">
                     <div className="mb-1.5 flex items-center gap-2">
                       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[11px]" style={{ background: `${color}22` }}>
-                        {route === "supervisor" ? "✦" : agentGlyph(route)}
+                        {route === "supervisor" ? <Plus size={13} strokeWidth={2.5} aria-hidden="true" /> : agentGlyph(route)}
                       </span>
                       <span className="t-label font-medium" style={{ color }}>
                         {route === "supervisor" ? "Supervisor" : agentName(route)}

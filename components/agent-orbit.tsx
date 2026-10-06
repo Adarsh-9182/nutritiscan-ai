@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { Plus } from "lucide-react";
 import { AGENTS, agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
 
 /**
@@ -64,7 +65,7 @@ export function AgentConstellation({ onPick }: { onPick?: (agentId: string) => v
         {!reduce && <span className="ns-orbit-ring" />}
         <div className="relative grid h-20 w-20 place-items-center rounded-full border border-[rgba(111,232,180,0.45)] bg-[radial-gradient(circle_at_30%_30%,#1d3b30,#08110d)] shadow-[0_0_60px_-8px_rgba(111,232,180,0.6)]">
           <div className="text-center">
-            <div className="text-xl leading-none text-[var(--emerald)]">✦</div>
+            <Plus size={23} strokeWidth={2.5} className="mx-auto text-[var(--emerald)]" aria-hidden="true" />
             <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Supervisor</div>
           </div>
         </div>
@@ -195,7 +196,7 @@ function AgentPill({ id, active, done }: { id: string; active: boolean; done: bo
           aria-hidden
         />
       )}
-      <span aria-hidden>{id === "supervisor" ? "✦" : agentGlyph(id)}</span>
+      <span aria-hidden>{id === "supervisor" ? <Plus size={13} strokeWidth={2.5} /> : agentGlyph(id)}</span>
       {id === "supervisor" ? "Supervisor" : agentName(id)}
       {done && <span aria-hidden className="opacity-70">✓</span>}
     </span>
