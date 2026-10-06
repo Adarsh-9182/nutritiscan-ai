@@ -2,9 +2,11 @@ import {
   createAgentUIStream,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  safeValidateUIMessages,
   type UIMessage,
   type UIMessageStreamWriter,
 } from "ai";
+import { z } from "zod";
 import { buildGeneralist, buildSoloist, buildSupervisor } from "@/lib/agents";
 import { MODEL_TIERS } from "@/lib/agents/provider";
 import { demoAnswer, isSmallTalk, routeOf } from "@/lib/agents/demo";
@@ -42,6 +44,58 @@ const RATE_WINDOW_MS = 60_000;
 
 /** Transcript ceiling — the supervisor re-reads history on every turn. */
 const MAX_MESSAGES = 40;
+/** The browser keeps up to 50 messages per thread; validate before trimming. */
+const MAX_SUBMITTED_MESSAGES = 50;
+
+const ChatRequestSchema = z.object({
+  messages: z.array(z.unknown()).min(1).max(MAX_SUBMITTED_MESSAGES),
+  profile: z.unknown().optional(),
+  meals: z.unknown().optional(),
+}).strict();
+
+const MessageDataSchemas = {
+  trace: z.object({
+    agents: z.array(z.enum(["supervisor", "doctor", "nutrition", "fitness", "lab", "coach"])).max(6),
+    done: z.boolean(),
+  }).strict(),
+  triage: z.object({
+    verdict: z.string().max(40),
+    firedRules: z.array(z.string().max(100)).max(32),
+    channel: z.string().max(40).nullable(),
+    failedClosed: z.boolean(),
+  }).strict(),
+  note: z.object({
+    note: z.object({
+      consultationId: z.string().max(120),
+      turn: z.number().int().nonnegative(),
+      verdict: z.string().max(60),
+      firedRules: z.array(z.string().max(100)).max(32),
+      generatedAt: z.string().datetime(),
+      subjective: z.object({
+        heading: z.string().max(100),
+        lines: z.array(z.string().max(2_000)).max(100),
+        emptyNote: z.string().max(500),
+      }).strict(),
+      objective: z.object({
+        heading: z.string().max(100),
+        lines: z.array(z.string().max(2_000)).max(100),
+        emptyNote: z.string().max(500),
+      }).strict(),
+      assessment: z.object({
+        heading: z.string().max(100),
+        lines: z.array(z.string().max(2_000)).max(100),
+        emptyNote: z.string().max(500),
+      }).strict(),
+      plan: z.object({
+        heading: z.string().max(100),
+        lines: z.array(z.string().max(2_000)).max(100),
+        emptyNote: z.string().max(500),
+      }).strict(),
+      disclaimer: z.string().max(2_000),
+    }).strict(),
+    text: z.string().max(32_000),
+  }).strict(),
+};
 
 function lastUserText(messages: UIMessage[]): string {
   const last = [...messages].reverse().find((m) => m.role === "user");
@@ -377,17 +431,28 @@ export async function POST(req: Request) {
   const body = await readJsonCapped(req, MAX_BODY_BYTES);
   if (!body.ok) return Response.json({ error: body.error }, { status: body.status });
 
-  const raw = body.value as { messages?: unknown; profile?: unknown; meals?: unknown };
-  const messages = (Array.isArray(raw.messages) ? raw.messages : []) as UIMessage[];
-  if (!messages.length) {
-    return Response.json({ error: "Send at least one message." }, { status: 400 });
+  const requestBody = ChatRequestSchema.safeParse(body.value);
+  if (!requestBody.success) {
+    return Response.json({ error: "That chat request is not valid. Please try again." }, { status: 400 });
+  }
+
+  const checkedMessages = await safeValidateUIMessages<UIMessage>({
+    messages: requestBody.data.messages,
+    dataSchemas: MessageDataSchemas,
+  });
+  if (!checkedMessages.success || checkedMessages.data.some((message) => message.role === "system")) {
+    return Response.json({ error: "Those chat messages could not be read. Start a new conversation and try again." }, { status: 400 });
+  }
+  const messages = checkedMessages.data;
+  if (!messages.some((message) => message.role === "user")) {
+    return Response.json({ error: "Send a message before asking for an answer." }, { status: 400 });
   }
 
   // Never trust the client profile: it is interpolated into agent instructions.
-  const profile = safeProfile(raw.profile);
+  const profile = safeProfile(requestBody.data.profile);
   // Meal titles are model- or user-authored free text, so they get the same
   // sanitising as the profile before going anywhere near an instruction block.
-  const meals = safeMeals(raw.meals);
+  const meals = safeMeals(requestBody.data.meals);
   const nutrition = nutritionContext(profile, meals);
   const recent = messages.slice(-MAX_MESSAGES);
   const userText = lastUserText(recent);

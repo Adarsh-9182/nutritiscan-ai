@@ -139,7 +139,7 @@ To answer that properly I need a couple of things about you — they change the 
 - Your **weight**, and your **height** if you have it
 - What you're working toward: building muscle, losing fat, or staying healthy
 
-Tell me in a sentence ("68 kg, 5'9\", trying to build muscle") and I'll work from that. You can also open the chart beside this conversation and fill it in once.
+Include those details in your question so I can take them into account.
 
 _I won't invent a target from an average — a protein or calorie figure is only useful if it's actually yours._`;
   }

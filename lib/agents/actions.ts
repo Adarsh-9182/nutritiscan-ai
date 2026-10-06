@@ -133,7 +133,7 @@ export function actionTools(initial: HealthProfile) {
         ].filter(Boolean);
         if (!parts.length && !patch.name) return { kind: "none", summary: "Nothing to save." };
         profile = applyPatch({ ...profile, recorded: [...new Set([...(profile.recorded ?? []), ...recorded])] }, patch);
-        return { kind: "profile", patch, recorded, summary: `Saved to your chart: ${parts.join(" · ") || patch.name}` };
+        return { kind: "profile", patch, recorded, summary: `Updated your health profile: ${parts.join(" · ") || patch.name}` };
       },
     }),
 

@@ -103,7 +103,13 @@ function ActionChips({ parts }: { parts: ReturnType<typeof actionPartsOf> }) {
           >
             <span aria-hidden>{icon}</span>
             <span className={failed ? "text-[var(--text-dim)]" : "text-[var(--text)]"}>
-              {!done ? "Saving to your chart…" : p.output!.summary}
+              {!done
+                ? p.type === "tool-logMeal"
+                  ? "Logging your meal…"
+                  : p.type === "tool-recordLabResult"
+                    ? "Saving your lab result…"
+                    : "Updating your health profile…"
+                : p.output!.summary}
             </span>
             {done && !failed && <span className="ml-auto text-[var(--emerald)]" aria-label="saved">✓</span>}
           </div>
@@ -294,9 +300,8 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
   const { messages, setMessages, sendMessage, status, error, stop, regenerate } = useChat({ transport, messages: restored });
 
   /*
-   * The agents act as well as answer: a completed updateProfile, logMeal or
-   * recordLabResult call carries the change as its output, and it lands in
-   * the chart here — once per call, however often this re-renders.
+   * The agents act as well as answer: completed profile, meal and lab
+   * updates are applied to local memory once per tool call.
    */
   const [, setProfileStore] = useProfileStore();
   const [, , addMealStore] = useMeals();
@@ -658,10 +663,10 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                   visitor as "Hi there." — fine as a greeting, wrong as a name.
                   Only use it once it is one. */}
               <h1 className="ns-hero-title mt-4 text-[26px] font-semibold tracking-tight sm:text-[32px]">
-                {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. How are you feeling?` : "How are you feeling?"}
+                {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. What would you like help with?` : "What would you like help with?"}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                A Supervisor and five specialist agents — Doctor, Nutrition, Fitness, Lab and Coach — work every message together.
+                Your AI health assistant for clear, source-aware support across everyday health questions.
               </p>
             </div>
 
