@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
 import AuthNav from "@/components/auth-nav";
-import { newThread, useProfile } from "@/lib/memory/store";
+import { clearPendingConversationImport, newThread, readPendingConversationImport, readThreads, replaceThreads, savePendingConversationImport, setAccountSyncEnabled, useProfile } from "@/lib/memory/store";
+import type { Thread } from "@/lib/memory/threads";
+
+type SyncStatus = "anonymous" | "off" | "on" | "error";
 
 /**
  * The full-page conversation.
@@ -20,9 +23,89 @@ import { newThread, useProfile } from "@/lib/memory/store";
 export default function ChatWorkspace() {
   const [profile] = useProfile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [syncReady, setSyncReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("anonymous");
+  const [pendingImport, setPendingImport] = useState<Thread[]>([]);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncError, setSyncError] = useState("");
   // The conversation list can be tucked away to give the chat more room.
   const [railShown, setRailShown] = usePanelPref("ns-rail", true);
   const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/conversations", { cache: "no-store" });
+        if (!live) return;
+        if (response.status === 401) {
+          setAccountSyncEnabled(false);
+          setSyncStatus("anonymous");
+          return;
+        }
+        if (!response.ok) throw new Error("Could not check account chat sync.");
+        const data = await response.json() as { enabled: boolean; conversations: Thread[] };
+        if (!live) return;
+        if (data.enabled) {
+          const local = readThreads();
+          const remoteById = new Map(data.conversations.map((thread) => [thread.id, thread.updatedAt]));
+          const pending = readPendingConversationImport();
+          const candidates = pending.length ? pending : local.filter((thread) => !remoteById.has(thread.id) || thread.updatedAt > (remoteById.get(thread.id) ?? 0));
+          setPendingImport(candidates);
+          if (candidates.length) savePendingConversationImport(candidates);
+          replaceThreads(data.conversations);
+          setAccountSyncEnabled(true);
+          setSyncStatus("on");
+        } else {
+          setAccountSyncEnabled(false);
+          setSyncStatus("off");
+        }
+      } catch {
+        if (live) {
+          setAccountSyncEnabled(false);
+          setSyncStatus("error");
+        }
+      } finally {
+        if (live) setSyncReady(true);
+      }
+    };
+    void load();
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    const onSyncError = () => setSyncError("A conversation could not be synced. Your browser copy is still here; check your connection and keep this tab open.");
+    window.addEventListener("ns-account-sync-error", onSyncError);
+    return () => window.removeEventListener("ns-account-sync-error", onSyncError);
+  }, []);
+
+  const postImport = useCallback(async (threads: Thread[]) => {
+    setSyncBusy(true);
+    setSyncError("");
+    try {
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "enable", conversations: threads }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save conversations.");
+      replaceThreads(data.conversations as Thread[]);
+      clearPendingConversationImport();
+      setPendingImport([]);
+      setAccountSyncEnabled(true);
+      setSyncStatus("on");
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "Could not save conversations.");
+    } finally { setSyncBusy(false); }
+  }, []);
+
+  const enableSync = useCallback(() => postImport(readThreads()), [postImport]);
+  const importLocal = useCallback(() => {
+    const current = readThreads();
+    const combined = [...new Map([...current, ...pendingImport].map((thread) => [thread.id, thread])).values()];
+    void postImport(combined);
+  }, [pendingImport, postImport]);
 
   // On a wide screen the conversation list is a floating panel; on a narrow
   // screen it opens as a drawer.
@@ -48,6 +131,8 @@ export default function ChatWorkspace() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (!syncReady) return <div className="grid h-[100svh] place-items-center text-sm text-[var(--text-dim)]">Loading your conversations…</div>;
 
   return (
     <div className="flex h-[100svh] flex-col overflow-hidden">
@@ -113,7 +198,7 @@ export default function ChatWorkspace() {
               className="hidden shrink-0 overflow-hidden lg:block"
             >
               <div className="ns-float ml-3 my-3 h-[calc(100%-24px)] w-[264px]">
-                <ThreadSidebar />
+                <ThreadSidebar syncStatus={syncStatus} pendingImportCount={pendingImport.length} syncBusy={syncBusy} syncError={syncError} onEnableSync={enableSync} onImportLocal={importLocal} />
               </div>
             </motion.aside>
           )}
@@ -139,7 +224,7 @@ export default function ChatWorkspace() {
                 transition={{ type: "spring", stiffness: 380, damping: 36 }}
                 className="ns-float ns-float-solid fixed bottom-3 left-3 top-3 z-50 w-[280px] max-w-[calc(100vw-24px)] lg:hidden"
               >
-                <ThreadSidebar onNavigate={() => setDrawerOpen(false)} />
+                <ThreadSidebar onNavigate={() => setDrawerOpen(false)} syncStatus={syncStatus} pendingImportCount={pendingImport.length} syncBusy={syncBusy} syncError={syncError} onEnableSync={enableSync} onImportLocal={importLocal} />
               </motion.aside>
             </>
           )}

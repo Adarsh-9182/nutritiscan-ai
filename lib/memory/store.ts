@@ -186,6 +186,20 @@ const threadsStore = createStore<Thread[]>(THREADS_KEY, []);
  * the worst case is landing back on the previous conversation.
  */
 const activeStore = createStore<string | null>(ACTIVE_THREAD_KEY, null);
+const PENDING_IMPORT_KEY = "ns-pending-conversation-import-v1";
+
+export function savePendingConversationImport(threads: Thread[]) {
+  try { localStorage.setItem(PENDING_IMPORT_KEY, JSON.stringify(capThreads(threads))); } catch {}
+}
+export function readPendingConversationImport(): Thread[] {
+  try {
+    const raw = localStorage.getItem(PENDING_IMPORT_KEY);
+    return raw ? capThreads(safeThreads(JSON.parse(raw))) : [];
+  } catch { return []; }
+}
+export function clearPendingConversationImport() {
+  try { localStorage.removeItem(PENDING_IMPORT_KEY); } catch {}
+}
 
 /**
  * Read the stored conversations, carrying the pre-threads transcript forward
@@ -230,7 +244,44 @@ function loadThreads(): Thread[] {
 
 const writeThreads = (next: Thread[]) => threadsStore.write(capThreads(next));
 
+// Account sync is activated only after the person explicitly enables it.
+let accountSyncEnabled = false;
+let accountSyncQueue: Promise<void> = Promise.resolve();
+export function setAccountSyncEnabled(enabled: boolean) { accountSyncEnabled = enabled; }
+function queueAccountWrite(write: () => Promise<Response>) {
+  const run = async () => {
+    const response = await write();
+    if (!response.ok) throw new Error("Account chat sync failed.");
+  };
+  accountSyncQueue = accountSyncQueue.then(run, run).then(() => undefined).catch(() => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("ns-account-sync-error"));
+  });
+}
+function syncThread(thread: Thread) {
+  if (!accountSyncEnabled || typeof window === "undefined") return;
+  queueAccountWrite(() => fetch("/api/conversations", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversation: thread }),
+  }));
+}
+
 export const readThreads = loadThreads;
+
+/** Replace the browser list after an authenticated account history is loaded. */
+export function replaceThreads(next: Thread[]) {
+  const safe = capThreads(safeThreads(next));
+  writeThreads(safe);
+  if (safe.length) {
+    const active = activeStore.read();
+    activeStore.write(safe.some((thread) => thread.id === active) ? active : safe[0].id);
+    return;
+  }
+  const fresh = createThread();
+  writeThreads([fresh]);
+  activeStore.write(fresh.id);
+  syncThread(fresh);
+}
 
 /** The conversation in view, creating the first one if there is none. */
 export function readActiveThread(): Thread {
@@ -265,9 +316,10 @@ export function useActiveThreadId(): string | null {
 export function saveThread(id: string, messages: UIMessage[]) {
   const threads = loadThreads();
   if (!threads.some((t) => t.id === id)) return;
-  writeThreads(
-    threads.map((t) => (t.id === id ? retitle({ ...t, messages, updatedAt: Date.now() }) : t)),
-  );
+  const next = threads.map((t) => (t.id === id ? retitle({ ...t, messages, updatedAt: Date.now() }) : t));
+  writeThreads(next);
+  const updated = next.find((thread) => thread.id === id);
+  if (updated) syncThread(updated);
 }
 
 /**
@@ -285,6 +337,7 @@ export function newThread(): Thread {
   const thread = createThread();
   writeThreads([thread, ...threads]);
   activeStore.write(thread.id);
+  syncThread(thread);
   return thread;
 }
 
@@ -295,7 +348,10 @@ export function selectThread(id: string) {
 export function renameThread(id: string, title: string) {
   const clean = title.replace(/\s+/g, " ").trim();
   if (!clean) return;
-  writeThreads(loadThreads().map((t) => (t.id === id ? { ...t, title: clean } : t)));
+  const next = loadThreads().map((t) => (t.id === id ? { ...t, title: clean, updatedAt: Date.now() } : t));
+  writeThreads(next);
+  const updated = next.find((thread) => thread.id === id);
+  if (updated) syncThread(updated);
 }
 
 /**
@@ -303,6 +359,8 @@ export function renameThread(id: string, title: string) {
  * stored here, so this removes rather than archives.
  */
 export function deleteThread(id: string) {
+  if (accountSyncEnabled && typeof window !== "undefined")
+    queueAccountWrite(() => fetch(`/api/conversations?id=${encodeURIComponent(id)}`, { method: "DELETE" }));
   const remaining = loadThreads().filter((t) => t.id !== id);
   if (remaining.length) {
     writeThreads(remaining);
@@ -322,4 +380,7 @@ export function deleteAllThreads() {
   writeThreads([fresh]);
   activeStore.write(fresh.id);
   clearTranscript();
+  if (accountSyncEnabled && typeof window !== "undefined")
+    queueAccountWrite(() => fetch("/api/conversations", { method: "DELETE" }));
+  syncThread(fresh);
 }

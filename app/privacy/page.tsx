@@ -10,22 +10,27 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 29 SEPTEMBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 6 OCTOBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
-        NutritiScan currently offers a conversation with health agents. It does
-        not provide account-based records or a connected medical record
-        service. Chat supports text-based PDF or TXT attachments for
+        NutritiScan currently offers an educational conversation with health
+        agents. It does not provide a connected medical record service. Chat supports text-based PDF or TXT attachments for
         explanation; scanned PDFs and image files are not supported yet.
       </p>
 
       <h2>What stays in your browser</h2>
       <p>
         Chat history, your optional health profile, and meal notes are saved in
-        this browser so they can be available in later conversations. They are
-        not synced to a NutritiScan account. Anyone with access to this browser
-        profile may be able to view them. Use your browser&apos;s site-data
-        controls to remove locally saved information.
+        this browser so they can be available in later conversations. Profile
+        details and meal notes stay browser-local. Chats remain on this device
+        unless you sign in and explicitly choose
+        <strong> Save current chats to my account</strong>. When enabled,
+        current and future conversations are encrypted with NutritiScan&apos;s
+        application key before storage and can sync across devices. This is
+        server-side encryption, not end-to-end encryption. Deleting a
+        conversation from the chat list removes its local and synced copies.
+        Other local copies remain in this browser until you clear site data.
+        Anyone with access to this browser profile may be able to view them.
       </p>
       <p>
         The separate synthetic discharge demo saves its fictional workflow
@@ -50,9 +55,10 @@ export default function Page() {
         Chat report attachments are read in your browser. The original file is
         not uploaded as a file, but up to 12,000 extracted text characters are
         added to the conversation, saved with chat history in this browser, and
-        sent with your message to NutriScan&apos;s server and, when configured, a
-        hosted AI provider. Remove the message or clear this site&apos;s browser
-        data to remove that local copy.
+        sent with your message to NutritiScan&apos;s server and, when configured,
+        a hosted AI provider. If account sync is enabled, that conversation
+        also becomes part of the encrypted account history. Clear this
+        site&apos;s browser data to remove the local copy.
       </p>
 
       <h2>Safety and limits</h2>

@@ -32,7 +32,17 @@ function previewOf(thread: Thread): string {
   return text.replace(/\s+/g, " ").slice(0, 70);
 }
 
-export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void }) {
+type ThreadSidebarProps = {
+  onNavigate?: () => void;
+  syncStatus?: "anonymous" | "off" | "on" | "error";
+  pendingImportCount?: number;
+  syncBusy?: boolean;
+  syncError?: string;
+  onEnableSync?: () => void;
+  onImportLocal?: () => void;
+};
+
+export default function ThreadSidebar({ onNavigate, syncStatus = "anonymous", pendingImportCount = 0, syncBusy = false, syncError = "", onEnableSync, onImportLocal }: ThreadSidebarProps) {
   const threads = useThreads();
   const activeId = useActiveThreadId();
   const [query, setQuery] = useState("");
@@ -194,6 +204,26 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
           a mis-click, so it asks — inline, rather than through a dialog that
           would trap focus over a chat someone may be mid-sentence in. */}
       <div className="border-t border-[var(--border)] p-2">
+        <section className="mb-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5" aria-label="Account chat sync">
+          <p className="text-xs font-medium text-[var(--text)]">{syncStatus === "on" ? "Account sync is on" : "Keep chats on this device"}</p>
+          <p className="mt-1 text-[11px] leading-4 text-[var(--text-dim)]">
+            {syncStatus === "on"
+              ? "Synced conversations are encrypted before storage."
+              : syncStatus === "error"
+                ? "Sync status could not be checked. Chats remain in this browser."
+                : syncStatus === "anonymous"
+                  ? "Sign in to choose whether to sync chats across devices."
+                : "Chats stay in this browser until you choose to upload them. Saving turns on encrypted account sync for current and future conversations."}
+          </p>
+          {syncStatus === "anonymous" && <Link href="/login" onClick={onNavigate} className="mt-2 inline-block text-xs text-[var(--emerald)] hover:underline">Sign in</Link>}
+          {syncStatus === "off" && <button type="button" onClick={onEnableSync} disabled={syncBusy} className="mt-2 text-left text-xs font-medium text-[var(--emerald)] hover:underline disabled:opacity-50">{syncBusy ? "Saving chats…" : "Save current chats to my account"}</button>}
+          {syncStatus === "on" && pendingImportCount > 0 && <>
+            <p className="mt-2 text-[11px] leading-4 text-[var(--text-dim)]">This browser has {pendingImportCount} conversation{pendingImportCount === 1 ? "" : "s"} not in your account. Import only if you want to upload them.</p>
+            <button type="button" onClick={onImportLocal} disabled={syncBusy} className="mt-2 text-left text-xs font-medium text-[var(--emerald)] hover:underline disabled:opacity-50">{syncBusy ? "Importing…" : "Import this browser's chats"}</button>
+          </>}
+          {syncError && <p role="alert" className="mt-2 text-[11px] text-[var(--rose)]">{syncError}</p>}
+          <Link href="/privacy" onClick={onNavigate} className="mt-2 inline-block text-[10px] text-[var(--text-dim)] underline underline-offset-2">Privacy details</Link>
+        </section>
         {/*
           The way back to the marketing page.
           `/` redirects a returning browser straight here (see proxy.ts), so

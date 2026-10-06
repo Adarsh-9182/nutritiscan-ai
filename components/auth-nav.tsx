@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function AuthNav() {
-  const router = useRouter();
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
     let live = true;
@@ -19,7 +17,6 @@ export default function AuthNav() {
   if (!signedIn) return <Link href="/login" className="btn-ghost rounded-full px-3 py-1 t-label">Sign in</Link>;
   return <button className="btn-ghost rounded-full px-3 py-1 t-label" onClick={async () => {
     await fetch("/api/auth", { method: "DELETE" });
-    setSignedIn(false);
-    router.refresh();
+    window.location.reload();
   }}>Sign out</button>;
 }

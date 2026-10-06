@@ -1,13 +1,13 @@
 # NutritiScan web product review
 
-Reviewed: 5 October 2026
+Reviewed: 6 October 2026
 
 This review describes the web application in this repository. It is a working prototype, not a production health agent. NutritiScan's target is a patient-facing agentic AI health agent; the current public `/chat` experience is an educational conversation and `/discharge-demo` is a fictional workflow simulator. See [the proposed product system design](PRODUCT_SYSTEM_DESIGN.md) for the target agent loop and architecture.
 
 ## What works today
 
 - `/chat` provides a supervisor and specialist agents, streams answers, and includes source references, safety triage, and a clinician-facing consult note for supported clinical turns.
-- Chat threads, profile details, and meal notes live in the current browser. A configured hosted model receives the submitted message and relevant context; review provider data terms before entering sensitive information.
+- Username/password accounts use server sessions. Chat history remains browser-only until the user explicitly enables account sync; synced conversation payloads are encrypted and scoped to the owning account. Profile details and meal notes remain browser-local. A configured hosted model receives the submitted message and relevant context; review provider data terms before entering sensitive information.
 - `/discharge-demo` walks through a pending-test case from source review through assignment, simulated result arrival, clinician review, an approved draft message, and a simulated delivery receipt. Its records are fictional and saved in browser storage.
 - The domain logic and health-answer behavior have a meaningful automated test and evaluation suite. The UI test harness was failing under Node 26 because its global `localStorage` shadowed the jsdom browser storage; this review fixes that harness.
 
@@ -17,6 +17,8 @@ This review describes the web application in this repository. It is a working pr
 flowchart LR
   Person[Person in browser] --> ChatUI[/chat UI/]
   ChatUI --> Local[(Browser localStorage\nthreads + profile + meal notes)]
+  ChatUI -. explicit opt-in .-> Auth[Session + owner check]
+  Auth --> EncryptedDB[(Encrypted account conversations)]
   ChatUI --> API[/api/chat/]
   API --> Guard[Request size + rate checks]
   Guard --> Triage[Deterministic safety triage]
@@ -36,7 +38,7 @@ In Python terms, `/api/chat/route.ts` is similar to a FastAPI route, Zod request
 
 | Priority | Gap | Why it matters | Next implementation step |
 | --- | --- | --- | --- |
-| P0 | No sign-in, verified identity, owner boundary, or server-side health record | Browser storage is tied to one device and is not a safe shared medical record. | Add authenticated patient accounts, owner-scoped storage, and server-side access checks before accepting real records. |
+| P0 | Prototype accounts are not verified identities; no MFA, organization tenancy, or clinician roles | Username/password sign-in is a first learning slice, not a hospital identity system. Chat history sync is opt-in; profile and meal data remain local. | Add verified identity and role/organization authorization before any care-team workflow or real patient record. |
 | P0 | No approved source-system integration or real document intake | The demo uses fixed fictional text and a rule-based extractor. | Keep synthetic fixtures; define an authorized import boundary and source provenance before implementing PDF/OCR ingestion. |
 | P0 | Demo actors are selectable labels, not authenticated people | A role check in a local simulator demonstrates workflow rules but cannot enforce real permissions. | Bind every action to a verified identity and server-enforced role/assignment. |
 | P1 | No durable server audit, job retries, or delivery receipt integration | Browser history can be cleared or edited; simulated delivery does not reach a patient. | Persist append-only workflow events and add idempotent integration jobs with explicit human approval. |

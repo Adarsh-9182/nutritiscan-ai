@@ -18,7 +18,7 @@ export default function LoginPage() {
         </Link>
         <AuthPanel />
         <p className="mt-6 text-center text-xs leading-5 text-white/50">
-          The account stores your profile encrypted. Health chat history is still kept only in this browser in this release. This educational prototype is not for emergencies.
+          The account stores your name encrypted. Chat history stays in this browser unless you explicitly enable account sync in the chat sidebar. This educational prototype is not for emergencies.
         </p>
       </div>
     </main>
