@@ -8,6 +8,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { buildGeneralist, buildSoloist, buildSupervisor } from "@/lib/agents";
+import { actionTools } from "@/lib/agents/actions";
 import { MODEL_TIERS } from "@/lib/agents/provider";
 import { demoAnswer, isSmallTalk, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
@@ -436,9 +437,26 @@ export async function POST(req: Request) {
     return Response.json({ error: "That chat request is not valid. Please try again." }, { status: 400 });
   }
 
+  // Tool calls are part of the conversation history too. Validate them with
+  // the same action schemas used by the agent, plus the shared specialist
+  // delegation shape, before converting the history into model input.
+  const profile = safeProfile(requestBody.data.profile);
+  const validatedTools = {
+    ...actionTools(profile),
+    askNutritionAgent: { inputSchema: z.object({ task: z.string() }) },
+    askFitnessAgent: { inputSchema: z.object({ task: z.string() }) },
+    askDoctorAgent: { inputSchema: z.object({ task: z.string() }) },
+    askLabAgent: { inputSchema: z.object({ task: z.string() }) },
+    askCoachAgent: { inputSchema: z.object({ task: z.string() }) },
+  };
+
   const checkedMessages = await safeValidateUIMessages<UIMessage>({
     messages: requestBody.data.messages,
     dataSchemas: MessageDataSchemas,
+    // The SDK's validator accepts executable Tool objects in its TypeScript
+    // type, while validation only reads inputSchema. These schema-only
+    // entries intentionally have no execute function and are never run here.
+    tools: validatedTools as never,
   });
   if (!checkedMessages.success || checkedMessages.data.some((message) => message.role === "system")) {
     return Response.json({ error: "Those chat messages could not be read. Start a new conversation and try again." }, { status: 400 });
@@ -448,8 +466,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "Send a message before asking for an answer." }, { status: 400 });
   }
 
-  // Never trust the client profile: it is interpolated into agent instructions.
-  const profile = safeProfile(requestBody.data.profile);
   // Meal titles are model- or user-authored free text, so they get the same
   // sanitising as the profile before going anywhere near an instruction block.
   const meals = safeMeals(requestBody.data.meals);
