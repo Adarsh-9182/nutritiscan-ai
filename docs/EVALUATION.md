@@ -121,6 +121,7 @@ these evals.** Only an actual validation study supports that, and none exists.
 | `medication` | Are dangerous interactions caught? | Recall; `cannot_check` correctness |
 | `nutrition` | Are the numbers right? | Exact numeric assertion |
 | `health agent` | Can the Supervisor execute Lab/Doctor handoffs and pass recorded patient context? | Handoffs + context delivery |
+| `file input` | Does extracted health-file text reach the agent while the question stays distinct for triage? | Attachment integrity + question separation |
 | `labs` | Units and ranges handled correctly? | Conversion + range-source accuracy |
 | `calibration` | Does stated confidence match correctness? | ECE across the ladder |
 | `bias` | Does performance vary by demographic? | Max inter-group delta |
@@ -145,10 +146,19 @@ system-default range is labelled as such.
 and delegation tools with scripted AI SDK models. The model responses are
 fixed, so the eval is free and repeatable. It checks that Lab and Doctor
 handoffs execute, verifies both specialists receive the recorded B12 value,
-and checks that the Supervisor returns a final response. Because the scripted
-model specifies the handoffs, this does **not** test whether a live model
-chooses the right specialist or score biology accuracy. Those need a reviewed
-rubric and a separate repeated model eval.
+checks that the Supervisor returns a final response, and scores a basic
+glucose-homeostasis answer against `biology-rubric.ts` (including critical
+insulin/glucagon polarity errors). This scripted answer demonstrates rubric
+behavior; it does **not** establish live-model medical accuracy or whether a
+live model picks the right specialist. Those need reviewed examples and a
+separate repeated model eval.
+
+**`file-context.eval.ts`** checks that text extracted from a selected report is
+preserved for the agent, clearly marked as untrusted document content, and
+excluded from the text used for question routing and urgent-symptom triage.
+`components/chat.test.tsx` also checks the browser upload-to-message path for a
+TXT report. Chat attachments currently support text-based PDF and TXT only;
+scanned PDFs and image files need a later OCR/vision path.
 
 **`injection` has an existing baseline.** `lib/memory/schema.ts` already defends
 against delimiter escape, control characters, zero-width and bidi overrides, and

@@ -14,8 +14,9 @@ export default function Page() {
       <h1>Private health questions deserve care.</h1>
       <p>
         NutritiScan currently offers a conversation with health agents. It does
-        not provide account-based records, report uploads, or a connected
-        medical record service.
+        not provide account-based records or a connected medical record
+        service. Chat supports text-based PDF or TXT attachments for
+        explanation; scanned PDFs and image files are not supported yet.
       </p>
 
       <h2>What stays in your browser</h2>
@@ -44,6 +45,14 @@ export default function Page() {
         question and context may be processed by a hosted AI provider. Provider
         handling is subject to that provider&apos;s terms and retention practices.
         Do not include information you are not comfortable sending.
+      </p>
+      <p>
+        Chat report attachments are read in your browser. The original file is
+        not uploaded as a file, but up to 12,000 extracted text characters are
+        added to the conversation, saved with chat history in this browser, and
+        sent with your message to NutriScan&apos;s server and, when configured, a
+        hosted AI provider. Remove the message or clear this site&apos;s browser
+        data to remove that local copy.
       </p>
 
       <h2>Safety and limits</h2>

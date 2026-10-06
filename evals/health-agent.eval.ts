@@ -9,9 +9,10 @@
 
 import { MockLanguageModelV3 } from "ai/test";
 import { expect, vi } from "vitest";
-import { buildSupervisor } from "../lib/agents";
+import { buildSoloist, buildSupervisor } from "../lib/agents";
 import { evalSuite, gate } from "./harness";
 import { blankProfile } from "../lib/memory/profile";
+import { glucoseHomeostasisRubric, scoreBiologyAnswer } from "./biology-rubric";
 
 const { providers } = vi.hoisted(() => ({
   providers: { supervisor: undefined as unknown, specialist: undefined as unknown },
@@ -58,6 +59,17 @@ function textAnswer(text: string) {
 }
 
 evalSuite("health agent: biology context and specialist handoff", () => {
+  gate("scores a physiology answer against required mechanisms and critical concept swaps", async () => {
+    const answer = "After a meal, rising blood glucose stimulates beta cells in the pancreas to release insulin. Insulin helps tissues take up glucose and supports storage, lowering blood glucose. Between meals, lower blood glucose promotes glucagon release from pancreatic alpha cells. Glucagon acts mainly on the liver, signaling it to release glucose and raise blood glucose.";
+    providers.supervisor = new MockLanguageModelV3({ doGenerate: textAnswer(answer) });
+    const agent = buildSoloist("doctor", blankProfile, "", null, null, null, 0, undefined, false);
+    const result = await agent.generate({ prompt: glucoseHomeostasisRubric.question });
+    const score = scoreBiologyAnswer(result.text, glucoseHomeostasisRubric);
+
+    expect(score).toMatchObject({ passed: true, coverage: 1, missing: [], criticalErrors: [] });
+    expect(result.text).toBe(answer);
+  });
+
   gate("routes a biology question across Lab and Doctor with recorded patient context", async () => {
     const profile = {
       ...blankProfile,

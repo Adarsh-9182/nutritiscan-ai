@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 import { buildGeneralist, buildSoloist, buildSupervisor } from "@/lib/agents";
 import { actionTools } from "@/lib/agents/actions";
+import { attachedHealthFileFromMessage, questionWithoutHealthFile } from "@/lib/chat/file-context";
 import { MODEL_TIERS } from "@/lib/agents/provider";
 import { demoAnswer, isSmallTalk, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
@@ -98,7 +99,7 @@ const MessageDataSchemas = {
   }).strict(),
 };
 
-function lastUserText(messages: UIMessage[]): string {
+function lastUserMessageText(messages: UIMessage[]): string {
   const last = [...messages].reverse().find((m) => m.role === "user");
   if (!last) return "";
   return last.parts
@@ -106,6 +107,10 @@ function lastUserText(messages: UIMessage[]): string {
     .map((p) => p.text)
     .join(" ")
     .trim();
+}
+
+function lastUserText(messages: UIMessage[]): string {
+  return questionWithoutHealthFile(lastUserMessageText(messages));
 }
 
 type RealOutcome = "ok" | "unavailable" | "partial";
@@ -472,6 +477,7 @@ export async function POST(req: Request) {
   const nutrition = nutritionContext(profile, meals);
   const recent = messages.slice(-MAX_MESSAGES);
   const userText = lastUserText(recent);
+  const hasAttachedFile = attachedHealthFileFromMessage(lastUserMessageText(recent)) !== null;
 
   // ----------------------------------------------------------------
   // SAFETY LAYER 2 — TRIAGE. Runs before retrieval, before reasoning,
@@ -549,6 +555,10 @@ export async function POST(req: Request) {
         }
         // Every rung was spent and nothing reached the client — the demo
         // brain can still answer, and an honest answer beats a dead spinner.
+      }
+      if (hasAttachedFile) {
+        writeFixed(writer, "I received the extracted file text, but the AI service is unavailable, so I could not interpret this report. Please try again later. No report interpretation was generated.");
+        return;
       }
       // The demo brain has no idea about triage, so the urgency is prepended
       // deterministically. A keyless deployment must not lose the one part of

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
+import { attachedHealthFileFromMessage, questionWithoutHealthFile, withHealthFile, type AttachedHealthFile } from "@/lib/chat/file-context";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
 import { AgentConstellation, AgentRun } from "@/components/agent-orbit";
 import { actionPartsOf, applyActions } from "@/lib/memory/apply-actions";
@@ -309,6 +310,9 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     applyActions(messages, { setProfile: setProfileStore, addMeal: addMealStore });
   }, [messages, setProfileStore, addMealStore]);
   const [input, setInput] = useState("");
+  const [attachment, setAttachment] = useState<AttachedHealthFile | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   /*
@@ -419,11 +423,31 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion || busy ? "auto" : "smooth" });
   }, [messages, status, busy, reduceMotion]);
 
-  const send = (text: string) => {
-    if (!text.trim() || busy) return;
+  const send = (text: string, includeAttachment = false) => {
+    if ((!text.trim() && !(includeAttachment && attachment)) || busy || attachmentBusy) return;
     pinnedRef.current = true;
-    sendMessage({ text });
+    sendMessage({ text: includeAttachment && attachment ? withHealthFile(text, attachment) : text });
     setInput("");
+    if (includeAttachment) setAttachment(null);
+  };
+
+  const attachFile = async (file: File | null) => {
+    if (!file) return;
+    setAttachmentError(null);
+    setAttachmentBusy(true);
+    try {
+      const { readReportFile } = await import("@/lib/workspace/pdf");
+      const text = await readReportFile(file);
+      if (text.length > 12_000) {
+        throw new Error("This report has too much text for one chat message. Choose a shorter text file or a smaller report section.");
+      }
+      setAttachment({ name: file.name, text });
+    } catch (cause) {
+      setAttachment(null);
+      setAttachmentError(cause instanceof Error ? cause.message : "Could not read that file.");
+    } finally {
+      setAttachmentBusy(false);
+    }
   };
 
   /**
@@ -448,9 +472,14 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     if (!text || busy) return;
     const index = messages.findIndex((m) => m.id === id);
     if (index < 0) return;
+    const originalText = messages[index].parts
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text: string }).text)
+      .join(" ");
+    const originalAttachment = attachedHealthFileFromMessage(originalText);
     pinnedRef.current = true;
     setMessages(messages.slice(0, index));
-    sendMessage({ text });
+    sendMessage({ text: originalAttachment ? withHealthFile(text, originalAttachment) : text });
   };
 
   /**
@@ -467,7 +496,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     if (!last || last.role !== "assistant") return [];
     const asked = messages
       .filter((m) => m.role === "user")
-      .map((m) => m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" "));
+      .map((m) => questionWithoutHealthFile(m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" ")));
     return followUps(routeOf(asked[asked.length - 1] ?? ""), profile, asked);
   }, [messages, busy, error, profile]);
 
@@ -565,7 +594,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     for (let i = idx - 1; i >= 0; i--) {
       if (messages[i].role === "user") {
         const t = messages[i].parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" ");
-        return routeOf(t);
+        return routeOf(questionWithoutHealthFile(t));
       }
     }
     return "supervisor";
@@ -580,7 +609,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
       setInput={setInput}
       textareaRef={textareaRef}
       busy={busy}
-      onSubmit={() => send(input)}
+      onSubmit={() => send(input, true)}
       onStop={stop}
       canDictate={canDictate}
       listening={listening}
@@ -588,6 +617,12 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
       interim={interim}
       micError={micError}
       reduceMotion={!!reduceMotion}
+      attachmentName={attachment?.name ?? null}
+      attachmentBusy={attachmentBusy}
+      attachmentError={attachmentError}
+      onPickFile={attachFile}
+      onRemoveFile={() => setAttachment(null)}
+      sendDisabled={attachmentBusy}
     />
   );
 
@@ -712,6 +747,8 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
               {messages.map((m, idx) => {
                 const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("");
                 if (m.role === "user") {
+                  const attachedFile = attachedHealthFileFromMessage(text);
+                  const question = questionWithoutHealthFile(text);
                   if (editingId === m.id) {
                     return (
                       <div key={m.id} className="flex justify-end">
@@ -734,6 +771,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                             }}
                             className="scroll-thin w-full resize-none bg-transparent text-sm text-[var(--text)] outline-none"
                           />
+                          {attachedFile && <p className="mt-1 t-label text-[var(--text-dim)]">📎 {attachedFile.name} will be included again with your edited question.</p>}
                           <div className="mt-1.5 flex justify-end gap-2">
                             <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 t-label text-[var(--text-dim)] hover:text-[var(--text)] focus-ring">
                               Cancel
@@ -756,7 +794,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                       {!busy && (
                         <button
                           type="button"
-                          onClick={() => startEdit(m.id, text)}
+                          onClick={() => startEdit(m.id, question)}
                           aria-label="Edit this message"
                           title="Edit"
                           className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-[var(--text)] focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
@@ -764,8 +802,14 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           <span aria-hidden="true">✎</span>
                         </button>
                       )}
-                      <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[var(--said)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--text)]">
-                        {text}
+                      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[var(--said)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--text)]">
+                        {question && <p className="whitespace-pre-wrap">{question}</p>}
+                        {attachedFile && (
+                          <details className={`rounded-lg border border-[var(--border)] bg-[var(--surface)] ${question ? "mt-2" : ""}`}>
+                            <summary className="cursor-pointer px-2.5 py-2 text-[12px] text-[var(--text-muted)]">📎 {attachedFile.name} · extracted text</summary>
+                            <pre className="scroll-thin max-h-48 overflow-auto whitespace-pre-wrap border-t border-[var(--border)] px-2.5 py-2 font-sans text-[11px] leading-relaxed text-[var(--text-dim)]">{attachedFile.text}</pre>
+                          </details>
+                        )}
                       </div>
                     </div>
                   );
@@ -980,6 +1024,12 @@ function Composer({
   interim,
   micError,
   reduceMotion,
+  attachmentName,
+  attachmentBusy,
+  attachmentError,
+  onPickFile,
+  onRemoveFile,
+  sendDisabled,
 }: {
   centered: boolean;
   input: string;
@@ -994,7 +1044,14 @@ function Composer({
   interim: string;
   micError: string | null;
   reduceMotion: boolean;
+  attachmentName: string | null;
+  attachmentBusy: boolean;
+  attachmentError: string | null;
+  onPickFile: (file: File | null) => void;
+  onRemoveFile: () => void;
+  sendDisabled: boolean;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <form
       onSubmit={(e) => {
@@ -1002,7 +1059,37 @@ function Composer({
         onSubmit();
       }}
     >
+      {(attachmentName || attachmentBusy) && (
+        <div className="mb-2 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+          <span aria-hidden="true">📎</span>
+          <span className="min-w-0 flex-1 truncate">{attachmentBusy ? "Reading file on this device…" : attachmentName}</span>
+          {!attachmentBusy && <button type="button" onClick={onRemoveFile} aria-label="Remove attached file" className="rounded px-1.5 text-[var(--text-dim)] hover:text-[var(--text)]">Remove</button>}
+        </div>
+      )}
+      {attachmentError && <p className="mb-2 text-[12px] text-[var(--rose)]" role="alert">{attachmentError}</p>}
       <div className="flex items-end gap-2 rounded-[18px] border border-[var(--border-strong)] bg-[var(--surface)] px-5 py-4 shadow-[0_1px_2px_rgba(28,25,20,.04),0_10px_28px_-18px_rgba(28,25,20,.22)] transition-colors focus-within:border-[color-mix(in_oklab,var(--emerald)_45%,transparent)]">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.txt,application/pdf,text/plain"
+          aria-label="Choose a health report file"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0] ?? null;
+            event.currentTarget.value = "";
+            onPickFile(file);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy || attachmentBusy}
+          aria-label="Attach a health report"
+          title="Attach a text-based PDF or TXT health report"
+          className="btn-ghost grid h-8 w-8 shrink-0 place-items-center rounded-full disabled:opacity-40"
+        >
+          <span aria-hidden="true">＋</span>
+        </button>
         {/* A placeholder is not a label — it disappears on focus. */}
         <label htmlFor="chat-input" className="sr-only">
           Describe how you feel, or ask a health question
@@ -1058,7 +1145,7 @@ function Composer({
             <span aria-hidden="true">■</span>
           </button>
         ) : (
-          <button type="submit" disabled={!input.trim()} aria-label="Send message" className="btn-primary grid h-8 w-8 shrink-0 place-items-center rounded-full text-base disabled:opacity-40">
+          <button type="submit" disabled={sendDisabled || (!input.trim() && !attachmentName)} aria-label="Send message" className="btn-primary grid h-8 w-8 shrink-0 place-items-center rounded-full text-base disabled:opacity-40">
             <span aria-hidden="true">↑</span>
           </button>
         )}
@@ -1074,6 +1161,7 @@ function Composer({
           {micError}
         </p>
       )}
+      {attachmentName && <p className="mt-2 text-center t-label text-[var(--text-dim)]">File text is extracted on this device and sent with your message. PDF/TXT only · 12,000 text characters max.</p>}
       <p className="mt-2 text-center t-label text-[var(--text-dim)]">
         Educational only · not a diagnosis · consult a clinician for medical concerns
       </p>
