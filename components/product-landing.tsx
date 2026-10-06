@@ -32,74 +32,74 @@ export function Brand() {
 
 /** The strip that scrolls under the hero. Duplicated once for a seamless loop. */
 const TOPICS = [
-  [Stethoscope, "Symptoms"],
-  [Pill, "Medicines"],
-  [Leaf, "Nutrition"],
-  [Moon, "Sleep"],
-  [Heart, "Wellbeing"],
-  [FileText, "Lab results"],
+  [Stethoscope, "Clinical context"],
+  [Pill, "Medication review"],
+  [Leaf, "Care coordination"],
+  [Moon, "Shift handoffs"],
+  [Heart, "Discharge follow-up"],
+  [FileText, "Documentation"],
 ] as const;
 
 const BENTO = [
   {
     icon: Sparkles,
     tone: "lime",
-    title: "A supervisor and focused agents",
-    body: "With hosted AI connected, a supervisor routes supported questions to Nutrition, Lab or Doctor agents and checks the answer against published references. The chat shows who contributed.",
-    tag: "Educational support · engine status shown",
+    title: "One patient, scattered context",
+    body: "The planned layer would gather authorized notes, medicines, labs and prior visits into a source-linked brief, so a care team can review the whole story faster.",
+    tag: "Planned · record synthesis",
   },
   {
     icon: Stethoscope,
     tone: "plain",
-    title: "Doctor and specialist agents",
-    body: "Supported questions can be routed to Doctor, Nutrition, Lab, Fitness or Coach specialists, then brought together by the supervisor.",
-    tag: "Specialists · supervised response",
+    title: "Documentation that takes over the day",
+    body: "Draft visit notes, summaries and patient instructions from approved context. A clinician checks and signs every clinical document before it enters a record.",
+    tag: "Planned · clinician-approved drafts",
   },
   {
     icon: Languages,
     tone: "plain",
-    title: "Hinglish bhi chalega",
-    body: "Poochho “neend kyu nahi aati” and the answer comes back in the language you asked in — Indian meals and portions included.",
-    tag: "English · हिन्दी · Hinglish",
+    title: "Handoffs that lose the next step",
+    body: "Prepare a structured handoff or discharge draft with medication changes, pending tests, warning signs and named follow-up tasks for the team to confirm.",
+    tag: "Planned · handoffs and discharge",
   },
   {
     icon: ShieldCheck,
     tone: "plain",
-    title: "Urgent signs checked first",
-    body: "Deterministic checks run before agent reasoning and can stop the response when an urgent-care pattern is detected.",
-    tag: "Safety checks · not a guarantee",
+    title: "Results waiting for an owner",
+    body: "Surface results and follow-up items that may need attention, show their source, and route them to the responsible team for review instead of silently closing the loop.",
+    tag: "Planned · human-owned follow-up",
   },
   {
     icon: MessageCircle,
     tone: "plain",
-    title: "A conversation that keeps context",
-    body: "Your recent chat, profile and meal notes can help the agents follow what you mean across turns.",
-    tag: "Saved in this browser",
+    title: "Prior authorization paperwork",
+    body: "Where prior authorization is required, assemble supporting facts and draft the request from approved records. Staff review accuracy and decide what is submitted.",
+    tag: "Planned · administrative support",
   },
   {
     icon: MessageCircle,
     tone: "wide",
-    title: "References alongside the answer",
-    body: "When published references are used, the chat shows the source notes that informed its explanation.",
-    tag: "Source-linked education",
+    title: "An agentic layer across the workflow",
+    body: "A supervisor would assign bounded tasks to specialist agents, track source and action history, and pause for a qualified person before any clinical or external action.",
+    tag: "Vision · connected, auditable, supervised",
   },
 ] as const;
 
 const STEPS = [
   [
     "01",
-    "Bring the question",
-    "A symptom you can’t explain, a medicine you want to understand, a habit you want to start. Plain words are enough.",
+    "Connect approved systems",
+    "A hospital chooses which records and tools the layer can access. Access is limited to the team, task and patient it is authorized for.",
   ],
   [
     "02",
-    "Add context when it helps",
-    "Share relevant details in your message or add context to your local profile. Avoid information you do not want processed.",
+    "Let agents prepare the work",
+    "A supervisor routes a task to focused agents that collect context, draft a summary or flag a missing next step with links back to the record.",
   ],
   [
     "03",
-    "Leave with a next step",
-    "A clearer explanation, the sources behind it, and a follow-up you can save. Nothing is booked or sent for you.",
+    "Keep the care team in control",
+    "Clinicians and staff review, edit and approve. The intended workflow records who did what and escalates uncertainty rather than making an unreviewed decision.",
   ],
 ] as const;
 
@@ -112,7 +112,7 @@ export default function ProductLanding() {
           <Brand />
         </Link>
         <nav aria-label="Main navigation">
-          <a href="#engine">The engine</a>
+          <a href="#engine">Hospital problems</a>
           <a href="#how">How it works</a>
           <Link href="/privacy">Privacy</Link>
         </nav>
@@ -130,113 +130,111 @@ export default function ProductLanding() {
         <section className="nl-hero" id="top">
           <p className="nl-positioning">Agentic layer on medical data</p>
           <span className="nl-badge">
-            <i /> Reference-backed help · free early access
+            <i /> Building the agentic layer for healthcare
           </span>
           <h1>
-            Health questions,
+            Hospital work,
             <br />
-            answered like <em>a friend who did the reading.</em>
+            connected by <em>agents that know when to ask.</em>
           </h1>
           <p>
-            NutritiScan is an AI health companion for questions about symptoms,
-            nutrition, medicines and everyday wellbeing. A supervisor can bring
-            focused health agents together and show reference notes used in an
-            answer. It is not a doctor, but can be a clearer place to start.
+            NutritiScan is building an agentic layer for the work between hospital
+            systems: gathering patient context, preparing documentation, tracking
+            handoffs and keeping follow-up visible. The public health chat is our
+            first prototype; hospital integrations are still on the roadmap.
           </p>
           <div className="nl-hero-actions">
             <Link href="/chat" className="nl-cta nl-cta-lg">
-              Start a conversation <ArrowRight size={17} />
+              Try the current health chat <ArrowRight size={17} />
             </Link>
           </div>
           <ul className="nl-trust">
             <li>
-              <Check size={13} /> No card, no trial countdown
+              <Check size={13} /> Public prototype available
             </li>
             <li>
-              <FileText size={13} /> Sources shown when used
+              <FileText size={13} /> Source-linked answers in chat
             </li>
             <li>
-              <LockKeyhole size={13} /> No advertising trackers
+              <LockKeyhole size={13} /> Human review is part of the plan
             </li>
           </ul>
 
           <div className="nl-preview">
             <div className="nl-preview-bar">
               <span className="nl-dot" />
-              <span>Your health companion</span>
-              <b>Illustrative preview</b>
+              <span>Hospital workflow concept</span>
+              <b>Future workflow · illustration</b>
             </div>
             <div className="nl-preview-grid">
               <div className="nl-thread">
                 <p className="nl-ask">
-                  I’ve been struggling with sleep for weeks. Where do I even
-                  start?
+                  What still needs to happen before this patient goes home?
                 </p>
                 <div className="nl-reply">
                   <span className="nl-avatar">n.</span>
                   <div>
                     <div className="nl-steps">
-                      <span>Checked urgent signs</span>
-                      <span>Read 2 references</span>
-                      <span>Drafted an explanation</span>
+                      <span>Gathered approved context</span>
+                      <span>Found pending tasks</span>
+                      <span>Prepared a draft</span>
                     </div>
-                    <b>Let’s take this one step at a time.</b>
+                    <b>Here is a draft for the care team to review.</b>
                     <p>
-                      Sleep is about rhythm as much as hours — when you go to
-                      bed, what breaks the night, and how the next day feels.
-                      Let’s note what you’ve been seeing, then turn it into
-                      questions worth asking a clinician.
+                      Medication changes, an outstanding result and a follow-up
+                      appointment are listed with their record sources. The
+                      responsible clinician confirms the plan before discharge.
                     </p>
                     <div className="nl-source">
-                      <FileText size={12} /> Healthy sleep · MedlinePlus
+                      <FileText size={12} /> Source-linked record summary
                       <ArrowUpRight size={11} />
                     </div>
                     <small>
-                      Illustrative conversation · not a medical assessment
+                      Concept only · no hospital record connected
                     </small>
                   </div>
                 </div>
                 <div className="nl-composer">
-                  Tell me what’s on your mind…
+                  Ask about a patient workflow…
                   <span>
                     <ArrowRight size={16} />
                   </span>
                 </div>
               </div>
               <aside className="nl-context" aria-label="Preview of agent activity">
-                <span className="nl-eyebrow">AGENT ACTIVITY</span>
-                <p className="nl-context-title">A bounded workflow.</p>
+                <span className="nl-eyebrow">PLANNED AGENT ACTIVITY</span>
+                <p className="nl-context-title">A reviewable workflow.</p>
                 <div>
                   <ShieldCheck size={15} />
                   <span>
-                    <b>Checked urgent signs</b>
-                    <small>Deterministic checks run first</small>
+                    <b>Read approved context</b>
+                    <small>Only permitted patient data</small>
                   </span>
                   <Check size={13} />
                 </div>
                 <div>
                   <Stethoscope size={15} />
                   <span>
-                    <b>Supervisor selected agents</b>
-                    <small>Doctor · Nutrition · Lab</small>
+                    <b>Supervisor assigned tasks</b>
+                    <small>Records · discharge · follow-up</small>
                   </span>
                   <Check size={13} />
                 </div>
                 <div>
                   <FileText size={15} />
                   <span>
-                    <b>Added source notes</b>
-                    <small>References shown when used</small>
+                    <b>Sent draft for review</b>
+                    <small>Clinician confirms the next step</small>
                   </span>
                   <Check size={13} />
                 </div>
-                <p>Illustrative preview · agent availability depends on the configured model.</p>
+                <p>Future hospital workflow concept · not available in the public chat.</p>
               </aside>
             </div>
           </div>
         </section>
 
-        <section className="nl-marquee" aria-label="Topics you can explore">
+        <section className="nl-marquee" aria-label="Hospital workflows we are exploring">
           <div>
             {[...TOPICS, ...TOPICS].map(([Icon, label], index) => (
               <span key={`${label}-${index}`} aria-hidden={index >= TOPICS.length}>
@@ -248,16 +246,19 @@ export default function ProductLanding() {
 
         <section className="nl-bento" id="engine">
           <div className="nl-section-head">
-            <span className="nl-eyebrow">WHAT’S UNDER THE HOOD</span>
+            <span className="nl-eyebrow">WHERE HOSPITAL TEAMS LOSE TIME</span>
             <h2>
-              See what shaped each answer,
+              Make the next step visible,
               <br />
-              with the sources in view.
+              with the care team in control.
             </h2>
             <p>
-              An answer you can’t trace is just a rumour with better grammar.
-              NutritiScan shows agent activity and reference notes when they
-              contribute to an answer.
+              Documentation burden, care transitions and prior authorization are
+              documented by <a className="underline" href="https://effectivehealthcare.ahrq.gov/sites/default/files/related_files/documentation-burden-prepub-technical-brief.pdf">AHRQ</a>,{" "}
+              <a className="underline" href="https://www.ahrq.gov/patient-safety/patients-families/engagingfamilies/strategy4/index.html">AHRQ&apos;s discharge guidance</a> and{" "}
+              <a className="underline" href="https://www.ama-assn.org/practice-management/prior-authorization/fixing-prior-auth-nearly-40-prior-authorizations-week-way">the AMA</a>.
+              We are exploring supervised agent workflows around work that can
+              be drafted, organized and checked by a person.
             </p>
           </div>
           <div className="nl-bento-grid">
@@ -275,7 +276,7 @@ export default function ProductLanding() {
         <section className="nl-how" id="how">
           <div className="nl-section-head">
             <span className="nl-eyebrow">HOW IT WORKS</span>
-            <h2>Three steps. No forms to fill first.</h2>
+            <h2>How the hospital layer is intended to work.</h2>
           </div>
           <ol>
             {STEPS.map(([number, title, body]) => (
@@ -291,48 +292,48 @@ export default function ProductLanding() {
         <section className="nl-privacy">
           <div>
             <LockKeyhole size={24} strokeWidth={1.4} />
-            <h2>Personal questions deserve a private space.</h2>
+            <h2>Health data needs a clear boundary.</h2>
             <p>
-              Chat history, profile details and meal notes are stored in this
-              browser. When you send a message, recent chat and the profile or
-              meal context you provided are sent to NutritiScan’s server and
-              may be processed by its configured AI provider. Don’t enter data
-              you are not comfortable sharing.
+              Today’s public chat stores history, profile details and meal notes
+              in your browser. Messages and recent context go to our server and
+              may be processed by a configured AI provider. There is no hospital
+              record connection today. Any future integration would require
+              authorized access, clear data handling and hospital review.
             </p>
             <Link href="/privacy">
               Read how your data is handled <ArrowUpRight size={14} />
             </Link>
           </div>
           <div className="nl-limits">
-            <span className="nl-eyebrow">HONEST LIMITS</span>
+            <span className="nl-eyebrow">CURRENT SCOPE</span>
             <ul>
-              <li>Educational support, not diagnosis or emergency care.</li>
-              <li>Reference coverage is limited and still growing.</li>
-              <li>AI can make mistakes — the sources are there to check.</li>
-              <li>For adults 18+.</li>
+              <li>The live product is an educational health chat for adults 18+.</li>
+              <li>Hospital connections and workflow automation are planned.</li>
+              <li>No AI output should become a clinical decision without review.</li>
+              <li>The chat is not diagnosis, prescribing or emergency care.</li>
             </ul>
           </div>
         </section>
 
         <section className="nl-close">
-          <span className="nl-eyebrow">WE’RE STARTING WITH YOU</span>
+          <span className="nl-eyebrow">THE FIRST STEP IS LIVE</span>
           <h2>
-            One question is <em>a good beginning.</em>
+            A health conversation is <em>where we start.</em>
           </h2>
           <Link className="nl-cta nl-cta-lg" href="/chat">
-            Meet your health companion <ArrowRight size={17} />
+            Try the public health chat <ArrowRight size={17} />
           </Link>
-          <p>Free early access · no account required · for adults 18+.</p>
+          <p>Free early access · hospital workflows are a product direction, not a live service.</p>
         </section>
       </main>
 
       <footer className="nl-footer">
         <Brand />
-        <span>Made for the human behind the health data.</span>
+        <span>Building the missing layer between health data and the next action.</span>
         <div>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms & limitations</Link>
-          <Link href="/chat">Start a conversation</Link>
+          <Link href="/chat">Try the health chat</Link>
         </div>
       </footer>
     </div>

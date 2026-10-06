@@ -22,9 +22,13 @@ export default function Page() {
         inaccurate or incomplete.
       </p>
       <p>
-        The discharge workflow demo uses fictional records and simulated
-        roles. It does not connect to a hospital, identify a clinician, send a
-        patient message or provide a real clinical audit record.
+        Hospital documentation, handoffs, discharge and follow-up workflows
+        described on the home page are a product direction. The current chat
+        has no hospital record or medicine app integration and does not act on
+        behalf of a care team. The discharge workflow demo uses fictional
+        records and simulated roles. It does not connect to a hospital,
+        identify a clinician, send a patient message or provide a real clinical
+        audit record.
       </p>
 
       <h2>Medical decisions stay with qualified professionals</h2>

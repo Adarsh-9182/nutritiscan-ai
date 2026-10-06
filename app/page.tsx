@@ -41,7 +41,7 @@ const STRUCTURED_DATA = {
       operatingSystem: "Web",
       url: SITE_URL,
       description:
-        "A conversational health companion with a supervisor and specialist agents for source-linked educational answers.",
+        "A public educational health chat prototype with a supervisor and specialist agents. Hospital workflow automation is a future product direction.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },

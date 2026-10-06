@@ -701,7 +701,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. What would you like help with?` : "What would you like help with?"}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                Your AI health assistant for clear, source-aware support across everyday health questions.
+                Public health chat prototype. The Supervisor routes supported questions to specialist agents for educational answers.
               </p>
             </div>
 
@@ -741,7 +741,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
             role="log"
             aria-live="polite"
             aria-busy={busy}
-            aria-label="Conversation with your health companion"
+            aria-label="Public health chat conversation"
           >
             <div className="mx-auto max-w-2xl space-y-5">
               {messages.map((m, idx) => {
