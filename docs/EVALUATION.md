@@ -143,10 +143,11 @@ system-default range is labelled as such.
 
 **`agent-actions.eval.ts`** runs the production Nutrition Agent and production
 `logMeal` action with a scripted AI SDK model. The model response is fixed, so
-the eval is free and repeatable. It checks the tool call, the database-backed
-meal output, and the final response. It does **not** measure whether a live
-model chooses the right tool; that needs a separate repeated model eval and
-reviewed scoring rubric.
+the eval is free and repeatable. It checks the tool call, database-backed meal
+output, and final response. A second case checks that an `updateProfile` result
+is visible to a later `calculateTargets` call in the same agent turn. It does
+**not** measure whether a live model chooses the right tool; that needs a
+separate repeated model eval and reviewed scoring rubric.
 
 **`injection` has an existing baseline.** `lib/memory/schema.ts` already defends
 against delimiter escape, control characters, zero-width and bidi overrides, and
