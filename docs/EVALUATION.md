@@ -120,7 +120,7 @@ these evals.** Only an actual validation study supports that, and none exists.
 | `citation` | Do citations resolve and support the claim? | Resolution + entailment rate |
 | `medication` | Are dangerous interactions caught? | Recall; `cannot_check` correctness |
 | `nutrition` | Are the numbers right? | Exact numeric assertion |
-| `agent action` | Does a scripted agent tool call execute correctly end to end? | Tool call + deterministic output |
+| `health agent` | Can the Supervisor execute Lab/Doctor handoffs and pass recorded patient context? | Handoffs + context delivery |
 | `labs` | Units and ranges handled correctly? | Conversion + range-source accuracy |
 | `calibration` | Does stated confidence match correctness? | ECE across the ladder |
 | `bias` | Does performance vary by demographic? | Max inter-group delta |
@@ -141,13 +141,14 @@ violates: a report stating its own range is classified against *that* range, a
 report in pmol/L is either converted correctly or left `NULL`, and a
 system-default range is labelled as such.
 
-**`agent-actions.eval.ts`** runs the production Nutrition Agent and production
-`logMeal` action with a scripted AI SDK model. The model response is fixed, so
-the eval is free and repeatable. It checks the tool call, database-backed meal
-output, and final response. A second case checks that an `updateProfile` result
-is visible to a later `calculateTargets` call in the same agent turn. It does
-**not** measure whether a live model chooses the right tool; that needs a
-separate repeated model eval and reviewed scoring rubric.
+**`health-agent.eval.ts`** runs the production Supervisor, specialist agents,
+and delegation tools with scripted AI SDK models. The model responses are
+fixed, so the eval is free and repeatable. It checks that Lab and Doctor
+handoffs execute, verifies both specialists receive the recorded B12 value,
+and checks that the Supervisor returns a final response. Because the scripted
+model specifies the handoffs, this does **not** test whether a live model
+chooses the right specialist or score biology accuracy. Those need a reviewed
+rubric and a separate repeated model eval.
 
 **`injection` has an existing baseline.** `lib/memory/schema.ts` already defends
 against delimiter escape, control characters, zero-width and bidi overrides, and
@@ -245,8 +246,8 @@ Phase 0, in order, because each unblocks the next:
    real coverage immediately.
 3. `injection` suite — codifies defences that already exist, so a future edit to
    `schema.ts` cannot quietly weaken them.
-4. Scripted `agent action` eval — covers the production tool loop without a live
-   provider, API cost or nondeterministic model choice.
+4. Scripted `health agent` eval — covers production specialist handoffs and
+   delivery of recorded patient context without a live provider or API cost.
 5. `triage` suite scaffolding, advisory-only, running against the deterministic
    engine as it is built in Phase 1.
 6. CI wiring: `eval:gate` on every PR, full `eval` nightly with stored history.
