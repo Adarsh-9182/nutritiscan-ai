@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
+import AuthNav from "@/components/auth-nav";
 import { newThread, useProfile } from "@/lib/memory/store";
 
 /**
@@ -91,6 +92,8 @@ export default function ChatWorkspace() {
         <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
           Research
         </Link>
+
+        <AuthNav />
       </header>
 
       <div className="flex min-h-0 flex-1">
