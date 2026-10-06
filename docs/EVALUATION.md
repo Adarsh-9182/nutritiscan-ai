@@ -120,6 +120,7 @@ these evals.** Only an actual validation study supports that, and none exists.
 | `citation` | Do citations resolve and support the claim? | Resolution + entailment rate |
 | `medication` | Are dangerous interactions caught? | Recall; `cannot_check` correctness |
 | `nutrition` | Are the numbers right? | Exact numeric assertion |
+| `agent action` | Does a scripted agent tool call execute correctly end to end? | Tool call + deterministic output |
 | `labs` | Units and ranges handled correctly? | Conversion + range-source accuracy |
 | `calibration` | Does stated confidence match correctness? | ECE across the ladder |
 | `bias` | Does performance vary by demographic? | Max inter-group delta |
@@ -139,6 +140,13 @@ The `labs` suite specifically asserts the §15 requirement the current code
 violates: a report stating its own range is classified against *that* range, a
 report in pmol/L is either converted correctly or left `NULL`, and a
 system-default range is labelled as such.
+
+**`agent-actions.eval.ts`** runs the production Nutrition Agent and production
+`logMeal` action with a scripted AI SDK model. The model response is fixed, so
+the eval is free and repeatable. It checks the tool call, the database-backed
+meal output, and the final response. It does **not** measure whether a live
+model chooses the right tool; that needs a separate repeated model eval and
+reviewed scoring rubric.
 
 **`injection` has an existing baseline.** `lib/memory/schema.ts` already defends
 against delimiter escape, control characters, zero-width and bidi overrides, and
@@ -236,9 +244,11 @@ Phase 0, in order, because each unblocks the next:
    real coverage immediately.
 3. `injection` suite — codifies defences that already exist, so a future edit to
    `schema.ts` cannot quietly weaken them.
-4. `triage` suite scaffolding, advisory-only, running against the deterministic
+4. Scripted `agent action` eval — covers the production tool loop without a live
+   provider, API cost or nondeterministic model choice.
+5. `triage` suite scaffolding, advisory-only, running against the deterministic
    engine as it is built in Phase 1.
-5. CI wiring: `eval:gate` on every PR, full `eval` nightly with stored history.
+6. CI wiring: `eval:gate` on every PR, full `eval` nightly with stored history.
 
 Steps 2 and 3 are worth doing even if the rest of the roadmap slips. They are a
 few days of work against code that already exists, and they convert the most
