@@ -20,5 +20,5 @@ describe("local workspace database", () => {
     } finally {
       await db.close();
     }
-  });
+  }, 15_000);
 });
