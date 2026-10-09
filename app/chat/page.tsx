@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Try the public health chat",
   description: "Explore NutritiScan's current educational health chat prototype with a supervisor and specialist agents. Hospital workflows are in development.",
   alternates: { canonical: "/chat" },
+  robots: { index: false, follow: true },
 };
 
 export const viewport: Viewport = { themeColor: "#05080a" };

@@ -9,7 +9,7 @@ import { ImageResponse } from "next/og";
  * than committed as a PNG so the wording tracks the page instead of going stale
  * in a binary nobody opens.
  */
-export const alt = "NutritiScan — your personal health companion";
+export const alt = "NutritiScan — personal health journal and doctor visit preparation";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -60,8 +60,8 @@ export default async function Image() {
 
         <div style={{ display: "flex", gap: 36, fontSize: 24, color: "#93a79a" }}>
           <div style={{ display: "flex" }}>Questions</div>
-          <div style={{ display: "flex" }}>Confirmed records</div>
-          <div style={{ display: "flex" }}>Doctor summaries</div>
+          <div style={{ display: "flex" }}>Meal journal</div>
+          <div style={{ display: "flex" }}>Doctor visit prep</div>
         </div>
       </div>
     ),

@@ -3,8 +3,10 @@ import Link from "next/link";
 import ResearchWorkspace from "@/components/research-workspace";
 
 export const metadata: Metadata = {
-  title: "Health research workspace | NutritiScan",
+  title: "Health research workspace",
   description: "Search PubMed and ClinicalTrials.gov, inspect sources, and build a cited evidence brief.",
+  alternates: { canonical: "/research" },
+  robots: { index: false, follow: true },
 };
 
 export default function ResearchPage() {

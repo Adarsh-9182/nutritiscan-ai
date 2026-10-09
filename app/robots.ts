@@ -8,7 +8,9 @@ import type { MetadataRoute } from "next";
 export default function robots(): MetadataRoute.Robots {
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/api/", "/chat"] }],
+    // Public pages communicate their own `noindex` directive where appropriate.
+    // Crawlers must be allowed to fetch those pages to see that directive.
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/api/"] }],
     sitemap: `${base}/sitemap.xml`,
   };
 }

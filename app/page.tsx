@@ -38,13 +38,14 @@ const STRUCTURED_DATA = {
       "@type": "SoftwareApplication",
       name: "NutritiScan",
       applicationCategory: "HealthApplication",
-      operatingSystem: "Web",
       url: SITE_URL,
       description:
-        "An educational health companion with public chat, a local Android journal and a consent-scoped shared health workspace.",
+        "An early-access educational health companion with general health chat on the web and a local health journal in the Android beta. Shared cloud records, report uploads, lab interpretation and voice are not active in the current release.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },
+      operatingSystem: "Web, Android",
+      downloadUrl: "https://github.com/Adarsh-9182/nutritiscan/releases",
       disclaimer:
         "Educational support only. Not a diagnosis, not a prescription and not emergency care. For adults 18+.",
     },
@@ -57,7 +58,7 @@ export default function Page() {
       <script
         type="application/ld+json"
         // Static, authored above — no user or model input reaches this string.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA).replace(/</g, "\\u003c") }}
       />
       <ProductLanding />
     </>

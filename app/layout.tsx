@@ -14,27 +14,24 @@ import "./globals.css";
  * absolute ones. Without it, every share card and canonical tag was relative
  * and therefore useless to a crawler.
  *
- * The default points at the deployment that actually serves traffic today.
- * Set NEXT_PUBLIC_SITE_URL once nutritiscan.com resolves here instead of
- * redirecting away from it.
+ * www is the canonical production host. The apex host redirects to it.
  */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
 
-const TITLE = "NutritiScan — your personal health companion";
+const TITLE = "NutritiScan | Personal health journal & doctor visit prep";
 const DESCRIPTION =
-  "Understand health information, organize confirmed records and prepare a clearer doctor visit. NutritiScan is an educational health companion for web and Android.";
+  "Keep health notes, meals and doctor-visit questions together. NutritiScan offers an educational web chat and an Android journal in beta; it does not diagnose or prescribe.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: TITLE, template: "%s — NutritiScan AI" },
+  title: { default: TITLE, template: "%s | NutritiScan" },
   description: DESCRIPTION,
-  applicationName: "NutritiScan AI",
-  keywords: ["health companion", "health records", "lab trends", "nutrition journal", "doctor summary"],
+  applicationName: "NutritiScan",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     url: "/",
-    siteName: "NutritiScan AI",
+    siteName: "NutritiScan",
     title: TITLE,
     description: DESCRIPTION,
     locale: "en_US",

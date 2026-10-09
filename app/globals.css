@@ -3710,6 +3710,13 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .nl-how h3 { margin: 14px 0 10px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
 .nl-how p { font-size: 13.5px; line-height: 1.8; color: var(--nl-muted); }
 
+/* Direct, crawlable answers for people comparing the early-access product. */
+.nl-faq { max-width: 1200px; margin: 100px auto 0; padding: 0 32px; }
+.nl-faq-list { margin-top: 38px; border-top: 1px solid var(--nl-line); }
+.nl-faq-list article { padding: 22px 0; border-bottom: 1px solid var(--nl-line); }
+.nl-faq-list h3 { margin: 0; font-size: 17px; line-height: 1.45; font-weight: 600; letter-spacing: -0.02em; }
+.nl-faq-list p { margin-top: 9px; max-width: 78ch; font-size: 14px; line-height: 1.8; color: var(--nl-muted); }
+
 /* Privacy & limits */
 .nl-privacy { max-width: 1200px; margin: 100px auto 0; padding: 0 32px; display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.5fr); gap: 16px; }
@@ -3756,7 +3763,8 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
   .nl-hero-actions > a { width: 100%; }
   .nl-thread { padding: 22px 18px; }
   .nl-ask { max-width: 100%; }
-  .nl-bento, .nl-how { padding: 72px 20px 0; }
+  .nl-bento, .nl-how, .nl-faq { padding: 72px 20px 0; }
+  .nl-faq { margin-top: 0; }
   .nl-bento-grid, .nl-how ol { grid-template-columns: minmax(0, 1fr); }
   .nl-card.nl-lime, .nl-card.nl-wide { grid-column: span 1; }
   .nl-privacy { margin-top: 72px; padding: 0 20px; }
