@@ -10,22 +10,24 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">EARLY ACCESS · 29 SEPTEMBER 2026</span>
+      <span className="ns-eyebrow">EARLY ACCESS · 9 OCTOBER 2026</span>
       <h1>A clearer picture. An honest scope.</h1>
 
       <h2>What NutritiScan does</h2>
       <p>
-        NutritiScan is a conversational health companion. A supervisor may
-        route supported questions to specialist agents and use published
+        NutritiScan is a conversational health companion. A supervisor uses
+        specialized tools and published
         reference notes to prepare an educational response. Agent and model
         availability depends on deployment configuration. Answers can be
         inaccurate or incomplete.
       </p>
       <p>
-        Hospital documentation, handoffs, discharge and follow-up workflows
-        described on the home page are a product direction. The current chat
-        has no hospital record or medicine app integration and does not act on
-        behalf of a care team. The discharge workflow demo uses fictional
+        Public chat and the Android journal are separate from the shared
+        health account. Shared records require a configured private health
+        service and consent. Proposed report values must be checked against
+        the original before confirmation. Recorded medicine histories do not
+        authorize prescription or interaction decisions. The service does not
+        act on behalf of a care team. The older discharge workflow demo uses fictional
         records and simulated roles. It does not connect to a hospital,
         identify a clinician, send a patient message or provide a real clinical
         audit record.
