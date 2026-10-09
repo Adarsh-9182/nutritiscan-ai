@@ -61,6 +61,11 @@ export default function AboutPage() {
           get the Android beta
         </Link>.
       </p>
+      <p>
+        <Link href="/guides/doctor-appointment-checklist">
+          Read the doctor appointment preparation checklist.
+        </Link>
+      </p>
     </main>
   );
 }
