@@ -88,10 +88,13 @@ describe("agent context scoping — each specialist gets only the memory it need
   // that can't see the relevant fact, the answer is blind to it. This test
   // exists so nobody "simplifies" that guidance back to bare minimum-routing
   // instructions later, undoing the reason scoping is safe to do at all.
-  it("Supervisor is explicitly told to consult a second specialist for cross-domain signals", () => {
+  it("Supervisor retains cross-domain context without independent LLM delegation by default", () => {
     const text = instructionsOf(buildSupervisor(demoProfile, NUTRITION_CONTEXT_SAMPLE));
     expect(text).toMatch(/cross-domain/i);
     expect(text).toMatch(/only one positioned to notice/i);
+    const settings = (buildSupervisor(demoProfile, NUTRITION_CONTEXT_SAMPLE) as unknown as { settings: { tools: Record<string, unknown> } }).settings;
+    expect(settings.tools).not.toHaveProperty("askNutritionAgent");
+    expect(settings.tools).not.toHaveProperty("askDoctorAgent");
   });
 
   it("does not offer browser-only save actions in the account workspace", () => {

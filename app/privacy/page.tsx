@@ -10,13 +10,14 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 29 SEPTEMBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 9 OCTOBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
-        NutritiScan currently offers a conversation with health agents. It does
-        not provide account-based records or a connected medical record
-        service. Chat supports text-based PDF or TXT attachments for
-        explanation; scanned PDFs and image files are not supported yet.
+        NutritiScan offers a public health conversation, a local Android journal,
+        and a separate shared health workspace. Shared accounts and private report
+        storage require a deployed health service; the dashboard displays its
+        connection status. Public-chat attachments and shared report uploads have
+        different data boundaries, described below.
       </p>
 
       <h2>What stays in your browser</h2>
@@ -53,6 +54,48 @@ export default function Page() {
         sent with your message to NutriScan&apos;s server and, when configured, a
         hosted AI provider. Remove the message or clear this site&apos;s browser
         data to remove that local copy.
+      </p>
+
+      <h2>Android local data and public chat</h2>
+      <p>
+        The Android app saves local profiles, meal entries, health history and
+        conversations on your device using app storage. NutritiScan does not
+        encrypt that local journal storage. Public AI chat asks for consent before
+        sending chosen messages to the web server and configured AI provider;
+        the local profile and meal journal are not silently attached. You can
+        revoke public-chat consent and delete local entries in the app’s You screen.
+        Barcode lookup sends a product code to Open Food Facts, not your health profile.
+      </p>
+      <h2>Shared account, reports and consent</h2>
+      <p>
+        When connected, the shared health service stores records and conversations
+        under your account. Health content and original files are encrypted by the
+        service. Native access tokens use secure device credential storage; web
+        sessions use an HttpOnly cookie. Explicit health storage consent is
+        required, and cloud AI processing is a separate optional choice. The
+        service records access and change events without clinical payloads.
+      </p>
+      <p>
+        Uploaded shared reports go to private object storage. Extracted values
+        stay as drafts until you compare them with the original and confirm the
+        name, value, unit and collection date. Patient confirmation is not clinical
+        validation. Structured records support FHIR export; the prototype is not
+        a certified FHIR server. NutritiScan does not use patient records for model
+        training. Any configured provider’s retention and processing terms must
+        be reviewed before real patient use.
+      </p>
+      <h2>Voice, export and deletion</h2>
+      <p>
+        Voice transcription requires an enabled provider and cloud AI consent.
+        Audio is sent for transcription after you choose to transcribe, is not
+        added to health history by this service, and the transcript is reviewed
+        before a question is sent. The provider may have separate retention terms.
+        Shared records and conversation history can be exported from the dashboard;
+        originals are downloaded separately. Password-confirmed account deletion
+        removes active records, documents and sessions. Infrastructure backups
+        follow the host’s retention policy. Android local entries are deleted
+        separately in the app. Revoking storage consent stops routine access and
+        new storage but keeps export and deletion available.
       </p>
 
       <h2>Safety and limits</h2>

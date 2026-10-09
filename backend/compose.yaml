@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: nutritiscan
+      POSTGRES_USER: nutritiscan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a private database password}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U nutritiscan -d nutritiscan']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes:
+      - redis:/data
+    restart: unless-stopped
+  migrate:
+    build: .
+    env_file: .env
+    command: [python, -m, nutritiscan.migrate]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - '127.0.0.1:8000:8000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    restart: unless-stopped
+  worker:
+    build: .
+    env_file: .env
+    command: [celery, -A, nutritiscan.worker, worker, --loglevel, warning, --concurrency, '2', --max-tasks-per-child, '20']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    restart: unless-stopped
+volumes:
+  postgres:
+  redis:

@@ -41,7 +41,7 @@ const STRUCTURED_DATA = {
       operatingSystem: "Web",
       url: SITE_URL,
       description:
-        "A public educational health chat prototype with a supervisor and specialist agents. Hospital workflow automation is a future product direction.",
+        "An educational health companion with public chat, a local Android journal and a consent-scoped shared health workspace.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },

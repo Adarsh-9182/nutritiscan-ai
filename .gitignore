@@ -49,3 +49,12 @@ next-env.d.ts
 # Local tooling installed by the hosting CLI
 /.agents/
 /skills-lock.json
+
+# Python health service
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+backend/.env
+backend/.local/
+*.pyc

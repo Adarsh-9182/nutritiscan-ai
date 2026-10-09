@@ -1,4 +1,4 @@
-import { ToolLoopAgent, stepCountIs, tool } from "ai";
+import { ToolLoopAgent, stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { SAFETY, MEDICAL_REASONING_FORMAT } from "./safety";
 import { resolveModel } from "./provider";
@@ -226,20 +226,21 @@ export function buildGeneralist(
   profile: HealthProfile,
   tier = 0,
   available: MemorySection[] = ALL_MEMORY_SECTIONS,
+  allowActions = true,
 ) {
   const resolved = resolveModel("specialist", tier);
   return new ToolLoopAgent({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
-    tools: actionTools(profile),
+    tools: allowActions ? actionTools(profile) : {},
     stopWhen: stepCountIs(3),
-    instructions: `You are the Supervisor of NutritiScan AI, a health companion with five specialist
-agents behind you: Nutrition, Fitness, Doctor, Lab and Health Coach.
+    instructions: `You are the Supervisor of NutritiScan AI, a health companion with specialized
+tools for nutrition, fitness, health information, lab records and habits.
 This message is conversational, not a health question. Reply briefly and warmly (2–4 short
 sentences), in the user's language — Hinglish if they write Hinglish. If it helps, say in one line
 what you can do: answer health questions, log meals, read lab values, and track their chart.
 Invite one concrete next step. No headings, no Facts/Inference sections.
-${ACTION_INSTRUCTIONS}
+${allowActions ? ACTION_INSTRUCTIONS : "Do not claim to save or change records. Record edits happen in the account workspace."}
 
 ${memoryContext(profile, available)}`,
   });
@@ -278,6 +279,26 @@ export function buildSupervisor(
   allowActions = true,
 ) {
   const resolved = resolveModel("supervisor", tier);
+  // One supervisor owns the initial product. Independent model delegation is
+  // retained only as an explicit evaluation experiment.
+  if (process.env.HEALTH_MULTI_AGENT_ENABLED !== "true") {
+    return new ToolLoopAgent<never, ToolSet>({
+      model: resolved.model,
+      providerOptions: resolved.providerOptions,
+      tools: allowActions ? actionTools(profile) : {},
+      stopWhen: stepCountIs(4),
+      instructions: `You are NutritiScan's health supervisor. You are the only one positioned to notice cross-domain facts; consider the complete available record before answering.
+${triage ? `\n${triage}\n` : ""}${brief ? `\n${brief}\n` : ""}
+Use specialized expertise in labs, nutrition, medicines, habits and fitness within this one answer. Do not call or claim to consult independent LLM specialists. Patient records are facts; their medical meaning is uncertain. Never diagnose, prescribe, change a medicine, invent values or assume an absent measurement. Medication interactions require verified drug data and pharmacist/doctor confirmation.
+Reply in the user's language. Explain uncertainty, cite only sources and records actually available, and keep the answer readable.
+${allowActions ? ACTION_INSTRUCTIONS : "Do not claim to save or change a record. The account workspace handles record edits separately."}
+${SAFETY}
+${MEDICAL_REASONING_FORMAT}
+${memoryContext(profile, available)}
+${nutrition}
+${recalled ? `\n${recalled}\n` : ""}`,
+    });
+  }
   const s = buildSpecialists(profile, nutrition, tier, available);
 
   const delegate = (agent: ToolLoopAgent, label: string) =>
@@ -292,7 +313,7 @@ export function buildSupervisor(
       },
     });
 
-  return new ToolLoopAgent({
+  return new ToolLoopAgent<never, ToolSet>({
     model: resolved.model,
     providerOptions: resolved.providerOptions,
     // Save → consult (in parallel) → answer. Anything longer is the model

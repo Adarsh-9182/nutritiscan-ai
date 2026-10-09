@@ -53,9 +53,11 @@ const ChatRequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(MAX_SUBMITTED_MESSAGES),
   profile: z.unknown().optional(),
   meals: z.unknown().optional(),
+  allowActions: z.boolean().optional(),
 }).strict();
 
 const MessageDataSchemas = {
+  mode: z.object({ mode: z.enum(["safety", "model", "demo"]) }).strict(),
   trace: z.object({
     agents: z.array(z.enum(["supervisor", "doctor", "nutrition", "fitness", "lab", "coach"])).max(6),
     done: z.boolean(),
@@ -151,6 +153,7 @@ async function streamRealSupervisor(
   signal: AbortSignal,
   /** Rungs down the model ladder; raised by the caller after "unavailable". */
   tier: number,
+  allowActions = true,
 ): Promise<RealOutcome> {
   let wrote = false;
 
@@ -199,18 +202,18 @@ async function streamRealSupervisor(
     // difference rather than resolving one.
     const stream = solo
       ? await createAgentUIStream({
-          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier, recordedSections(profile)),
+          agent: buildSoloist(route, profile, nutrition, recalled, triage, brief, tier, recordedSections(profile), allowActions),
           uiMessages: messages,
           abortSignal: signal,
         })
       : general
       ? await createAgentUIStream({
-          agent: buildGeneralist(profile, tier, recordedSections(profile)),
+          agent: buildGeneralist(profile, tier, recordedSections(profile), allowActions),
           uiMessages: messages,
           abortSignal: signal,
         })
       : await createAgentUIStream({
-          agent: buildSupervisor(profile, nutrition, recalled, triage, brief, tier, recordedSections(profile)),
+          agent: buildSupervisor(profile, nutrition, recalled, triage, brief, tier, recordedSections(profile), allowActions),
           uiMessages: messages,
           abortSignal: signal,
         });
@@ -501,6 +504,7 @@ export async function POST(req: Request) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
       writeTriage(writer, state);
+      writer.write({ type: "data-mode", id: "mode", data: { mode: "safety" } } as never);
 
       // A dedicated non-clinical path owns this turn entirely — no
       // differential, no nutrition advice, nothing else alongside it.
@@ -542,10 +546,11 @@ export async function POST(req: Request) {
          */
         for (let tier = 0; tier < MODEL_TIERS; tier++) {
           if (signal.aborted) break;
-          const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal, tier);
+          const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal, tier, requestBody.data.allowActions !== false);
           if (outcome !== "unavailable") {
             // A partial turn still gets its note: the record of what the system
             // concluded is independent of whether the prose finished.
+            writer.write({ type: "data-mode", id: "mode", data: { mode: "model" } } as never);
             writeNote(writer, state);
             return;
           }
@@ -567,6 +572,7 @@ export async function POST(req: Request) {
       // Only the client going away stops the fallback. The model budget may
       // be exactly what ran out, and it must not also silence the answer
       // that stands in for it — that is how a turn used to end with nothing.
+      writer.write({ type: "data-mode", id: "mode", data: { mode: "demo" } } as never);
       await streamDemo(writer, userText, profile, meals, state, req.signal);
       writeNote(writer, state);
     },

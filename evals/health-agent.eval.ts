@@ -8,7 +8,7 @@
 // ============================================================
 
 import { MockLanguageModelV3 } from "ai/test";
-import { expect, vi } from "vitest";
+import { afterEach, expect, vi } from "vitest";
 import { buildSoloist, buildSupervisor } from "../lib/agents";
 import { evalSuite, gate } from "./harness";
 import { blankProfile } from "../lib/memory/profile";
@@ -59,6 +59,7 @@ function textAnswer(text: string) {
 }
 
 evalSuite("health agent: biology context and specialist handoff", () => {
+  afterEach(() => vi.unstubAllEnvs());
   gate("scores a physiology answer against required mechanisms and critical concept swaps", async () => {
     const answer = "After a meal, rising blood glucose stimulates beta cells in the pancreas to release insulin. Insulin helps tissues take up glucose and supports storage, lowering blood glucose. Between meals, lower blood glucose promotes glucagon release from pancreatic alpha cells. Glucagon acts mainly on the liver, signaling it to release glucose and raise blood glucose.";
     providers.supervisor = new MockLanguageModelV3({ doGenerate: textAnswer(answer) });
@@ -70,7 +71,8 @@ evalSuite("health agent: biology context and specialist handoff", () => {
     expect(result.text).toBe(answer);
   });
 
-  gate("routes a biology question across Lab and Doctor with recorded patient context", async () => {
+  gate("experimental delegation routes Lab and Doctor with recorded patient context", async () => {
+    vi.stubEnv("HEALTH_MULTI_AGENT_ENABLED", "true");
     const profile = {
       ...blankProfile,
       biomarkers: [{
