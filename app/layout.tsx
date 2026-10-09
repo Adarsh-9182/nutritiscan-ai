@@ -38,6 +38,7 @@ export const metadata: Metadata = {
   },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
   robots: { index: true, follow: true },
+  verification: { google: "ulMshIi5M5dzmbbmD1e18cK9ewd8ElKmLz0FJth9xeg" },
   // Health data on a personal device — never worth surfacing in a search
   // engine's cached snapshot of a logged-in view.
   formatDetection: { telephone: false, address: false, email: false },
