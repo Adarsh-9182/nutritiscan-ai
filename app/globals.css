@@ -3958,6 +3958,7 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .hp-main-auth .hp-auth > .hp-eyebrow { color:#9bebae; font-size:9px; letter-spacing:1.7px; }
 .hp-main-auth .hp-auth h2 { margin:15px 0 8px; font-size:32px; letter-spacing:-1.2px; }
 .hp-main-auth .hp-auth > p:not(.hp-muted):not(.hp-legal-note) { margin:0 0 25px; font-size:14px; }
+.hp-main-auth .hp-auth > .hp-service-note { margin:-10px 0 18px!important; padding:11px 13px; border:1px solid #f3c96945; border-radius:11px; background:#f3c9690c; color:#f0d9a4; font-size:12px!important; line-height:1.6; }
 .hp-main-auth .hp-auth form label { margin:15px 0; font-size:12px; color:#c9d5cd; }
 .hp-main-auth .hp-auth form input:not([type=checkbox]) { min-height:52px; margin-top:9px; padding:14px 15px; border-radius:12px; background:#080d0b; font-size:14px; }
 .hp-main-auth .hp-auth form .hp-primary { min-height:52px; margin-top:7px; border-radius:12px; background:linear-gradient(110deg,#b9ef80,#73dfaa); font-weight:700; }

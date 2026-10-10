@@ -77,7 +77,18 @@ export default function HealthPlatform() {
   const markers = [...new Set(measurements.map(titleOf))];
   const markerRows = measurements.filter((r) => titleOf(r) === (marker || markers[0])).sort((a, b) => dateOf(a).localeCompare(dateOf(b)));
   const units = [...new Set(markerRows.map((r) => r.valueQuantity!.unit))];
-  const finishSignIn = async () => { setSignedIn(true); const c = await api("consent"); setConsent({ storage: c.storage, cloud_ai: c.cloud_ai }); if (c.storage) await refresh(); };
+  const finishSignIn = async () => {
+    // Do not switch away from the sign-in screen until the authenticated consent
+    // check succeeds. A successful credential exchange alone is not enough to
+    // safely initialize the health workspace.
+    const c = await api("consent");
+    setConsent({ storage: c.storage, cloud_ai: c.cloud_ai });
+    setSignedIn(true);
+    if (c.storage) {
+      try { await refresh(); }
+      catch { setNotice("You’re signed in, but your records could not load. Use Refresh to try again."); }
+    }
+  };
   const signIn = (event: React.FormEvent) => { event.preventDefault(); if (emailStep) { setEmailStep(false); return; } void run(async () => { await api(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify({ email, password }) }); setPassword(""); await finishSignIn(); }); };
   const googleSignIn = (credential: string) => { void run(async () => { await api("auth/google", { method: "POST", body: JSON.stringify({ credential }) }); await finishSignIn(); }); };
   const upload = async (file: File) => { if (file.size > 10 * 1024 * 1024) throw new Error("Use a report smaller than 10 MB."); const body = new FormData(); body.append("file", file); await api("documents", { method: "POST", body }); await refresh(); setNotice("Report uploaded privately. We’ll update its status here when extraction is ready; check every proposed value against the original before saving."); };
@@ -91,7 +102,7 @@ export default function HealthPlatform() {
     {!signedIn ? <>
       <div className="hp-login-layout">
       <section className="hp-login-story" aria-label="About your health space"><span className="hp-login-mark"><Leaf size={22} /></span><p className="hp-eyebrow">YOUR HEALTH, IN CONTEXT</p><h1>A clearer picture<br />starts <em>with you.</em></h1><p className="hp-login-copy">Keep your reports and health notes together, so you can feel more prepared for your next care conversation.</p><div className="hp-login-promise"><ShieldCheck size={17} /><span>Your health information stays private and in your control.</span></div><div className="hp-login-orbit" aria-hidden="true"><span /><span /><span /></div></section>
-      <section className="hp-card hp-auth"><p className="hp-eyebrow">WELCOME TO NUTRITISCAN</p><h2>Sign in</h2><p>Continue to your personal health space.</p>
+      <section className="hp-card hp-auth"><p className="hp-eyebrow">WELCOME TO NUTRITISCAN</p><h2>Sign in</h2><p>Continue to your personal health space.</p>{service === "unavailable" && <p className="hp-service-note" role="status">Sign-in is temporarily unavailable. Please try again in a little while.</p>}
         <form onSubmit={signIn}><label>Email<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>{!emailStep && <><label>Password · at least 12 characters<input type="password" autoComplete={register ? "new-password" : "current-password"} minLength={12} maxLength={128} required value={password} onChange={(e) => setPassword(e.target.value)} /></label>{register && <p className="hp-muted">Younger users should ask a parent or guardian to create and manage their account. Verified guardian consent for a child&apos;s health records is not available yet.</p>}</>}<button className="hp-primary" disabled={busy}>{busy ? "Please wait…" : emailStep ? "Continue" : register ? "Create account" : "Sign in"}<ArrowRight size={16} /></button></form>
         {!emailStep && <button className="hp-link" onClick={() => { setEmailStep(true); setPassword(""); }}>Use a different email</button>}
         <div className="hp-auth-divider"><span>or continue with</span></div>
