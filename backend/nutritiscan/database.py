@@ -38,6 +38,13 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class GoogleIdentity(Base):
+    __tablename__ = "health_google_identities"
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    owner: Mapped[str] = mapped_column(ForeignKey("health_accounts.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class LoginSession(Base):
     __tablename__ = "health_sessions"
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)

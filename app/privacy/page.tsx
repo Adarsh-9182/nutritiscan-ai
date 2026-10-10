@@ -99,8 +99,9 @@ export default function Page() {
         added to health history by this service, and the transcript is reviewed
         before a question is sent. The provider may have separate retention terms.
         Shared records and conversation history can be exported from the dashboard;
-        originals are downloaded separately. Password-confirmed account deletion
-        removes active records, documents and sessions. Infrastructure backups
+        originals are downloaded separately. Account deletion requires your password
+        or a sign-in from the last 15 minutes.
+        It removes active records, documents and sessions. Infrastructure backups
         follow the host’s retention policy. Android local entries are deleted
         separately in the app. Revoking storage consent stops routine access and
         new storage but keeps export and deletion available.

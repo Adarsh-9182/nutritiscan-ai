@@ -15,13 +15,14 @@ import type { NextConfig } from "next";
  */
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' https://accounts.google.com 'wasm-unsafe-eval' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+  "frame-src https://accounts.google.com",
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   // data: covers the in-browser canvas preview of the user's meal photo
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://huggingface.co https://*.hf.co https://raw.githubusercontent.com",
+  "connect-src 'self' https://accounts.google.com https://huggingface.co https://*.hf.co https://raw.githubusercontent.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

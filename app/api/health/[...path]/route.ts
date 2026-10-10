@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 export const maxDuration = 60;
 const SESSION = "nutritiscan-health-session";
 const MAX_BODY = 11 * 1024 * 1024;
-const allowed = /^(status|consent|records(?:\/[^/]+)?|observations|timeline|trends|documents(?:\/[^/]+(?:\/(?:original|confirm))?)?|chat|conversations|doctor-summary|voice|export|account|auth\/(?:login|register|logout))$/;
+const allowed = /^(status|consent|records(?:\/[^/]+)?|observations|timeline|trends|documents(?:\/[^/]+(?:\/(?:original|confirm))?)?|chat|conversations|doctor-summary|voice|export|account|auth\/(?:login|register|google|logout))$/;
 
 async function proxy(req: Request, context: { params: Promise<{ path: string[] }> }) {
   const base = process.env.HEALTH_API_URL;
@@ -44,7 +44,7 @@ async function proxy(req: Request, context: { params: Promise<{ path: string[] }
   try {
     const target = `${base.replace(/\/$/, "")}/${joined}${new URL(req.url).search}`;
     const upstream = await fetch(target, { method: req.method, headers, body: body as BodyInit | undefined, signal: AbortSignal.any([req.signal, AbortSignal.timeout(55000)]), cache: "no-store", redirect: "error" });
-    if ((joined === "auth/login" || joined === "auth/register") && upstream.ok) {
+    if (["auth/login", "auth/register", "auth/google"].includes(joined) && upstream.ok) {
       const result = await upstream.json();
       if (!native) {
         jar.set(SESSION, result.access_token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/api/health", maxAge: result.expires_in });

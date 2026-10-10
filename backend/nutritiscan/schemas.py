@@ -55,6 +55,10 @@ class ObservationInput(Strict):
         return value
 
 
+class GoogleCredential(Strict):
+    credential: str = Field(min_length=100, max_length=8192)
+
+
 class RecordInput(Strict):
     kind: Literal["condition", "allergy", "medication", "visit", "nutrition"]
     title: str = Field(min_length=1, max_length=120)
@@ -73,5 +77,5 @@ class ChatInput(Strict):
 
 
 class DeleteInput(Strict):
-    password: str = Field(min_length=1, max_length=128)
+    password: str | None = Field(default=None, min_length=1, max_length=128)
     confirmation: Literal["DELETE MY HEALTH DATA"]

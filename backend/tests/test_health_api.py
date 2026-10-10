@@ -16,6 +16,7 @@ def api(tmp_path):
         database_url=f"sqlite:///{tmp_path}/test.db",
         data_key="ab" * 32,
         object_dir=str(tmp_path / "documents"),
+        google_client_id="test-google-client",
     )
     with TestClient(create_app(settings)) as client:
         yield client
@@ -53,6 +54,59 @@ def test_legacy_age_field_is_accepted_but_not_required(api):
         json={"email": "legacy-client@example.test", "password": "a-long-test-password", "adult": False},
     )
     assert response.status_code == 201, response.text
+
+
+def test_google_sign_in_creates_then_reuses_provider_identity(api, monkeypatch):
+    claims = {
+        "iss": "https://accounts.google.com",
+        "aud": "test-google-client",
+        "sub": "google-subject-123",
+        "email": "scan.user@gmail.com",
+        "email_verified": True,
+    }
+    monkeypatch.setattr("nutritiscan.app.verify_google_credential", lambda credential, client_id: claims)
+    first = api.post("/auth/google", json={"credential": "x" * 120})
+    assert first.status_code == 200, first.text
+    first_user = first.json()["user_id"]
+    second = api.post("/auth/google", json={"credential": "x" * 120})
+    assert second.status_code == 200, second.text
+    assert second.json()["user_id"] == first_user
+    headers = {"Authorization": f"Bearer {second.json()['access_token']}"}
+    consent = api.get("/consent", headers=headers).json()
+    assert consent["storage"] is False and consent["cloud_ai"] is False
+
+
+def test_google_sign_in_does_not_merge_untrusted_existing_email(api, monkeypatch):
+    user(api, "patient@outside.test", consent=False)
+    claims = {
+        "iss": "https://accounts.google.com",
+        "aud": "test-google-client",
+        "sub": "unlinked-subject",
+        "email": "patient@outside.test",
+        "email_verified": True,
+    }
+    monkeypatch.setattr("nutritiscan.app.verify_google_credential", lambda credential, client_id: claims)
+    response = api.post("/auth/google", json={"credential": "x" * 120})
+    assert response.status_code == 409
+
+
+def test_google_only_account_can_be_deleted_after_recent_sign_in(api, monkeypatch):
+    claims = {
+        "iss": "https://accounts.google.com",
+        "aud": "test-google-client",
+        "sub": "deletable-google-user",
+        "email": "delete.me@gmail.com",
+        "email_verified": True,
+    }
+    monkeypatch.setattr("nutritiscan.app.verify_google_credential", lambda credential, client_id: claims)
+    login = api.post("/auth/google", json={"credential": "x" * 120}).json()
+    response = api.request(
+        "DELETE",
+        "/account",
+        headers={"Authorization": f"Bearer {login['access_token']}"},
+        json={"confirmation": "DELETE MY HEALTH DATA"},
+    )
+    assert response.status_code == 204
 
 
 def measurement(value=13.2, unit="g/dL", measured_at="2026-07-01"):
