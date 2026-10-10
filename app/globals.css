@@ -4008,6 +4008,7 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .hp-report-status-review::before,.hp-report-status-confirmed::before { background:#74dfa1; box-shadow:0 0 10px #74dfa155; }
 .hp-report-status-manual_review::before { background:#eeae72; }
 @keyframes hp-status-pulse { 50% { opacity:.4; } }
+.hp-consent-note { margin:-5px 0 16px 27px; padding:10px 12px; border-left:2px solid #edc66b; color:#d8c89f; font-size:12px!important; line-height:1.6; }
 .hp-root hr { border:0; border-top:1px solid #ffffff15; margin:30px 0; }.hp-disclaimer { display:flex; align-items:flex-start; gap:9px; color:#869b8d; font-size:11px; line-height:1.8; padding-top:20px; }.hp-disclaimer svg { flex-shrink:0; margin-top:3px; }.hp-disclaimer p { max-width:78ch; }
 .hp-sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
 @media(max-width:1000px) { .hp-main { padding:30px; }.hp-shell { grid-template-columns:190px minmax(0,1fr); }.hp-intro { flex-direction:column; }.hp-stats { gap:10px; }.hp-stats .hp-card { padding:17px; } }
