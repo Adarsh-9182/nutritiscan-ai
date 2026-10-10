@@ -4001,6 +4001,12 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .hp-answer { border-top:1px solid #ffffff15; margin-top:25px; padding-top:25px; }.hp-answer-text { white-space:pre-wrap; overflow-wrap:anywhere; color:#d2e0d6; }.hp-tool { display:inline-flex; padding:5px 10px; background:#c9fa6310; border:1px solid #c9fa6325; border-radius:99px; color:#c9fa63; font-size:10px; margin-bottom:12px; text-transform:uppercase; letter-spacing:.7px; }
 .hp-citations { display:flex; flex-wrap:wrap; gap:7px; margin-top:20px; }.hp-citations span { padding:6px 10px; border:1px solid #ffffff15; border-radius:8px; font-size:10px; color:#a3b5a9; }.hp-citations a { color:#6fe8b4; }
 .hp-trend { border-top:1px solid #ffffff12; margin-top:18px; padding-top:10px; }.hp-trend .hp-section-head span { font-size:11px; color:#a3b5a9; }.hp-trend svg { width:100%; height:auto; margin-top:12px; }.hp-trend table { width:100%; font-size:11px; margin-top:16px; }.hp-trend :is(td,th) { padding:9px; border-bottom:1px solid #ffffff15; text-align:left; overflow-wrap:anywhere; }
+.hp-report-status { display:inline-flex; align-items:center; gap:6px; color:#bdd0c1; font-size:11px; }
+.hp-report-status::before { content:""; width:7px; height:7px; border-radius:50%; background:#87978d; }
+.hp-report-status-queued::before,.hp-report-status-processing::before { background:#f3c969; box-shadow:0 0 10px #f3c96955; animation:hp-status-pulse 1.5s ease-in-out infinite; }
+.hp-report-status-review::before,.hp-report-status-confirmed::before { background:#74dfa1; box-shadow:0 0 10px #74dfa155; }
+.hp-report-status-manual_review::before { background:#eeae72; }
+@keyframes hp-status-pulse { 50% { opacity:.4; } }
 .hp-root hr { border:0; border-top:1px solid #ffffff15; margin:30px 0; }.hp-disclaimer { display:flex; align-items:flex-start; gap:9px; color:#869b8d; font-size:11px; line-height:1.8; padding-top:20px; }.hp-disclaimer svg { flex-shrink:0; margin-top:3px; }.hp-disclaimer p { max-width:78ch; }
 .hp-sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
 @media(max-width:1000px) { .hp-main { padding:30px; }.hp-shell { grid-template-columns:190px minmax(0,1fr); }.hp-intro { flex-direction:column; }.hp-stats { gap:10px; }.hp-stats .hp-card { padding:17px; } }
