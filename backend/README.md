@@ -4,7 +4,7 @@ FastAPI API for the web `/health` workspace and Android shared-account screens. 
 
 ## What works
 
-- Opaque, revocable bearer sessions; scrypt password hashing; HMAC email index and encrypted account email.
+- Opaque, revocable bearer sessions; email/password sign-in with scrypt hashing; Google Identity Services ID-token verification; HMAC email index and encrypted account email.
 - Explicit, versioned consent for health storage, with separate optional cloud AI processing. No training pipeline exists.
 - Per-account access on every health query and original-file download. AES-GCM encrypted record, document metadata and conversation content, with owner-associated authentication.
 - Private, application-encrypted original documents in S3-compatible storage; encrypted local files only for development.
@@ -13,7 +13,7 @@ FastAPI API for the web `/health` workspace and Android shared-account screens. 
 - Exact trends from structured records; known hemoglobin g/L↔g/dL normalization, with unsupported units kept in separate series.
 - A LangGraph supervisor selects specialized record, lab, nutrition, medication-boundary and doctor-summary tools. At most one optional LLM call rephrases a deterministic factual summary. Original factual text remains authoritative. It does not fan out to separate LLM agents.
 - Redis/Celery extraction jobs and distributed rate limits when configured. In development without Redis, extraction runs as a background task and limits are per-process.
-- Encrypted conversations, audit events without clinical payloads, JSON/FHIR export and password-confirmed account deletion. Export includes document metadata; originals are downloaded separately.
+- Encrypted conversations, audit events without clinical payloads, JSON/FHIR export and account deletion with a password or a sign-in from the last 15 minutes. Export includes document metadata; originals are downloaded separately.
 - Optional OpenAI voice transcription with cloud consent; audio is not persisted by this service. The user reviews the transcript before submitting a question.
 
 ## Run locally with synthetic data
@@ -28,7 +28,7 @@ PYTHONPATH=backend .venv/bin/python -m nutritiscan.migrate
 PYTHONPATH=backend .venv/bin/uvicorn nutritiscan.main:app --port 8000 --no-access-log
 ```
 
-Set `HEALTH_API_URL=http://127.0.0.1:8000` in the web app's ignored `.env.local`, then run `npm run dev`. Local development uses SQLite and encrypted files under ignored `.local/`; production startup refuses SQLite or an absent private S3 bucket.
+Set `HEALTH_API_URL=http://127.0.0.1:8000` in the web app's ignored `.env.local`, then run `npm run dev`. To enable Google sign-in, create a Google OAuth **Web application** client, allow the exact NutritiScan web origins in Google Cloud, and set the same client ID as `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in the web deployment and `GOOGLE_CLIENT_ID` in the FastAPI service. The backend validates Google's signature, issuer, expiry and audience before creating a session; the browser never supplies a trusted email by itself. Email/password works independently. Local development uses SQLite and encrypted files under ignored `.local/`; production startup refuses SQLite or an absent private S3 bucket.
 
 ## Deploy
 

@@ -3920,6 +3920,11 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .hp-root .hp-check { display:flex!important; gap:10px; align-items:flex-start; line-height:1.8; }
 .hp-check input { accent-color:#c9fa63; margin-top:5px; width:16px; height:16px; flex-shrink:0; }
 .hp-auth form .hp-primary { width:100%; margin:8px 0; }
+.hp-google-wrap { display:flex; justify-content:center; min-height:42px; margin:18px 0 10px; }
+.hp-google-button { min-height:42px; }
+.hp-google-unconfigured { width:min(100%,340px); border:1px solid #ffffff26; border-radius:999px; background:transparent; color:#9bb1a2; font:inherit; }
+.hp-auth-divider { display:flex; align-items:center; gap:12px; margin:14px 0; color:#9bb1a2; font-size:.8rem; }
+.hp-auth-divider::before,.hp-auth-divider::after { content:""; height:1px; flex:1; background:#ffffff26; }
 .hp-empty { padding:35px; max-width:760px; }
 .hp-empty > svg { color:#6fe8b4; margin-bottom:12px; }
 .hp-empty p { color:#a3b5a9; margin-bottom:24px; }

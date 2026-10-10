@@ -3,6 +3,7 @@ import secrets
 import threading
 import time
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
 
@@ -38,6 +39,7 @@ from .database import (
     Conversation,
     Document,
     LoginSession,
+    GoogleIdentity,
     Resource,
     audit,
     connect,
@@ -51,6 +53,7 @@ from .schemas import (
     ConfirmInput,
     ConsentInput,
     Credentials,
+    GoogleCredential,
     DeleteInput,
     ObservationInput,
     RecordInput,
@@ -59,6 +62,27 @@ from .storage import DocumentStorage
 from .supervisor import supervisor
 
 MAX_UPLOAD = 10 * 1024 * 1024
+
+
+def verify_google_credential(credential, client_id):
+    if not client_id:
+        raise HTTPException(503, "Google sign-in is not configured yet.")
+    try:
+        from google.auth.transport.requests import Request as GoogleRequest
+        from google.oauth2 import id_token
+
+        claims = id_token.verify_oauth2_token(credential, GoogleRequest(), client_id)
+    except Exception as exc:
+        raise HTTPException(401, "Google sign-in could not be verified. Please retry.") from exc
+    if (
+        claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com")
+        or claims.get("aud") != client_id
+        or not claims.get("sub")
+        or not claims.get("email_verified")
+        or not claims.get("email")
+    ):
+        raise HTTPException(401, "Google sign-in could not be verified. Please retry.")
+    return claims
 
 
 def create_app(settings=None):
@@ -248,6 +272,46 @@ def create_app(settings=None):
         result = start_session(db, user)
         audit(db, user.id, "account.login")
         db.commit()
+        return result
+
+    @app.post("/auth/google")
+    def google_login(data: GoogleCredential, request: Request, db=Depends(db_session)):
+        rate_limit("auth:" + (request.client.host if request.client else "unknown"), 10)
+        claims = verify_google_credential(data.credential, settings.google_client_id)
+        subject = str(claims["sub"])
+        identity = db.get(GoogleIdentity, subject)
+        if identity:
+            user = db.get(Account, identity.owner)
+            if not user:
+                raise HTTPException(401, "This Google account is not linked. Please contact support.")
+        else:
+            address = str(claims["email"]).casefold()
+            index = email_index(address, settings.data_key)
+            user = db.scalar(select(Account).where(Account.email_index == index))
+            if user:
+                # Only attach a verified Google identity to an existing account
+                # when Google is authoritative for the address.
+                authoritative = address.endswith("@gmail.com") or bool(claims.get("hd"))
+                if not authoritative:
+                    raise HTTPException(409, "Sign in with email first to protect this existing account.")
+            else:
+                user = Account(
+                    id=new_id(),
+                    email_index=index,
+                    email_cipher=b"",
+                    password_hash=password_hash(secrets.token_urlsafe(48)),
+                )
+                user.email_cipher = cipher.seal(address, user.id)
+                db.add(user)
+                db.add(Consent(owner=user.id, storage=False, cloud_ai=False))
+            db.add(GoogleIdentity(subject=subject, owner=user.id))
+        result = start_session(db, user)
+        audit(db, user.id, "account.google_login")
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(409, "Unable to finish Google sign-in. Please retry.")
         return result
 
     @app.post("/auth/logout", status_code=204)
@@ -666,12 +730,19 @@ def create_app(settings=None):
 
     @app.delete("/account", status_code=204)
     def remove_account(
-        data: DeleteInput, user=Depends(account), db=Depends(db_session)
+        data: DeleteInput, request: Request, user=Depends(account), db=Depends(db_session)
     ):
-        if not password_valid(data.password, user.password_hash):
-            raise HTTPException(401, "Password is incorrect.")
+        if data.password:
+            if not password_valid(data.password, user.password_hash):
+                raise HTTPException(401, "Password is incorrect.")
+        else:
+            _, session = authenticate(db, request.headers.get("authorization"))
+            signed_in_at = session.expires_at.replace(tzinfo=now().tzinfo) - timedelta(days=7)
+            if now() - signed_in_at > timedelta(minutes=15):
+                raise HTTPException(401, "Sign in again before deleting your account.")
         for d in db.scalars(select(Document).where(Document.owner == user.id)).all():
             storage.delete(d.object_key)
+        db.execute(delete(GoogleIdentity).where(GoogleIdentity.owner == user.id))
         for model in (Resource, Document, Conversation, Consent, LoginSession, Audit):
             db.execute(delete(model).where(model.owner == user.id))
         db.delete(user)

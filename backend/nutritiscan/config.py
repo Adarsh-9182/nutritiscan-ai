@@ -16,6 +16,7 @@ class Settings:
     provider_key: str = ""
     model_approved: bool = False
     origins: tuple[str, ...] = ("http://localhost:3000",)
+    google_client_id: str = ""
 
     @classmethod
     def from_env(cls):
@@ -52,4 +53,5 @@ class Settings:
                     "HEALTH_ALLOWED_ORIGINS", "http://localhost:3000"
                 ).split(",")
             ),
+            google_client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
         )
