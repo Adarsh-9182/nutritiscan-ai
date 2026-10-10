@@ -3964,7 +3964,11 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .hp-main-auth .hp-auth-divider { margin:21px 0 15px; font-size:12px; }
 .hp-main-auth .hp-auth > .hp-link { color:#a6edb6; font-size:12px; }
 .hp-main-auth .hp-auth .hp-legal-note { margin-top:23px!important; font-size:11px!important; line-height:1.8; }
-.hp-main-auth .hp-google-unconfigured { border-color:#ffffff25; background:#ffffff06; color:#d5e0d8; font-size:12px; }
+.hp-main-auth .hp-google-wrap { width:min(100%,360px); min-height:52px; margin:0 auto; padding:2px; overflow:hidden; border-radius:14px; background:linear-gradient(105deg,#4285f4 0%,#34a853 34%,#fbbc05 67%,#ea4335 100%); box-shadow:0 5px 22px #4285f41c; }
+.hp-main-auth .hp-google-button { width:100%; min-height:48px; display:flex; justify-content:center; border-radius:12px; overflow:hidden; background:#fff; }
+.hp-main-auth .hp-google-button iframe { max-width:100%; border-radius:12px; }
+.hp-main-auth .hp-google-unconfigured { width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; gap:12px; border:0; border-radius:12px; background:#fff; color:#303134; font-size:14px; font-weight:600; letter-spacing:.05px; opacity:1!important; cursor:not-allowed; }
+.hp-main-auth .hp-google-unconfigured svg { width:20px; height:20px; flex:none; }
 .hp-legal-note { margin-top:28px!important; color:#87998d; font-size:13px!important; }
 .hp-legal-note a { color:#aaf0c2; text-decoration:underline; text-underline-offset:3px; }
 .hp-empty { padding:35px; max-width:760px; }
