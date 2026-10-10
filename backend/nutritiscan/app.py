@@ -210,10 +210,6 @@ def create_app(settings=None):
     @app.post("/auth/register", status_code=201)
     def register(data: Credentials, request: Request, db=Depends(db_session)):
         rate_limit("auth:" + (request.client.host if request.client else "unknown"), 10)
-        if not data.adult:
-            raise HTTPException(
-                400, "This prototype is for adults 18+. Confirm your age to continue."
-            )
         user = Account(
             email_index=email_index(data.email, settings.data_key),
             email_cipher=b"",

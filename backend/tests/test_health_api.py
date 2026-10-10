@@ -24,7 +24,7 @@ def api(tmp_path):
 def user(api, email="first@example.test", consent=True):
     response = api.post(
         "/auth/register",
-        json={"email": email, "password": "a-long-test-password", "adult": True},
+        json={"email": email, "password": "a-long-test-password"},
     )
     assert response.status_code == 201, response.text
     token = response.json()["access_token"]
@@ -37,6 +37,22 @@ def user(api, email="first@example.test", consent=True):
             == 200
         )
     return headers
+
+
+def test_registration_does_not_require_an_age_attestation(api):
+    response = api.post(
+        "/auth/register",
+        json={"email": "all-ages@example.test", "password": "a-long-test-password"},
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_legacy_age_field_is_accepted_but_not_required(api):
+    response = api.post(
+        "/auth/register",
+        json={"email": "legacy-client@example.test", "password": "a-long-test-password", "adult": False},
+    )
+    assert response.status_code == 201, response.text
 
 
 def measurement(value=13.2, unit="g/dL", measured_at="2026-07-01"):

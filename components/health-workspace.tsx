@@ -217,7 +217,6 @@ function AccountGate({
         name: f.get("name"),
         recovery: f.get("recovery"),
         consent: f.get("consent") === "on",
-        adult: f.get("adult") === "on",
       });
       if (mode === "recover") {
         setRecovery(result.recovery!);
@@ -317,10 +316,10 @@ function AccountGate({
           </label>
           {mode === "register" && (
             <>
-              <label className="ns-check">
-                <input type="checkbox" name="adult" required /> I am 18 or
-                older.
-              </label>
+              <p className="ns-muted">
+                Younger users should create and manage health records with a
+                parent or guardian.
+              </p>
               <label className="ns-check">
                 <input type="checkbox" name="consent" required />
                 <span>

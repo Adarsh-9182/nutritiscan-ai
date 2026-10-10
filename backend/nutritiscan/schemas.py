@@ -13,7 +13,9 @@ class Strict(BaseModel):
 class Credentials(Strict):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=12, max_length=128)
-    adult: bool = False
+    # Accepted for compatibility with older web and Android clients. Account
+    # creation no longer uses a self-declared age gate.
+    adult: bool | None = None
 
     @field_validator("email")
     @classmethod

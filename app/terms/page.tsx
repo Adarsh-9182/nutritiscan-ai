@@ -54,7 +54,8 @@ export default function Page() {
         Check health information with a qualified professional. Only share
         information you have the right to use, and avoid entering details you
         do not want processed by NutritiScan or a configured AI provider. This
-        early-access service is for adults 18+.
+        early-access service is designed for all ages. Younger users should
+        involve a parent or guardian before sharing personal health information.
       </p>
 
       <h2>Availability and feedback</h2>

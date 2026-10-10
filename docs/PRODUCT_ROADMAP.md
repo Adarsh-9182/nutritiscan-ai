@@ -22,7 +22,7 @@ Breadth is the product ambition. Each supported workflow must have a tested boun
 
 ### Initial audience and geography
 
-Initial audience hypothesis: adults managing their own health questions across appointments and scattered records. Validate this with user interviews before expanding into clinic operations or insurance workflows.
+Initial audience hypothesis: people and families organizing health questions across appointments and scattered records. Younger users need age-appropriate experiences and parent/guardian support for personal health data. Validate workflows with users and families before expanding into clinic operations or insurance workflows.
 
 Geography is a pending product decision. Build the shared upload/import and consent infrastructure first. An India-first product should investigate ABDM/ABHA through the official sandbox. A US-first product should evaluate patient-authorized EHR/FHIR integrations or a retrieval partner. Do not assume a US integration covers Indian hospitals, or imply access to all providers.
 
@@ -178,7 +178,7 @@ Execution contract:
 
 **Outcome:** a small group gets measurable value from a reliable product.
 
-- Pilot the chosen adult-user workflows with consent; collect task success, time to useful outcome, correction rates and retention.
+- Pilot age-inclusive workflows with appropriate consent and parent/guardian safeguards for younger users; collect task success, time to useful outcome, correction rates and retention.
 - Track operational health without logging conversation content: availability, model load failure, response latency, connector completion, queue age and cost per completed workflow.
 - Security review, dependency checks, abuse protection, account recovery, accessibility, incident response and restore/deletion drills.
 - Introduce subscriptions only after repeated value and sustainable unit economics are measured.

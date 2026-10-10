@@ -15,7 +15,9 @@ export default function AboutPage() {
       <span className="ns-eyebrow">ABOUT THE PRODUCT</span>
       <h1>What is NutritiScan?</h1>
       <p>
-        NutritiScan is an early-access educational health companion for adults.
+        NutritiScan is an early-access educational health companion for people
+        and families of all ages. Younger users should involve a parent or
+        guardian when sharing personal health information.
         The website offers general health chat, and the Android beta includes a
         local journal for meals, health notes and saved conversations. It is
         designed to help people organize questions for a doctor visit—not to

@@ -35,4 +35,4 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests -q
 
 The GitHub workflow checks both web and backend. Tests use synthetic data and do not establish clinical validity.
 
-Educational prototype for adults 18+. Not a diagnosis, prescription, emergency service or replacement for a clinician. Clinical evaluation, security/privacy review, provider processing review and intended-use regulatory review are required before real patient use. Do not commit API keys, signing keys or patient records.
+Educational prototype for all ages. Younger users should involve a parent or guardian when sharing personal health information. Not a diagnosis, prescription, emergency service or replacement for a clinician. Clinical evaluation, security/privacy review, provider processing review and intended-use regulatory review are required before real patient use. Do not commit API keys, signing keys or patient records.

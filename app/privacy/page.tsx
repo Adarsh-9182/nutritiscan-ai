@@ -19,6 +19,14 @@ export default function Page() {
         connection status. Public-chat attachments and shared report uploads have
         different data boundaries, described below.
       </p>
+      <p>
+        NutritiScan is designed for people of all ages. Younger users should
+        review this notice with a parent or guardian before sharing personal
+        health information. A verified parent or guardian consent flow for
+        children&apos;s health records is not yet available; do not upload or
+        store a child&apos;s records in the shared account until that safeguard
+        is provided.
+      </p>
 
       <h2>What stays in your browser</h2>
       <p>

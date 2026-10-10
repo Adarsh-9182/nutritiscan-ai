@@ -1166,6 +1166,9 @@ function Composer({
       <p className="mt-2 text-center t-label text-[var(--text-dim)]">
         Educational only · not a diagnosis · consult a clinician for medical concerns
       </p>
+      <p className="mt-1 text-center t-label text-[var(--text-dim)]">
+        Under 18? Ask a parent or guardian before sharing personal health information.
+      </p>
     </form>
   );
 }

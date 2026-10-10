@@ -47,7 +47,7 @@ const STRUCTURED_DATA = {
       operatingSystem: "Web, Android",
       downloadUrl: "https://github.com/Adarsh-9182/nutritiscan/releases",
       disclaimer:
-        "Educational support only. Not a diagnosis, not a prescription and not emergency care. For adults 18+.",
+        "Educational support for all ages. Younger users should involve a parent or guardian when sharing personal health information. Not a diagnosis, not a prescription and not emergency care.",
     },
   ],
 };
