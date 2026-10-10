@@ -40,6 +40,13 @@ def user(api, email="first@example.test", consent=True):
     return headers
 
 
+def test_status_reports_database_and_storage_readiness(api):
+    response = api.get("/status")
+    assert response.status_code == 200
+    assert response.json()["database"] == "connected"
+    assert response.json()["document_storage"] == "local_only"
+
+
 def test_registration_does_not_require_an_age_attestation(api):
     response = api.post(
         "/auth/register",

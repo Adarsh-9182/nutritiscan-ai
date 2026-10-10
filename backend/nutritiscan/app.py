@@ -19,8 +19,8 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .auth import (
     authenticate,
@@ -219,12 +219,18 @@ def create_app(settings=None):
         return response
 
     @app.get("/status")
-    def status():
+    def status(db=Depends(db_session)):
+        try:
+            db.execute(text("SELECT 1"))
+        except SQLAlchemyError as exc:
+            raise HTTPException(503, "The health database is unavailable.") from exc
         return {
             "status": "ok",
             "api_version": "1.0.0",
             "fhir_version": "5.0.0",
             "clinical_validation": "not_completed",
+            "database": "connected",
+            "document_storage": "configured" if settings.s3_bucket else "local_only",
             "cloud_ai": settings.model_approved and bool(settings.provider_key),
             "voice": settings.model_approved
             and settings.provider == "openai"
