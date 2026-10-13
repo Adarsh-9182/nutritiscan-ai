@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import ChatWorkspace from "@/components/chat-workspace";
 
 export const metadata: Metadata = {
-  title: "Ask a health question | NutritiScan",
-  description: "Ask NutritiScan about nutrition, sleep, medicines, or general health. Get educational information and source links when available, with a clinician kept in the loop.",
+  title: "Ask a health question",
+  description: "Ask NutritiScan about nutrition, sleep, medicines, or general health. Get educational information, related reading, and help preparing questions for a clinician.",
   alternates: { canonical: "/chat" },
 };
 
