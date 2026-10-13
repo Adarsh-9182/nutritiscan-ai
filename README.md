@@ -45,7 +45,7 @@ reads, optional model-assisted synthesis, source-ID validation, artifact hashing
 and a review/approval handoff. Disabled plugins cannot execute. Runs have at most
 five execution steps and a 45-second budget, and can be stopped from the UI.
 
-If hosted synthesis is unavailable or fails citation-ID checks, the result is
+If hosted synthesis is unavailable or fails citation-ID or existing health-output checks, the result is
 labelled as a source collection. Empty retrieval and interrupted streams do not
 produce successful exports. Downloads require explicit approval, a matching
 SHA-256 fingerprint, and an unexpired preview. The receipt confirms file

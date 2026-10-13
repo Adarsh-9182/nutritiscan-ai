@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { assessTurn } from "@/lib/safety/triage";
+import { validateAnswer } from "@/lib/safety/validate";
 import { emergencyResponse, mentalHealthResponse, urgentPreamble } from "@/lib/safety/templates";
 import { blankProfile } from "@/lib/memory/profile";
 import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type RunEvent, type RunRequest } from "./contracts";
@@ -82,8 +83,9 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     }
     step("draft", "Prepare brief");
     const candidate = await abortable((dependencies.synthesize ?? summarize)(request, sources, signal), signal);
-    const summary = candidate ? validateSummary(candidate, sources) : null;
-    send({ type: "step", id: "draft", label: "Prepare brief", status: "done", detail: summary ? "Model-assisted summary prepared from retrieved sources" : "Source collection prepared; hosted synthesis was unavailable or did not pass citation checks" });
+    const cited = candidate ? validateSummary(candidate, sources) : null;
+    const summary = cited && !validateAnswer([...cited.points.map((point) => point.text), ...cited.gaps].join("\n"), state).blocked ? cited : null;
+    send({ type: "step", id: "draft", label: "Prepare brief", status: "done", detail: summary ? "Model-assisted summary prepared from retrieved sources" : "Source collection prepared; no model-assisted summary is included" });
     step("validate", "Validate artifact");
     const at = new Date().toISOString();
     const content = renderBrief(request, sources, summary, at);

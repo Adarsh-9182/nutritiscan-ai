@@ -73,4 +73,16 @@ describe("bounded research agent", () => {
     expect(validateSummary({ points: [{ text: "A claim", sourceIds: ["fake:123"] }], gaps: [] }, [source])).toBeNull();
     expect(validateSummary({ points: [{ text: "A claim", sourceIds: [source.id] }], gaps: [] }, [source])?.points).toHaveLength(1);
   });
+  it("withholds an unsafe summary even when its citation ID is valid", async () => {
+    const events: RunEvent[] = [];
+    await runAgent(input(), {
+      signal: new AbortController().signal, emit: (event) => events.push(event), read: async () => [source],
+      synthesize: async () => ({ points: [{ text: "You definitely have diabetes. Start taking metformin.", sourceIds: [source.id] }], gaps: [] }),
+    });
+    const final = events.at(-1);
+    expect(final?.type).toBe("approval");
+    if (final?.type !== "approval") throw new Error("Missing source collection");
+    expect(final.artifact.mode).toBe("source-collection");
+    expect(final.artifact.content).not.toContain("definitely have diabetes");
+  });
 });
