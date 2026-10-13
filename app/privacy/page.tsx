@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 6 OCTOBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 13 OCTOBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
         NutritiScan currently offers an educational conversation with health
@@ -59,6 +59,24 @@ export default function Page() {
         a hosted AI provider. If account sync is enabled, that conversation
         also becomes part of the encrypted account history. Clear this
         site&apos;s browser data to remove the local copy.
+      </p>
+
+      <h2>Agent Studio</h2>
+      <p>
+        Agent names, instructions and enabled plugin choices are saved in this
+        browser when you choose Save agent. Each run sends those settings and
+        your task question to NutritiScan. Enabled PubMed and ClinicalTrials.gov
+        plugins send the question as a public search query to their services.
+        A configured AI provider may receive the task, instructions and
+        retrieved source text to prepare a summary. Saved health profiles,
+        meal notes and chat history are not included in Agent Studio runs.
+      </p>
+      <p>
+        Run activity and draft briefs stay in this page&apos;s memory and are
+        cleared on refresh. A file download starts only when you select
+        Approve &amp; download after reviewing its preview. The file fingerprint
+        verifies the prepared content; it does not confirm where your browser
+        saved it. Clearing site data removes saved agent definitions.
       </p>
 
       <h2>Safety and limits</h2>

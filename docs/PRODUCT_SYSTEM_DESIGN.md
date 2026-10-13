@@ -2,7 +2,13 @@
 
 Status: proposed design for review. No new product architecture in this document is implemented by writing this file.
 
-Updated: 5 October 2026
+Updated: 13 October 2026
+
+Implementation note: `/agents` now provides a first research-agent builder and
+request-scoped plan → permitted reads → draft → citation-ID validation → review
+→ approved, fingerprint-verified download workflow. Reusable definitions are
+browser-local. Durable server runs, background jobs, external-action plugins and
+the wider architecture below remain proposed capabilities.
 
 ## 1. Product decision
 
@@ -40,6 +46,7 @@ Document intake, lab explanation, symptom organization and follow-up tasks are a
 ### Exists in the active web app
 
 - `/` is the product landing page; `/chat` is an educational supervisor/specialist chat.
+- `/agents` is Agent Studio: browser-local agent definitions, first-party source plugins, bounded server execution, visible activity and approved brief downloads.
 - `/api/chat` has request limits, deterministic safety triage, specialist routing, and answer validation for supported clinical turns.
 - The existing chat already has agent/tool activity traces and several bounded capabilities. Reuse its tested routing and safety logic; the target adds a general run lifecycle and explicit plugin contract rather than replacing the chat with another product surface.
 - Chat threads, profile, and meal notes are browser-local. The submitted message and relevant context go to the configured model provider when hosted inference is enabled.

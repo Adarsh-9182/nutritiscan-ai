@@ -112,6 +112,7 @@ export default function ProductLanding() {
           <Brand />
         </Link>
         <nav aria-label="Main navigation">
+          <Link href="/agents">Build agents</Link>
           <a href="#engine">Hospital problems</a>
           <a href="#how">How it works</a>
           <Link href="/privacy">Privacy</Link>
@@ -333,6 +334,7 @@ export default function ProductLanding() {
         <div>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms & limitations</Link>
+          <Link href="/agents">Agent Studio</Link>
           <Link href="/chat">Try the health chat</Link>
         </div>
       </footer>

@@ -16,7 +16,7 @@ export default function ResearchPage() {
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--emerald)] text-sm font-bold text-[#07130c]">N</span>
             NutritiScan
           </Link>
-          <Link href="/chat" className="btn-ghost rounded-full px-4 py-2 text-sm">Health chat →</Link>
+          <Link href="/agents" className="btn-ghost rounded-full px-4 py-2 text-sm">Build an agent →</Link>
         </header>
         <ResearchWorkspace />
         <footer className="mt-16 border-t border-[var(--border)] pt-5 text-xs leading-relaxed text-[var(--text-dim)]">

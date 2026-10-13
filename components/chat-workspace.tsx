@@ -177,13 +177,15 @@ export default function ChatWorkspace() {
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
-        <Link href="/" className="btn-ghost rounded-full px-3 py-1 t-label">
+        <Link href="/" className="btn-ghost hidden rounded-full px-3 py-1 t-label sm:block">
           Home
         </Link>
 
-        <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
+        <Link href="/research" className="btn-ghost hidden rounded-full px-3 py-1 t-label sm:block">
           Research
         </Link>
+
+        <Link href="/agents" className="btn-ghost rounded-full px-3 py-1 t-label">Agents</Link>
 
         <AuthNav />
       </header>

@@ -21,6 +21,7 @@ To enable hosted agent responses, configure `GOOGLE_GENERATIVE_AI_API_KEY` or an
 
 - `/` — marketing page
 - `/chat` — supervisor and specialist-agent conversation
+- `/agents` — create reusable research agents, select source plugins, run a bounded research task, review a source-linked brief and approve a verified Markdown download
 - `/discharge-demo` — two synthetic pending-result cases, including a missed-deadline escalation; fictional event history is saved per case in this browser, with no real records or messages
 - `/privacy` and `/terms` — current product notices
 
@@ -34,3 +35,20 @@ npx tsc --noEmit
 ```
 
 Do not commit API keys or real health information.
+
+## Agent Studio
+
+The first complete agent workflow is public-evidence research. Agent definitions
+are saved in the browser by an explicit Save action. The server owns a bounded
+plan and plugin gateway: selected health-library, PubMed and ClinicalTrials.gov
+reads, optional model-assisted synthesis, source-ID validation, artifact hashing,
+and a review/approval handoff. Disabled plugins cannot execute. Runs have at most
+five execution steps and a 45-second budget, and can be stopped from the UI.
+
+If hosted synthesis is unavailable or fails citation-ID checks, the result is
+labelled as a source collection. Empty retrieval and interrupted streams do not
+produce successful exports. Downloads require explicit approval, a matching
+SHA-256 fingerprint, and an unexpired preview. The receipt confirms file
+preparation and browser download initiation, not an operating-system save.
+Runs are request-scoped; they are not scheduled background jobs or durable,
+resumable server runs. No arbitrary third-party plugin code is loaded.

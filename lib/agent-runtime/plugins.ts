@@ -1,0 +1,32 @@
+import { findReferences } from "@/lib/workspace/health-library";
+import { findPapers } from "@/lib/evidence/pubmed";
+import { searchTrials } from "@/lib/evidence/trials";
+import { RunRequestSchema, type AgentDefinition, type AgentSource, type PluginId } from "./contracts";
+
+type ReadPlugin = Exclude<PluginId, "artifact">;
+type Plugin = (question: string, signal: AbortSignal) => Promise<AgentSource[]>;
+
+// Executable code is registered by the application, never by a model or browser.
+const registry: Record<ReadPlugin, Plugin> = {
+  library: async (question) => findReferences(question).map((note) => ({
+    id: `library:${note.id}`, title: note.title, url: note.url, kind: "reference", detail: note.text,
+  })),
+  pubmed: async (question, signal) => (await findPapers(question, { limit: 6, signal })).map((paper) => ({
+    id: `pubmed:${paper.pmid}`, title: paper.title.slice(0, 2000), url: paper.url, kind: "paper",
+    detail: `${paper.journal} · ${paper.year ?? "year not reported"} · ${paper.publicationTypes.join(", ")}\n${paper.abstract || "No abstract returned."}`.slice(0, 12000),
+  })),
+  trials: async (question, signal) => (await searchTrials(question, { limit: 4, signal })).map((trial) => ({
+    id: `trials:${trial.nctId}`, title: trial.title.slice(0, 2000), url: trial.url, kind: "trial",
+    detail: `${trial.studyType} · ${trial.status}\nConditions: ${trial.conditions.join(", ")}\nInterventions: ${trial.interventions.join(", ")}`.slice(0, 12000),
+  })),
+};
+
+export async function executeReadPlugin(agent: AgentDefinition, id: string, question: string, signal: AbortSignal): Promise<AgentSource[]> {
+  // Authorization is host-enforced even if a planner requests another tool.
+  if (!agent.plugins.includes(id as PluginId) || !Object.hasOwn(registry, id)) {
+    throw new Error("This agent does not have permission to use that read plugin.");
+  }
+  const task = RunRequestSchema.shape.task.parse(question);
+  signal.throwIfAborted();
+  return registry[id as ReadPlugin](task, signal);
+}
