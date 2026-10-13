@@ -1,6 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
 import postgres from 'postgres';
 // Single schema source, without a runtime TypeScript loader.
 const source = await readFile(new URL('../lib/workspace/schema.ts', import.meta.url), 'utf8');

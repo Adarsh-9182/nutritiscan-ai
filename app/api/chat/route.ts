@@ -14,6 +14,7 @@ import { MODEL_TIERS } from "@/lib/agents/provider";
 import { demoAnswer, isSmallTalk, routeOf } from "@/lib/agents/demo";
 import { safeMeals, safeProfile } from "@/lib/memory/schema";
 import { nutritionContext } from "@/lib/memory/nutrition-context";
+import { findReferences } from "@/lib/workspace/health-library";
 import { recallRelevant } from "@/lib/memory/recall";
 import { recordedSections, type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
@@ -97,6 +98,7 @@ const MessageDataSchemas = {
     }).strict(),
     text: z.string().max(32_000),
   }).strict(),
+  sources: z.object({ ids: z.array(z.string().max(40)).max(3) }).strict(),
 };
 
 function lastUserMessageText(messages: UIMessage[]): string {
@@ -381,6 +383,12 @@ function writeNote(writer: UIMessageStreamWriter, state: ClinicalState) {
   });
 }
 
+/** Attach only references selected from the published library for this turn. */
+function writeSources(writer: UIMessageStreamWriter, ids: string[]) {
+  if (!ids.length) return;
+  writer.write({ type: "data-sources", id: "sources", data: { ids } } as never);
+}
+
 /**
  * Demo brain — a safe, structured, keyless answer streamed word by word,
  * with the specialist trace the UI renders.
@@ -478,6 +486,13 @@ export async function POST(req: Request) {
   const recent = messages.slice(-MAX_MESSAGES);
   const userText = lastUserText(recent);
   const hasAttachedFile = attachedHealthFileFromMessage(lastUserMessageText(recent)) !== null;
+  const references = findReferences(userText);
+  const sourceIds = references.map((reference) => reference.id);
+  const sourceContext = references.length
+    ? `[PUBLISHED EDUCATIONAL REFERENCES — general information, not a personalized assessment]\n${references
+        .map((reference) => `- ${reference.title}: ${reference.text} Source: ${reference.url}`)
+        .join("\n")}\n[END PUBLISHED EDUCATIONAL REFERENCES]`
+    : null;
 
   // ----------------------------------------------------------------
   // SAFETY LAYER 2 — TRIAGE. Runs before retrieval, before reasoning,
@@ -522,7 +537,8 @@ export async function POST(req: Request) {
         // Best-effort: a failed or slow embedding call must not cost the
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
-        const recalled = await recallRelevant(userText, profile, meals, signal);
+        const recalledHistory = await recallRelevant(userText, profile, meals, signal);
+        const recalled = [recalledHistory, sourceContext].filter(Boolean).join("\n\n") || null;
 
         /*
          * Step down the model ladder before giving up on a real answer.
@@ -547,6 +563,7 @@ export async function POST(req: Request) {
             // A partial turn still gets its note: the record of what the system
             // concluded is independent of whether the prose finished.
             writeNote(writer, state);
+            if (!directive) writeSources(writer, sourceIds);
             return;
           }
           if (tier + 1 < MODEL_TIERS) {
@@ -569,6 +586,7 @@ export async function POST(req: Request) {
       // that stands in for it — that is how a turn used to end with nothing.
       await streamDemo(writer, userText, profile, meals, state, req.signal);
       writeNote(writer, state);
+      if (!directive) writeSources(writer, sourceIds);
     },
     onError: () => "Something went wrong on our side. Please try again.",
   });

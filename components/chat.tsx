@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import Link from "next/link";
 import { dictationSupport, startDictation } from "@/lib/http/dictation";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -10,6 +11,8 @@ import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
 import { attachedHealthFileFromMessage, questionWithoutHealthFile, withHealthFile, type AttachedHealthFile } from "@/lib/chat/file-context";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
+import { HEALTH_LIBRARY } from "@/lib/workspace/health-library";
+import { ChatRequestError, chatFailure, chatRequestMessages, fetchChat } from "@/lib/chat/transport";
 import { AgentConstellation, AgentRun } from "@/components/agent-orbit";
 import { actionPartsOf, applyActions } from "@/lib/memory/apply-actions";
 import { useMeals, useProfile as useProfileStore } from "@/lib/memory/store";
@@ -163,6 +166,36 @@ function noteFor(m: { parts: unknown[] }): NotePart | null {
   return parts.find((p) => p.type === "data-note")?.data ?? null;
 }
 
+function sourcesFor(m: { parts: unknown[] }) {
+  const parts = m.parts as { type: string; data?: { ids?: string[] } }[];
+  const ids = parts.find((p) => p.type === "data-sources")?.data?.ids ?? [];
+  const byId = new Map(HEALTH_LIBRARY.map((reference) => [reference.id, reference]));
+  return [...new Set(ids)].flatMap((id) => {
+    const reference = byId.get(id as (typeof HEALTH_LIBRARY)[number]["id"]);
+    return reference ? [reference] : [];
+  });
+}
+
+function RelatedReading({ ids }: { ids: string[] }) {
+  const parts = sourcesFor({ parts: [{ type: "data-sources", data: { ids } }] });
+  if (!parts.length) return null;
+  return (
+    <section aria-label="Related reading" className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3">
+      <div className="text-[12px] font-semibold text-[var(--text)]">Related reading</div>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-dim)]">Curated general information; these sources do not confirm a personal diagnosis.</p>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {parts.map((reference) => (
+          <li key={reference.id}>
+            <a href={reference.url} target="_blank" rel="noreferrer" className="text-[12px] text-[var(--emerald)] underline decoration-[color-mix(in_oklab,var(--emerald)_40%,transparent)] underline-offset-2 hover:decoration-current focus-ring">
+              {reference.title} <span aria-hidden="true">↗</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ConsultNote({ note }: { note: NotePart }) {
   const [copied, setCopied] = useState(false);
 
@@ -212,20 +245,43 @@ function ConsultNote({ note }: { note: NotePart }) {
   );
 }
 
+function ChatFailure({ error, onRetry, onNewChat }: { error: Error; onRetry: () => void; onNewChat: () => void }) {
+  const failure = chatFailure(error);
+  const deadline = error instanceof ChatRequestError ? error.retryAt : 0;
+  const [seconds, setSeconds] = useState(() => Math.max(0, Math.ceil((deadline - Date.now()) / 1_000)));
+  useEffect(() => {
+    if (!deadline) return;
+    const interval = window.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1_000));
+      setSeconds(remaining);
+      if (!remaining) window.clearInterval(interval);
+    }, 1_000);
+    return () => window.clearInterval(interval);
+  }, [deadline]);
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_8%,transparent)] px-4 py-3 text-[13px] text-[var(--text)]">
+      <p className="min-w-0 flex-1 basis-48 leading-relaxed">{failure.message}</p>
+      <button type="button" onClick={failure.newChat ? onNewChat : onRetry} disabled={seconds > 0} className="rounded-lg border border-[var(--border-strong)] px-3 py-2 font-medium transition hover:bg-[var(--surface)] disabled:cursor-wait disabled:opacity-60 focus-ring">
+        {failure.newChat ? "Start a new chat" : seconds > 0 ? `Try again in ${seconds}s` : "Try again"}
+      </button>
+    </div>
+  );
+}
+
 /** One opening question per specialist, for the constellation's buttons. */
 const AGENT_PROMPTS: Record<string, string> = {
   nutrition: "Am I eating enough protein?",
   fitness: "Best workout for building muscle?",
-  doctor: "I have a headache since yesterday.",
-  lab: "Explain my blood report.",
+  doctor: "What information should I include when I describe a symptom?",
+  lab: "How do I read the units and reference range on a lab report?",
   coach: "Help me fix my sleep schedule.",
 };
 
 const SUGGESTIONS = [
-  "I have a fever.",
+  "What information helps when describing a symptom?",
   "Am I eating enough protein?",
-  "Explain my blood report.",
-  "How's my sleep trend?",
+  "What should I ask my clinician about a lab result?",
+  "How can I build a more regular sleep routine?",
   "Best workout for building muscle?",
 ];
 
@@ -289,8 +345,9 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
+        fetch: fetchChat,
         prepareSendMessagesRequest: ({ messages }) => ({
-          body: { messages, profile: readProfile(), meals: readMeals() },
+          body: { messages: chatRequestMessages(messages), profile: readProfile(), meals: readMeals() },
         }),
       }),
     [],
@@ -372,11 +429,13 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     setListening(true);
   };
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerDockRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const reduceMotion = useReducedMotion();
 
   const busy = status === "submitted" || status === "streaming";
+  const empty = messages.length === 0;
 
   // Write the transcript back only when a turn settles. Persisting on every
   // token would serialise the whole conversation to localStorage tens of times
@@ -423,6 +482,26 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     if (!el || !pinnedRef.current) return;
     el.scrollTo({ top: el.scrollHeight, behavior: reduceMotion || busy ? "auto" : "smooth" });
   }, [messages, status, busy, reduceMotion]);
+
+  // Reserve the dock's actual height as typing, attachments and wrapped
+  // notices change it. Only follow that resize when already reading the
+  // newest messages; someone reviewing earlier replies keeps their place.
+  useEffect(() => {
+    const dock = composerDockRef.current;
+    const viewport = scrollRef.current;
+    if (!dock || !viewport) return;
+    const resize = () => {
+      viewport.style.paddingBottom = `${Math.ceil(dock.getBoundingClientRect().height) + 16}px`;
+      if (pinnedRef.current) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+      }
+    };
+    resize();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(resize);
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, [empty]);
 
   const send = (text: string, includeAttachment = false) => {
     if ((!text.trim() && !(includeAttachment && attachment)) || busy || attachmentBusy) return;
@@ -601,8 +680,6 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     return "supervisor";
   };
 
-  const empty = messages.length === 0;
-
   const composer = (
     <Composer
       centered={empty}
@@ -643,7 +720,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
           {empty ? "" : thread.title}
         </p>
 
-        <div className="flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover/head:opacity-100">
+        <div className="flex items-center gap-1 opacity-100 transition [@media(hover:hover)]:opacity-0 focus-within:opacity-100 group-hover/head:opacity-100">
           {!empty && (
             <>
               <button
@@ -702,7 +779,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 {isRecorded(profile, "name") && profile.name !== "there" ? `Hi ${profile.name}. What would you like help with?` : "What would you like help with?"}
               </h1>
               <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                Public health chat prototype. The Supervisor routes supported questions to specialist agents for educational answers.
+                Ask about nutrition, sleep, medicines or a health concern. NutritiScan shares general educational information and source links when available; it can’t diagnose or replace a clinician.
               </p>
             </div>
 
@@ -798,7 +875,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           onClick={() => startEdit(m.id, question)}
                           aria-label="Edit this message"
                           title="Edit"
-                          className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-0 transition hover:text-[var(--text)] focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
+                          className="mt-1.5 rounded-md px-1.5 py-1 t-label text-[var(--text-dim)] opacity-100 transition [@media(hover:hover)]:opacity-0 hover:text-[var(--text)] focus-visible:opacity-100 group-hover:opacity-100 focus-ring"
                         >
                           <span aria-hidden="true">✎</span>
                         </button>
@@ -818,6 +895,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
 
                 const trace = tracesFor(m);
                 const note = noteFor(m);
+                const sources = sourcesFor(m);
                 const route = badgeFor(idx, trace);
                 const color = agentColor(route);
                 return (
@@ -870,10 +948,11 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                       )}
                       <ActionChips parts={actionPartsOf(m)} />
                       {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
+                      {text && sources.length > 0 && <RelatedReading ids={sources.map((source) => source.id)} />}
                       {note && <ConsultNote note={note} />}
 
                       {text && (
-                        <div className="mt-1.5 flex items-center gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100">
+                        <div className="mt-1.5 flex items-center gap-1 opacity-100 transition [@media(hover:hover)]:opacity-0 focus-within:opacity-100 group-hover:opacity-100">
                           <button
                             type="button"
                             onClick={() => copyMessage(m.id, text)}
@@ -947,13 +1026,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
               )}
 
               {error && (
-                <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color-mix(in_oklab,var(--rose)_40%,transparent)] bg-[color-mix(in_oklab,var(--rose)_10%,transparent)] px-3 py-2 text-xs text-[#ffd7dd]">
-                  <span>That answer didn&apos;t come through.</span>
-                  {/* An error with no way out is a dead end — offer the retry. */}
-                  <button type="button" onClick={() => regenerate()} className="rounded-md border border-[color-mix(in_oklab,var(--rose)_45%,transparent)] px-2.5 py-1 font-medium transition hover:bg-[color-mix(in_oklab,var(--rose)_18%,transparent)]">
-                    Try again
-                  </button>
-                </div>
+                <ChatFailure error={error} onRetry={() => { pinnedRef.current = true; void regenerate(); }} onNewChat={startNewConversation} />
               )}
             </div>
           </div>
@@ -975,7 +1048,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
             and a hard-coded colour here would have shown as a slab of the
             wrong grey in one of the two places.
           */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+          <div ref={composerDockRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
             <div className="h-16 bg-[linear-gradient(to_bottom,transparent,var(--chat-ground))]" />
             <div className="bg-[var(--chat-ground)] px-4 pb-3">
               <div className="pointer-events-auto mx-auto max-w-2xl">
@@ -1164,6 +1237,10 @@ function Composer({
       )}
       {attachmentName && <p className="mt-2 text-center t-label text-[var(--text-dim)]">File text is extracted on this device and sent with your message. PDF/TXT only · 12,000 text characters max.</p>}
       <p className="mt-2 text-center t-label text-[var(--text-dim)]">
+        <span>Sending shares this message, recent chat history, and any saved profile or meal notes with NutritiScan; a configured AI provider may process them. Avoid details you don’t want to share. </span>
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-[var(--text-muted)]">Privacy</Link>
+      </p>
+      <p className="mt-1 text-center t-label text-[var(--text-dim)]">
         Educational only · not a diagnosis · consult a clinician for medical concerns
       </p>
     </form>

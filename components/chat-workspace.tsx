@@ -34,9 +34,11 @@ export default function ChatWorkspace() {
 
   useEffect(() => {
     let live = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 6_000);
     const load = async () => {
       try {
-        const response = await fetch("/api/conversations", { cache: "no-store" });
+        const response = await fetch("/api/conversations", { cache: "no-store", signal: controller.signal });
         if (!live) return;
         if (response.status === 401) {
           setAccountSyncEnabled(false);
@@ -66,11 +68,16 @@ export default function ChatWorkspace() {
           setSyncStatus("error");
         }
       } finally {
+        window.clearTimeout(timeout);
         if (live) setSyncReady(true);
       }
     };
     void load();
-    return () => { live = false; };
+    return () => {
+      live = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {

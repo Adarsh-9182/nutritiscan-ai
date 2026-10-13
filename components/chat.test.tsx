@@ -188,3 +188,37 @@ describe("conversations", () => {
     expect(screen.getByText(/what would you like help with/i)).toBeInTheDocument();
   });
 });
+
+describe("recovering a failed answer", () => {
+  it("keeps the submitted question visible and retries without duplicating it", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(<Chat profile={demoProfile} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Am I eating enough protein?" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Connection lost");
+    expect(transcript().getByText("Am I eating enough protein?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Aim for 1.6 g per kg.")).toBeInTheDocument();
+    expect(transcript().getAllByText("Am I eating enough protein?")).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits before retrying a rate-limited request", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 429, headers: { "retry-after": "60" } }));
+    render(<Chat profile={demoProfile} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Am I eating enough protein?" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("wait a moment");
+    expect(screen.getByRole("button", { name: /Try again in \d+s/ })).toBeDisabled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a new chat when retrying the same oversized request would fail", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 413 }));
+    render(<Chat profile={demoProfile} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Am I eating enough protein?" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("too large");
+    fireEvent.click(screen.getByRole("button", { name: "Start a new chat" }));
+    expect(await screen.findByText(/what would you like help with/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
