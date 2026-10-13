@@ -30,9 +30,11 @@ export const SourceSchema = z.object({
   id: z.string().max(80),
   title: z.string().max(2000),
   url: z.string().url().max(2000).refine((value) => {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password && !url.port &&
-      ["medlineplus.gov", "ods.od.nih.gov", "pubmed.ncbi.nlm.nih.gov", "clinicaltrials.gov"].includes(url.hostname);
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password && !url.port &&
+        ["medlineplus.gov", "ods.od.nih.gov", "pubmed.ncbi.nlm.nih.gov", "clinicaltrials.gov"].includes(url.hostname);
+    } catch { return false; }
   }, "Only approved public source URLs are supported."),
   kind: z.enum(["reference", "paper", "trial"]),
   detail: z.string().max(12000),
@@ -51,9 +53,10 @@ export const ArtifactSchema = z.object({
 export type AgentArtifact = z.infer<typeof ArtifactSchema>;
 
 const eventBase = { runId: z.string().uuid(), at: z.string().datetime() };
+export const StepEventSchema = z.object({ ...eventBase, type: z.literal("step"), id: z.string().max(40), label: z.string().max(200), status: z.enum(["running", "done", "empty", "failed", "cancelled"]), detail: z.string().max(500) }).strict();
 export const RunEventSchema = z.discriminatedUnion("type", [
-  z.object({ ...eventBase, type: z.literal("started"), plan: z.array(z.string().max(200)).max(6) }).strict(),
-  z.object({ ...eventBase, type: z.literal("step"), id: z.string().max(40), label: z.string().max(200), status: z.enum(["running", "done", "empty"]), detail: z.string().max(500) }).strict(),
+  z.object({ ...eventBase, type: z.literal("started"), plan: z.array(z.string().max(200)).max(8) }).strict(),
+  StepEventSchema,
   z.object({ ...eventBase, type: z.literal("approval"), artifact: ArtifactSchema }).strict(),
   z.object({ ...eventBase, type: z.literal("failed"), message: z.string().max(2000) }).strict(),
   z.object({ ...eventBase, type: z.literal("cancelled") }).strict(),

@@ -55,4 +55,23 @@ describe("Agent Studio", () => {
     expect(screen.getByText("Stopped")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve & download" })).not.toBeInTheDocument();
   });
+
+  it("saves the executed task and restores its result after remount without rerunning it", async () => {
+    const view = render(<AgentStudio />);
+    fireEvent.change(screen.getByLabelText("Agent task"), { target: { value: "protein in vegetarian diets" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+    await screen.findByRole("button", { name: "Approve & download" });
+    // A new, unsent draft must not rename the task that produced this result.
+    fireEvent.change(screen.getByLabelText("Agent task"), { target: { value: "sleep duration" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save result on this device" }));
+    view.unmount();
+    render(<AgentStudio />);
+    fireEvent.click(await screen.findByRole("button", { name: "Restore result: protein in vegetarian diets" }));
+    expect(screen.getByLabelText("Agent task")).toHaveValue("protein in vegetarian diets");
+    expect(screen.getByLabelText("Brief preview")).toHaveTextContent("Protein brief");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Reject export" }));
+    const retained = JSON.parse(localStorage.getItem("ns-agent-run-history-v1")!);
+    expect(retained[0].status).toBe("rejected");
+  });
 });

@@ -4,6 +4,7 @@ import { RESEARCH_AGENT, RunEventSchema, RunRequestSchema, type AgentSource, typ
 import { runAgent } from "./run";
 import { executeReadPlugin } from "./plugins";
 import { validateSummary } from "./brief";
+import { planResearch } from "./plan";
 
 const source: AgentSource = { id: "library:nutrition", title: "Nutrition", url: "https://medlineplus.gov/nutrition.html", kind: "reference", detail: "Individual food needs vary." };
 const request = { agent: { ...RESEARCH_AGENT, plugins: ["library", "artifact"] as const }, task: "protein in vegetarian diets" };
@@ -84,5 +85,26 @@ describe("bounded research agent", () => {
     if (final?.type !== "approval") throw new Error("Missing source collection");
     expect(final.artifact.mode).toBe("source-collection");
     expect(final.artifact.content).not.toContain("definitely have diabetes");
+  });
+  it("recovers a failed public source without discarding successful reads", async () => {
+    const events: RunEvent[] = [];
+    const paper = { ...source, id: "pubmed:123", kind: "paper" as const, url: "https://pubmed.ncbi.nlm.nih.gov/123/" };
+    let attempts = 0;
+    const read = vi.fn(async (_agent, id) => {
+      if (id === "library") return [source];
+      if (++attempts === 1) throw new Error("temporary provider failure");
+      return [paper];
+    });
+    await runAgent({ ...input(), agent: { ...input().agent, plugins: ["library", "pubmed", "artifact"] } }, { signal: new AbortController().signal, emit: (event) => events.push(event), read, synthesize: async () => null });
+    const final = events.at(-1);
+    expect(final?.type).toBe("approval");
+    if (final?.type !== "approval") throw new Error("Missing approval");
+    expect(final.artifact.sources.map((item) => item.id)).toEqual([source.id, paper.id]);
+    expect(attempts).toBe(2);
+    expect(events).toContainEqual(expect.objectContaining({ id: "pubmed-retry", status: "done" }));
+  });
+  it("prioritizes the requested source while keeping tool permissions intact", () => {
+    expect(planResearch({ agent: RESEARCH_AGENT, task: "registered clinical trials about sleep" }).readers[0]).toBe("trials");
+    expect(planResearch({ ...input(), task: "registered clinical trials about sleep" }).readers).toEqual(["library"]);
   });
 });

@@ -43,12 +43,19 @@ are saved in the browser by an explicit Save action. The server owns a bounded
 plan and plugin gateway: selected health-library, PubMed and ClinicalTrials.gov
 reads, optional model-assisted synthesis, source-ID validation, artifact hashing,
 and a review/approval handoff. Disabled plugins cannot execute. Runs have at most
-five execution steps and a 45-second budget, and can be stopped from the UI.
+six execution steps and a 45-second budget, and can be stopped from the UI.
+Plans prioritize the source requested by the task. A failed read does not discard
+other successful reads; one public source may be retried when time permits.
+Synthesis tries up to three configured models within one shared deadline.
 
 If hosted synthesis is unavailable or fails citation-ID or existing health-output checks, the result is
 labelled as a source collection. Empty retrieval and interrupted streams do not
 produce successful exports. Downloads require explicit approval, a matching
 SHA-256 fingerprint, and an unexpired preview. The receipt confirms file
 preparation and browser download initiation, not an operating-system save.
+Results can be explicitly saved on this device and restored after refresh,
+including their original task, tool activity and export receipt. Saved results
+are not automatically sent into later runs. Storage is bounded to eight results
+and 1 MB; remove older results when full. Approval expiry still applies.
 Runs are request-scoped; they are not scheduled background jobs or durable,
 resumable server runs. No arbitrary third-party plugin code is loaded.

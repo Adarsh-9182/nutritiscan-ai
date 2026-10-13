@@ -5,15 +5,16 @@ import { emergencyResponse, mentalHealthResponse, urgentPreamble } from "@/lib/s
 import { blankProfile } from "@/lib/memory/profile";
 import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type RunEvent, type RunRequest } from "./contracts";
 import { executeReadPlugin } from "./plugins";
-import { renderBrief, summarize, validateSummary, type Summary } from "./brief";
+import { renderBrief, summarize, validateSummary } from "./brief";
+import { planResearch } from "./plan";
 
-export const RUN_LIMITS = { steps: 5, milliseconds: 45_000, sources: 13 } as const;
+export const RUN_LIMITS = { steps: 6, milliseconds: 45_000, sources: 13 } as const;
 type Emit = (event: RunEvent) => void;
 type Dependencies = {
   signal: AbortSignal;
   emit: Emit;
   read?: typeof executeReadPlugin;
-  synthesize?: (request: RunRequest, sources: AgentSource[], signal: AbortSignal) => Promise<Summary | null>;
+  synthesize?: typeof summarize;
 };
 
 /** A budget expiry also stops waiting for a queued or misbehaving plugin. */
@@ -44,22 +45,24 @@ function validSource(source: AgentSource): boolean {
 /** The host owns the lifecycle and tool gate; model prose grants no powers. */
 export async function runAgent(input: RunRequest, dependencies: Dependencies): Promise<void> {
   const runId = randomUUID();
+  const deadline = Date.now() + RUN_LIMITS.milliseconds;
   const signal = AbortSignal.any([dependencies.signal, AbortSignal.timeout(RUN_LIMITS.milliseconds)]);
-  const send = (event: Omit<Extract<RunEvent, { type: "step" }>, "runId" | "at">) =>
+  const activeStep: { current: { id: string; label: string } | null } = { current: null };
+  const send = (event: Omit<Extract<RunEvent, { type: "step" }>, "runId" | "at">) => {
+    if (event.status !== "running" && activeStep.current?.id === event.id) activeStep.current = null;
     dependencies.emit({ ...event, runId, at: new Date().toISOString() });
+  };
   let steps = 0;
   const step = (id: string, label: string) => {
     signal.throwIfAborted();
     if (++steps > RUN_LIMITS.steps) throw new Error("Step budget exhausted");
+    activeStep.current = { id, label };
     send({ type: "step", id, label, status: "running", detail: "" });
   };
   try {
     const request = RunRequestSchema.parse(input);
-    const readers = request.agent.plugins.filter((id) => id !== "artifact");
-    dependencies.emit({ type: "started", runId, at: new Date().toISOString(), plan: [
-      ...readers.map((id) => `Read ${PLUGINS.find((plugin) => plugin.id === id)!.name}`),
-      "Prepare a source-linked research brief", "Validate references and prepare the approval preview", "Wait for your approval to download",
-    ] });
+    const { readers, stages } = planResearch(request);
+    dependencies.emit({ type: "started", runId, at: new Date().toISOString(), plan: stages });
     const state = assessTurn({ text: request.task, profile: blankProfile, consultationId: runId, turn: 1 });
     if (state.triage.channel === "mental_health" || state.triage.verdict === "emergency" || state.triage.verdict === "urgent") {
       const message = state.triage.channel === "mental_health" ? mentalHealthResponse() : state.triage.verdict === "emergency" ? emergencyResponse(state) : urgentPreamble(state);
@@ -67,22 +70,40 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
       return;
     }
     const sources: AgentSource[] = [];
-    for (const id of readers) {
-      const label = PLUGINS.find((plugin) => plugin.id === id)!.name;
-      step(id, label);
-      const result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, request.task, signal), signal);
+    const retryCandidates: typeof readers = [];
+    const readOne = async (id: typeof readers[number], retry = false) => {
+      const label = `${PLUGINS.find((plugin) => plugin.id === id)!.name}${retry ? " (retry)" : ""}`;
+      const stepId = retry ? `${id}-retry` : id;
+      step(stepId, label);
+      const readSignal = retry ? AbortSignal.any([signal, AbortSignal.timeout(6_000)]) : signal;
+      let result: AgentSource[];
+      try {
+        result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, request.task, readSignal), readSignal);
+      } catch {
+        signal.throwIfAborted();
+        send({ type: "step", id: stepId, label, status: "failed", detail: "This source could not be read. Other permitted sources will still be used." });
+        if (!retry && id !== "library") retryCandidates.push(id);
+        return;
+      }
       signal.throwIfAborted();
       if (!result.every(validSource)) throw new Error("Plugin returned invalid source provenance");
-      sources.push(...result);
+      for (const source of result) if (!sources.some((existing) => existing.id === source.id)) sources.push(source);
       if (sources.length > RUN_LIMITS.sources) throw new Error("Source budget exhausted");
-      send({ type: "step", id, label, status: result.length ? "done" : "empty", detail: result.length ? `${result.length} sources retrieved` : "No results returned. This source may be unavailable or need different search terms." });
-    }
+      send({ type: "step", id: stepId, label, status: result.length ? "done" : "empty", detail: result.length ? `${result.length} sources retrieved` : "No results returned. This source may be unavailable or need different search terms." });
+      if (!result.length && !retry && id !== "library") retryCandidates.push(id);
+    };
+    for (const id of readers) await readOne(id);
+    // Exactly one read-only recovery attempt; reserve time for synthesis and validation.
+    if (retryCandidates.length && deadline - Date.now() > 19_000) await readOne(retryCandidates[0], true);
     if (!sources.length) {
       dependencies.emit({ type: "failed", runId, at: new Date().toISOString(), message: "No sources were returned. Try a more specific question or enable another source plugin. A source may also be temporarily unavailable." });
       return;
     }
     step("draft", "Prepare brief");
-    const candidate = await abortable((dependencies.synthesize ?? summarize)(request, sources, signal), signal);
+    const candidate = await abortable((dependencies.synthesize ?? summarize)(request, sources, signal, {
+      milliseconds: Math.max(1, deadline - Date.now() - 2_000),
+      onAttempt: (attempt) => send({ type: "step", id: "draft", label: "Prepare brief", status: "running", detail: attempt === 1 ? "Preparing a source-linked summary" : "Trying another configured model within the same time budget" }),
+    }), signal);
     const cited = candidate ? validateSummary(candidate, sources) : null;
     const summary = cited && !validateAnswer([...cited.points.map((point) => point.text), ...cited.gaps].join("\n"), state).blocked ? cited : null;
     send({ type: "step", id: "draft", label: "Prepare brief", status: "done", detail: summary ? "Model-assisted summary prepared from retrieved sources" : "Source collection prepared; no model-assisted summary is included" });
@@ -100,6 +121,8 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
       expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
     } });
   } catch {
+    // Finish the active row too, so failed/stopped runs never keep pulsing.
+    if (activeStep.current) send({ type: "step", ...activeStep.current, status: dependencies.signal.aborted ? "cancelled" : "failed", detail: dependencies.signal.aborted ? "Stopped before completion" : "This step did not complete" });
     dependencies.emit(dependencies.signal.aborted
       ? { type: "cancelled", runId, at: new Date().toISOString() }
       : { type: "failed", runId, at: new Date().toISOString(), message: signal.aborted ? "The run reached its time limit. Try a narrower question or fewer plugins." : "The run could not be completed. No file was exported. Please try again." });

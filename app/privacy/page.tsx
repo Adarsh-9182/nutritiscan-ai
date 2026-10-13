@@ -72,8 +72,12 @@ export default function Page() {
         meal notes and chat history are not included in Agent Studio runs.
       </p>
       <p>
-        Run activity and draft briefs stay in this page&apos;s memory and are
-        cleared on refresh. A file download starts only when you select
+        Run activity and draft briefs stay in this page&apos;s memory unless you
+        select Save result on this device. Saved results include the task,
+        agent settings, source text, brief, activity and any later export
+        receipt. They stay in this browser, are not synced to an account, and
+        are not automatically included in later agent requests. Use Remove in
+        Saved results or clear site data to delete them. A file download starts only when you select
         Approve &amp; download after reviewing its preview. The file fingerprint
         verifies the prepared content; it does not confirm where your browser
         saved it. Clearing site data removes saved agent definitions.
