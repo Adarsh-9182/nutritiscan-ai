@@ -118,6 +118,7 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     dependencies.emit({ type: "approval", runId, at, artifact: {
       filename: `research-brief-${runId.slice(0, 8)}.md`, content, sha256, bytes, sources,
       mode: summary ? "model-assisted" : "source-collection",
+      summary: summary ?? undefined,
       expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
     } });
   } catch {

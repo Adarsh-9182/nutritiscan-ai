@@ -1,16 +1,7 @@
 import { generateText, Output } from "ai";
-import { z } from "zod";
 import { hasAnyModel, MODEL_TIERS, resolveModel } from "@/lib/agents/provider";
-import type { AgentSource, RunRequest } from "./contracts";
-
-const SummarySchema = z.object({
-  points: z.array(z.object({
-    text: z.string().min(1).max(700),
-    sourceIds: z.array(z.string().max(80)).min(1).max(3),
-  }).strict()).min(1).max(6),
-  gaps: z.array(z.string().max(500)).max(5),
-}).strict();
-export type Summary = z.infer<typeof SummarySchema>;
+import { SummarySchema, type Summary, type AgentSource, type RunRequest } from "./contracts";
+export type { Summary } from "./contracts";
 
 export function validateSummary(input: unknown, sources: AgentSource[]): Summary | null {
   const parsed = SummarySchema.safeParse(input);
@@ -67,12 +58,15 @@ export function renderBrief(request: RunRequest, sources: AgentSource[], summary
     `# ${escapeMarkdown(request.agent.name)} — research brief`,
     "", `Question: ${escapeMarkdown(request.task)}`, "", `Prepared: ${at}`,
     `Mode: ${summary ? "Model-assisted synthesis; check every claim against its source." : "Source collection; no AI synthesis was used."}`,
+    `Search depth: ${request.agent.depth === "quick" ? "Quick (up to 3 papers and 2 registered studies)" : "Standard (up to 6 papers and 4 registered studies)"}. Only enabled sources are searched.`,
     "", "## Scope", "",
     "Public source metadata and available abstracts only. This is not a systematic review, clinical advice, or a full-text assessment. Search rank does not establish evidence quality. Registered studies do not establish efficacy.",
   ];
+  lines.push("", "## Source coverage", "",
+    `${sources.filter((source) => source.kind === "reference").length} reference notes · ${sources.filter((source) => source.kind === "paper").length} papers · ${sources.filter((source) => source.kind === "trial").length} registered studies. Counts describe retrieved sources, not evidence strength or completeness.`);
   if (summary) {
     lines.push("", "## Source-linked summary", "");
-    for (const point of summary.points) lines.push(`- ${escapeMarkdown(point.text)} (${point.sourceIds.join(", ")})`);
+    for (const point of summary.points) lines.push(`- ${escapeMarkdown(point.text)} (${point.sourceIds.map((id) => `[${id}](${sources.find((source) => source.id === id)!.url})`).join(", ")})`);
     if (summary.gaps.length) lines.push("", "## Gaps to check", "", ...summary.gaps.map((gap) => `- ${escapeMarkdown(gap)}`));
   }
   lines.push("", "## Sources", "");

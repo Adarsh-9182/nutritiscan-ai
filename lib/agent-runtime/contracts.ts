@@ -7,6 +7,7 @@ export const AgentDefinitionSchema = z.object({
   id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/),
   name: z.string().trim().min(2).max(60),
   instructions: z.string().trim().min(10).max(1200),
+  depth: z.enum(["quick", "standard"]).optional(),
   plugins: z.array(PluginId).min(2).max(4)
     .refine((ids) => new Set(ids).size === ids.length, "Choose each plugin once.")
     .refine((ids) => ids.includes("artifact") && ids.some((id) => id !== "artifact"), "Enable a source plugin and the brief export plugin."),
@@ -41,6 +42,15 @@ export const SourceSchema = z.object({
 }).strict();
 export type AgentSource = z.infer<typeof SourceSchema>;
 
+export const SummarySchema = z.object({
+  points: z.array(z.object({
+    text: z.string().min(1).max(700),
+    sourceIds: z.array(z.string().max(80)).min(1).max(3),
+  }).strict()).min(1).max(6),
+  gaps: z.array(z.string().max(500)).max(5),
+}).strict();
+export type Summary = z.infer<typeof SummarySchema>;
+
 export const ArtifactSchema = z.object({
   filename: z.string().regex(/^[a-z0-9_-]+\.md$/).max(100),
   content: z.string().max(100000),
@@ -49,7 +59,11 @@ export const ArtifactSchema = z.object({
   sources: z.array(SourceSchema).max(13),
   mode: z.enum(["model-assisted", "source-collection"]),
   expiresAt: z.string().datetime(),
-}).strict();
+  summary: SummarySchema.optional(),
+}).strict().refine((artifact) => !artifact.summary || (
+  artifact.mode === "model-assisted" && artifact.summary.points.every((point) =>
+    point.sourceIds.every((id) => artifact.sources.some((source) => source.id === id)))
+), "Summary citations must refer to collected sources.");
 export type AgentArtifact = z.infer<typeof ArtifactSchema>;
 
 const eventBase = { runId: z.string().uuid(), at: z.string().datetime() };

@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentStudio from "./agent-studio";
 
 const runId = "8d7983ed-d3d5-4c4c-8c94-14a1b65e97e1";
-function completedRun() {
+function completedRun(withSummary = false) {
   const content = "# Protein brief\nReview the published nutrition source.\n";
   const at = new Date().toISOString();
   const events = [
     { type: "started", runId, at, plan: ["Read the library", "Draft a brief", "Wait for approval"] },
     { type: "step", runId, at, id: "library", label: "Health library", status: "done", detail: "1 source retrieved" },
-    { type: "approval", runId, at, artifact: { filename: "research-brief-test.md", content, bytes: Buffer.byteLength(content), sha256: createHash("sha256").update(content).digest("hex"), sources: [{ id: "library:nutrition", title: "Nutrition", url: "https://medlineplus.gov/nutrition.html", kind: "reference", detail: "Nutrition reference" }], mode: "source-collection", expiresAt: new Date(Date.now() + 60000).toISOString() } },
+    { type: "approval", runId, at, artifact: { filename: "research-brief-test.md", content, bytes: Buffer.byteLength(content), sha256: createHash("sha256").update(content).digest("hex"), sources: [{ id: "library:nutrition", title: "Nutrition", url: "https://medlineplus.gov/nutrition.html", kind: "reference", detail: "Nutrition reference" }], mode: withSummary ? "model-assisted" : "source-collection", summary: withSummary ? { points: [{ text: "Food needs vary by individual.", sourceIds: ["library:nutrition"] }], gaps: ["Full text was not assessed."] } : undefined, expiresAt: new Date(Date.now() + 60000).toISOString() } },
   ];
   return new Response(events.map((event) => JSON.stringify(event)).join("\n") + "\n");
 }
@@ -41,6 +41,22 @@ describe("Agent Studio", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reject export" }));
     expect(screen.queryByRole("button", { name: "Approve & download" })).not.toBeInTheDocument();
     expect(screen.getByText("Export rejected")).toBeInTheDocument();
+  });
+
+  it("sends selected depth and displays source-linked answers with the executed question", async () => {
+    vi.mocked(fetch).mockImplementation(async () => completedRun(true));
+    render(<AgentStudio />);
+    fireEvent.change(screen.getByLabelText(/Research depth/), { target: { value: "quick" } });
+    fireEvent.change(screen.getByLabelText("Agent task"), { target: { value: "protein in vegetarian diets" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+    await screen.findByRole("button", { name: "Approve & download" });
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)).agent.depth).toBe("quick");
+    expect(screen.getByRole("link", { name: "Citation 1: Nutrition" })).toHaveAttribute("href", "https://medlineplus.gov/nutrition.html");
+    expect(screen.getByLabelText("Source-linked answer")).toHaveTextContent("Food needs vary by individual.");
+    expect(screen.getByText("Full text was not assessed.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Agent task"), { target: { value: "unsent draft" } });
+    expect(screen.getByText("protein in vegetarian diets")).toBeInTheDocument();
+    expect(screen.getByLabelText("Source coverage")).toHaveTextContent("Reference notes");
   });
 
   it("stops an in-flight run and allows a new task", async () => {
