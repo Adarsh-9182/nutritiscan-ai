@@ -27,6 +27,45 @@ describe("bounded research agent", () => {
     expect(final.artifact.content).toContain(source.url);
   });
 
+  it("uses explicit public search terms while retaining the original question and an audit", async () => {
+    const events: RunEvent[] = [];
+    const read = vi.fn().mockResolvedValue([source]);
+    const synthesize = vi.fn(async (received: unknown) => { expect(received).toMatchObject({ task: request.task }); return null; });
+    await runAgent({ ...input(), searchTerms: "vegetarian protein" }, { signal: new AbortController().signal, emit: (event) => events.push(event), read, synthesize });
+    expect(read.mock.calls[0][2]).toBe("vegetarian protein");
+    expect(synthesize.mock.calls[0][0]).toMatchObject({ task: request.task, searchTerms: "vegetarian protein" });
+    const final = events.at(-1);
+    if (final?.type !== "approval") throw new Error("Missing approval");
+    expect(final.artifact.searches).toEqual([{ plugin: "library", query: "vegetarian protein", status: "done", returned: 1, retry: false }]);
+    expect(final.artifact.content).toContain("Question: protein in vegetarian diets");
+    expect(final.artifact.content).toContain("Query: vegetarian protein");
+  });
+
+  it("lets other permitted sources finish when a read stalls", async () => {
+    vi.useFakeTimers();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((milliseconds) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), milliseconds);
+      return controller.signal;
+    });
+    try {
+      const events: RunEvent[] = [];
+      const running = runAgent({ ...input(), agent: { ...input().agent, plugins: ["library", "pubmed", "artifact"] } }, {
+        signal: new AbortController().signal, emit: (event) => events.push(event),
+        read: async (_agent, id) => id === "library" ? new Promise(() => {}) : [
+          { id: "pubmed:123", title: "Nutrition paper", url: "https://pubmed.ncbi.nlm.nih.gov/123/", kind: "paper", detail: "Public abstract" },
+        ], synthesize: async () => null,
+      });
+      await vi.advanceTimersByTimeAsync(8001);
+      await running;
+      expect(events.at(-1)?.type).toBe("approval");
+      const final = events.at(-1);
+      if (final?.type === "approval") expect(final.artifact.searches).toMatchObject([
+        { plugin: "library", status: "failed" }, { plugin: "pubmed", status: "done" },
+      ]);
+    } finally { timeout.mockRestore(); vi.useRealTimers(); }
+  });
+
   it("does not claim success when every source is empty", async () => {
     const events: RunEvent[] = [];
     const synthesize = vi.fn();

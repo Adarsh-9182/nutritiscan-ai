@@ -17,6 +17,7 @@ export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
 export const RunRequestSchema = z.object({
   agent: AgentDefinitionSchema,
   task: z.string().trim().min(3).max(300),
+  searchTerms: z.string().trim().min(3).max(300).optional(),
 }).strict();
 export type RunRequest = z.infer<typeof RunRequestSchema>;
 
@@ -39,6 +40,13 @@ export const SourceSchema = z.object({
   }, "Only approved public source URLs are supported."),
   kind: z.enum(["reference", "paper", "trial"]),
   detail: z.string().max(12000),
+  metadata: z.object({
+    year: z.number().int().min(1000).max(9999).nullable().optional(),
+    publicationTypes: z.array(z.string().max(200)).max(30).optional(),
+    hasAbstract: z.boolean().optional(),
+    studyType: z.string().max(200).optional(),
+    status: z.string().max(200).optional(),
+  }).strict().optional(),
 }).strict();
 export type AgentSource = z.infer<typeof SourceSchema>;
 
@@ -51,6 +59,15 @@ export const SummarySchema = z.object({
 }).strict();
 export type Summary = z.infer<typeof SummarySchema>;
 
+export const SearchAuditSchema = z.object({
+  plugin: z.enum(["library", "pubmed", "trials"]),
+  query: z.string().min(3).max(300),
+  status: z.enum(["done", "empty", "failed"]),
+  returned: z.number().int().nonnegative().max(13),
+  retry: z.boolean(),
+}).strict();
+export type SearchAudit = z.infer<typeof SearchAuditSchema>;
+
 export const ArtifactSchema = z.object({
   filename: z.string().regex(/^[a-z0-9_-]+\.md$/).max(100),
   content: z.string().max(100000),
@@ -60,6 +77,7 @@ export const ArtifactSchema = z.object({
   mode: z.enum(["model-assisted", "source-collection"]),
   expiresAt: z.string().datetime(),
   summary: SummarySchema.optional(),
+  searches: z.array(SearchAuditSchema).max(4).optional(),
 }).strict().refine((artifact) => !artifact.summary || (
   artifact.mode === "model-assisted" && artifact.summary.points.every((point) =>
     point.sourceIds.every((id) => artifact.sources.some((source) => source.id === id)))

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Check, FileDown, Play, Plus, Square, Sparkles } from "lucide-react";
 import { AgentDefinitionSchema, PLUGINS, RESEARCH_AGENT, RunRequestSchema, type AgentArtifact, type AgentDefinition, type PluginId, type RunEvent, type RunRequest } from "@/lib/agent-runtime/contracts";
+import ResearchBrief from "./research-brief";
 import { consumeRun, verifiedArtifactBlob } from "@/lib/agent-runtime/client";
 import { removeAgentDefinition, saveAgentDefinition, useAgentDefinitions } from "@/lib/agent-runtime/store";
 import { useHydrated } from "@/lib/memory/store";
@@ -25,6 +26,7 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
   const savedRuns = useSavedRuns();
   const [agent, setAgent] = useState<AgentDefinition>(() => definitions[0] ?? RESEARCH_AGENT);
   const [task, setTask] = useState("");
+  const [searchTerms, setSearchTerms] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState<string[]>([]);
@@ -81,8 +83,8 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
 
   const run = async () => {
     if (controllerRef.current || exportLock.current) return;
-    const parsed = RunRequestSchema.safeParse({ agent, task });
-    if (!parsed.success) { setError("Add valid agent settings and a question between 3 and 300 characters."); return; }
+    const parsed = RunRequestSchema.safeParse({ agent, task, searchTerms: searchTerms.trim() || undefined });
+    if (!parsed.success) { setError("Add valid agent settings and a question between 3 and 300 characters. Optional search terms must also be between 3 and 300 characters."); return; }
     const controller = new AbortController();
     controllerRef.current = controller;
     setBusy(true); setStatus("running"); setPlan([]); setSteps([]);
@@ -133,7 +135,7 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
 
   const restoreResult = (saved: SavedRun) => {
     if (controllerRef.current || exportLock.current) return;
-    setAgent(saved.request.agent); setTask(saved.request.task); setRunRequest(saved.request);
+    setAgent(saved.request.agent); setTask(saved.request.task); setSearchTerms(saved.request.searchTerms ?? ""); setRunRequest(saved.request);
     setRunId(saved.id); setCreatedAt(saved.createdAt); setPlan(saved.plan); setSteps(saved.steps);
     setArtifact(saved.artifact); setReceipt(saved.receipt ?? null); setStatus(saved.status);
     setError(""); setNotice("Saved result restored. Run again to retrieve fresh sources.");
@@ -185,6 +187,7 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
             <form onSubmit={(event) => { event.preventDefault(); void run(); }}>
               <label htmlFor="agent-task" className="sr-only">Agent task</label>
               <textarea id="agent-task" placeholder="What should your agent research?" value={task} onChange={(event) => setTask(event.target.value)} disabled={locked} maxLength={300} rows={3} className="w-full resize-y rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] px-4 py-3 text-[15px] leading-6 focus-ring" />
+              <details className="mt-3 rounded-xl border border-[var(--border)] p-3 text-xs text-[var(--text-muted)]"><summary className="cursor-pointer">Search controls · {searchTerms.trim() ? "Custom search terms" : "Search uses your question"}</summary><label className="mt-3 block">Search terms (optional)<input value={searchTerms} onChange={(event) => setSearchTerms(event.target.value)} disabled={locked} maxLength={300} placeholder="e.g. sleep duration type 2 diabetes" className="mt-2 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm focus-ring" /></label><p className="mt-2 leading-5 text-[var(--text-dim)]">Use focused keywords for public searches. The original question still guides the brief. These terms are sent to every enabled source service.</p></details>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-[11px] text-[var(--text-dim)]">Up to 6 steps · 45-second run budget</span>{busy ? <button type="button" onClick={() => controllerRef.current?.abort()} className="btn-ghost flex items-center gap-2 rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm"><Square size={13} />Stop run</button> : <button type="submit" disabled={locked || task.trim().length < 3} className="btn-primary flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm disabled:opacity-40"><Play size={14} />Run agent</button>}</div>
             </form>
             <div className="mt-4 flex flex-wrap gap-2">{EXAMPLES.map((example) => <button key={example} type="button" onClick={() => setTask(example)} disabled={locked} className="rounded-full border border-[var(--border)] px-2.5 py-1.5 text-[11px] text-[var(--text-muted)] transition hover:border-[var(--emerald)] disabled:opacity-40">{example}</button>)}</div>
@@ -216,7 +219,7 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
 
           {artifact && <section className="overflow-hidden rounded-2xl border border-[color-mix(in_oklab,var(--emerald)_35%,transparent)] bg-[var(--surface)]">
             <div className="border-b border-[var(--border)] p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Review the brief</h2><span className="rounded-full bg-[var(--bg)] px-2.5 py-1 text-[10px] uppercase tracking-wide text-[var(--emerald)]">{artifact.mode === "model-assisted" ? "Model-assisted" : "Source collection"}</span></div><p className="mt-2 break-all font-mono text-[11px] text-[var(--text-muted)]">{artifact.filename} · {(artifact.bytes / 1024).toFixed(1)} KB · {artifact.sources.length} sources</p></div>
-            <ReadableBrief artifact={artifact} question={runRequest?.task ?? ""} />
+            <ResearchBrief key={artifact.sha256} artifact={artifact} question={runRequest?.task ?? ""} />
             <details className="border-t border-[var(--border)]"><summary className="cursor-pointer px-5 py-4 text-xs text-[var(--text-muted)]">Review exact Markdown file</summary>
             <pre aria-label="Brief preview" className="max-h-[440px] overflow-auto whitespace-pre-wrap break-words p-5 font-sans text-[13px] leading-6 text-[var(--text-muted)]">{artifact.content}</pre></details>
             <div className="border-t border-[var(--border)] p-5"><div className="flex flex-wrap gap-2">{artifact.sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="max-w-full truncate rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[11px] text-[var(--emerald)]">{source.id} ↗</a>)}</div>
@@ -243,18 +246,4 @@ function Studio({ definitions }: { definitions: AgentDefinition[] }) {
       </div>
     </div>
   );
-}
-
-function ReadableBrief({ artifact, question }: { artifact: AgentArtifact; question: string }) {
-  const sources = new Map(artifact.sources.map((source, index) => [source.id, { ...source, number: index + 1 }]));
-  const cited = new Set(artifact.summary?.points.flatMap((point) => point.sourceIds) ?? []);
-  return <div className="space-y-6 p-5 sm:p-6">
-    <p className="break-words text-lg font-medium leading-7">{question}</p>
-    <div aria-label="Source coverage" className="grid grid-cols-3 gap-2">
-      {([ ["reference", "Reference notes"], ["paper", "Papers"], ["trial", "Registered studies"] ] as const).map(([kind, label]) => <div key={kind} className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3"><p className="text-2xl font-semibold text-[var(--emerald)]">{artifact.sources.filter((source) => source.kind === kind).length}</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">{label}</p></div>)}
-    </div>
-    <p className="text-xs leading-5 text-[var(--text-dim)]">These counts describe retrieved sources, not evidence strength or completeness. Registered studies do not establish efficacy. Available abstracts and metadata are used; this is not a full-text or systematic review.</p>
-    {artifact.summary ? <section aria-label="Source-linked answer"><h3 className="mb-3 text-sm font-semibold">What the sources say</h3><ul className="space-y-4">{artifact.summary.points.map((point, index) => <li key={index} className="text-sm leading-6 text-[var(--text-muted)]"><p>{point.text}</p><div className="mt-2 flex flex-wrap gap-2">{point.sourceIds.map((id) => { const source = sources.get(id); return source ? <a key={id} href={source.url} target="_blank" rel="noreferrer" aria-label={`Citation ${source.number}: ${source.title}`} className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--emerald)]">[{source.number}] {source.kind} ↗</a> : null; })}</div></li>)}</ul>{artifact.summary.gaps.length > 0 && <div className="mt-5 rounded-xl bg-[var(--bg)] p-4"><h3 className="text-sm font-semibold">What remains uncertain</h3><ul className="mt-2 list-disc space-y-2 pl-4 text-xs leading-5 text-[var(--text-muted)]">{artifact.summary.gaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul></div>}<p className="mt-4 text-[11px] text-[var(--text-dim)]">{cited.size} of {artifact.sources.length} retrieved sources cited in the summary. Citation IDs were checked; verify each claim against the original source.</p></section> : <p className="rounded-xl bg-[var(--bg)] p-4 text-sm leading-6 text-[var(--text-muted)]">{artifact.mode === "source-collection" ? "No model-assisted answer was produced. Browse the collected sources below to assess the question." : "This saved brief predates the readable answer view. Open the exact Markdown file to review its summary."}</p>}
-    <section aria-label="Collected sources"><h3 className="mb-3 text-sm font-semibold">Explore the sources</h3><ol className="space-y-3">{Array.from(sources.values()).map((source) => <li key={source.id} className="rounded-xl border border-[var(--border)] p-4"><p className="mb-2 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">[{source.number}] {source.kind === "trial" ? "Registered study" : source.kind} {cited.has(source.id) ? "· Cited in answer" : ""}</p><a href={source.url} target="_blank" rel="noreferrer" className="break-words text-sm font-medium leading-6 text-[var(--emerald)]">{source.title} ↗</a><details className="mt-3 text-xs text-[var(--text-muted)]"><summary className="cursor-pointer">Read retrieved excerpt</summary><p className="mt-2 whitespace-pre-wrap break-words leading-6">{source.detail.slice(0, 1800)}</p></details></li>)}</ol></section>
-  </div>;
 }

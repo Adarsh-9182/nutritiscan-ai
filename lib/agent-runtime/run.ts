@@ -3,7 +3,7 @@ import { assessTurn } from "@/lib/safety/triage";
 import { validateAnswer } from "@/lib/safety/validate";
 import { emergencyResponse, mentalHealthResponse, urgentPreamble } from "@/lib/safety/templates";
 import { blankProfile } from "@/lib/memory/profile";
-import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type RunEvent, type RunRequest } from "./contracts";
+import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type SearchAudit, type RunEvent, type RunRequest } from "./contracts";
 import { executeReadPlugin } from "./plugins";
 import { renderBrief, summarize, validateSummary } from "./brief";
 import { planResearch } from "./plan";
@@ -70,23 +70,27 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
       return;
     }
     const sources: AgentSource[] = [];
+    const searches: SearchAudit[] = [];
+    const query = request.searchTerms ?? request.task;
     const retryCandidates: typeof readers = [];
     const readOne = async (id: typeof readers[number], retry = false) => {
       const label = `${PLUGINS.find((plugin) => plugin.id === id)!.name}${retry ? " (retry)" : ""}`;
       const stepId = retry ? `${id}-retry` : id;
       step(stepId, label);
-      const readSignal = retry ? AbortSignal.any([signal, AbortSignal.timeout(6_000)]) : signal;
+      const readSignal = AbortSignal.any([signal, AbortSignal.timeout(retry ? 6_000 : 8_000)]);
       let result: AgentSource[];
       try {
-        result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, request.task, readSignal), readSignal);
+        result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, query, readSignal), readSignal);
       } catch {
         signal.throwIfAborted();
+        searches.push({ plugin: id, query, status: "failed", returned: 0, retry });
         send({ type: "step", id: stepId, label, status: "failed", detail: "This source could not be read. Other permitted sources will still be used." });
         if (!retry && id !== "library") retryCandidates.push(id);
         return;
       }
       signal.throwIfAborted();
       if (!result.every(validSource)) throw new Error("Plugin returned invalid source provenance");
+      searches.push({ plugin: id, query, status: result.length ? "done" : "empty", returned: result.length, retry });
       for (const source of result) if (!sources.some((existing) => existing.id === source.id)) sources.push(source);
       if (sources.length > RUN_LIMITS.sources) throw new Error("Source budget exhausted");
       send({ type: "step", id: stepId, label, status: result.length ? "done" : "empty", detail: result.length ? `${result.length} sources retrieved` : "No results returned. This source may be unavailable or need different search terms." });
@@ -101,6 +105,7 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     }
     step("draft", "Prepare brief");
     const candidate = await abortable((dependencies.synthesize ?? summarize)(request, sources, signal, {
+      searches,
       milliseconds: Math.max(1, deadline - Date.now() - 2_000),
       onAttempt: (attempt) => send({ type: "step", id: "draft", label: "Prepare brief", status: "running", detail: attempt === 1 ? "Preparing a source-linked summary" : "Trying another configured model within the same time budget" }),
     }), signal);
@@ -109,7 +114,7 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     send({ type: "step", id: "draft", label: "Prepare brief", status: "done", detail: summary ? "Model-assisted summary prepared from retrieved sources" : "Source collection prepared; no model-assisted summary is included" });
     step("validate", "Validate artifact");
     const at = new Date().toISOString();
-    const content = renderBrief(request, sources, summary, at);
+    const content = renderBrief(request, sources, summary, at, searches);
     const bytes = Buffer.byteLength(content, "utf8");
     if (bytes > 400000 || content.length > 100000) throw new Error("Artifact budget exhausted");
     const sha256 = createHash("sha256").update(content, "utf8").digest("hex");
@@ -118,7 +123,7 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     dependencies.emit({ type: "approval", runId, at, artifact: {
       filename: `research-brief-${runId.slice(0, 8)}.md`, content, sha256, bytes, sources,
       mode: summary ? "model-assisted" : "source-collection",
-      summary: summary ?? undefined,
+      summary: summary ?? undefined, searches,
       expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
     } });
   } catch {

@@ -46,10 +46,12 @@ describe("Agent Studio", () => {
   it("sends selected depth and displays source-linked answers with the executed question", async () => {
     vi.mocked(fetch).mockImplementation(async () => completedRun(true));
     render(<AgentStudio />);
+    fireEvent.change(screen.getByLabelText("Search terms (optional)"), { target: { value: "vegetarian protein" } });
     fireEvent.change(screen.getByLabelText(/Research depth/), { target: { value: "quick" } });
     fireEvent.change(screen.getByLabelText("Agent task"), { target: { value: "protein in vegetarian diets" } });
     fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
     await screen.findByRole("button", { name: "Approve & download" });
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)).searchTerms).toBe("vegetarian protein");
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)).agent.depth).toBe("quick");
     expect(screen.getByRole("link", { name: "Citation 1: Nutrition" })).toHaveAttribute("href", "https://medlineplus.gov/nutrition.html");
     expect(screen.getByLabelText("Source-linked answer")).toHaveTextContent("Food needs vary by individual.");

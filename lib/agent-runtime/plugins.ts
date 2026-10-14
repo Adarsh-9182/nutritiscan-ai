@@ -13,10 +13,12 @@ const registry: Record<ReadPlugin, Plugin> = {
   })),
   pubmed: async (question, signal, quick) => (await findPapers(question, { limit: quick ? 3 : 6, signal })).map((paper) => ({
     id: `pubmed:${paper.pmid}`, title: paper.title.slice(0, 2000), url: paper.url, kind: "paper",
+    metadata: { year: paper.year, publicationTypes: paper.publicationTypes.slice(0, 30).map((type) => type.slice(0, 200)), hasAbstract: Boolean(paper.abstract.trim()) },
     detail: `${paper.journal} · ${paper.year ?? "year not reported"} · ${paper.publicationTypes.join(", ")}\n${paper.abstract || "No abstract returned."}`.slice(0, 12000),
   })),
   trials: async (question, signal, quick) => (await searchTrials(question, { limit: quick ? 2 : 4, signal })).map((trial) => ({
     id: `trials:${trial.nctId}`, title: trial.title.slice(0, 2000), url: trial.url, kind: "trial",
+    metadata: { studyType: trial.studyType.slice(0, 200), status: trial.status.slice(0, 200) },
     detail: `${trial.studyType} · ${trial.status}\nConditions: ${trial.conditions.join(", ")}\nInterventions: ${trial.interventions.join(", ")}`.slice(0, 12000),
   })),
 };
