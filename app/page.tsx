@@ -40,7 +40,7 @@ const STRUCTURED_DATA = {
       applicationCategory: "HealthApplication",
       url: SITE_URL,
       description:
-        "An early-access educational health companion with general health chat on the web and a local health journal in the Android beta. Shared cloud records, report uploads, lab interpretation and voice are not active in the current release.",
+        "An early-access AI scientist and hospital assistant for medical schools. Today it offers general health chat on the web and a local health journal in the Android beta. Shared cloud records, report uploads, lab interpretation and voice are not active in the current release.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },
