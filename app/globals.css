@@ -4020,3 +4020,29 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
 .nl-limits { list-style: none; margin: 0; padding: 26px 30px; border: 1px solid var(--nl-line); border-radius: 20px; background: #ffffff04; display: grid; gap: 20px; align-content: center; color: var(--nl-muted); font-size: 13px; line-height: 1.7; }
 .nl-limits li { padding-left: 18px; position: relative; }
 .nl-limits li::before { content: "·"; position: absolute; left: 0; color: var(--nl-lime); }
+
+/* Nutri, the NutritiScan agent mascot (components/agent-mascot.tsx). */
+.nl-mascot { display: flex; justify-content: center; margin: 0 auto 18px; filter: drop-shadow(0 0 28px #c9fa6333); }
+.nl-mascot svg { overflow: visible; }
+.nl-mascot g, .nl-mascot ellipse, .nl-mascot circle, .nl-mascot path { transform-box: fill-box; transform-origin: center; }
+.nl-m-float { animation: nl-m-float 3.6s ease-in-out infinite; }
+.nl-m-shadow { animation: nl-m-shadow 3.6s ease-in-out infinite; }
+.nl-m-eyes { animation: nl-m-blink 5s infinite; }
+.nl-m-antenna { transform-origin: 80px 32px; transform-box: view-box; animation: nl-m-sway 3.6s ease-in-out infinite; }
+.nl-m-bulb { animation: nl-m-glow 2s ease-in-out infinite; }
+.nl-m-plus { animation: nl-m-beat 2.4s ease-in-out infinite; }
+.nl-m-arm-r { transform-origin: 118px 112px; transform-box: view-box; animation: nl-m-wave 5s ease-in-out infinite; }
+.nl-m-spark-a { animation: nl-m-twinkle 2.8s ease-in-out infinite; }
+.nl-m-spark-b { animation: nl-m-twinkle 2.8s ease-in-out 1.2s infinite; }
+@keyframes nl-m-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes nl-m-shadow { 0%, 100% { transform: scaleX(1); opacity: .4; } 50% { transform: scaleX(.8); opacity: .25; } }
+@keyframes nl-m-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes nl-m-sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes nl-m-glow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.7); } }
+@keyframes nl-m-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+@keyframes nl-m-wave { 0%, 60%, 100% { transform: rotate(0); } 68% { transform: rotate(-38deg); } 76% { transform: rotate(-8deg); } 84% { transform: rotate(-38deg); } 92% { transform: rotate(0); } }
+@keyframes nl-m-twinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .nl-mascot * { animation: none !important; }
+  .nl-m-spark-a, .nl-m-spark-b { opacity: .8; }
+}
