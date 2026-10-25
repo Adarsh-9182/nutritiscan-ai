@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MAX_QUERY_LENGTH, PicoSchema, composeQueries, extractPico, planPubmedQuery, searchLadder, type Pico } from "./query";
+import { MAX_QUERY_LENGTH, PicoSchema, composeQueries, extractPico, normalizePico, planQueries, searchLadder, type Pico } from "./query";
 
 const searchPubMed = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/evidence/pubmed", () => ({ searchPubMed }));
@@ -77,7 +77,22 @@ describe("planning without a model", () => {
   it("keeps the question as typed and makes no PubMed call", async () => {
     searchPubMed.mockReset();
     expect(await extractPico("does vitamin D help in TB", signal())).toBeNull();
-    expect(await planPubmedQuery("does vitamin D help in TB", signal())).toBeNull();
+    expect(await planQueries("does vitamin D help in TB", signal())).toBeNull();
     expect(searchPubMed).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizePico", () => {
+  const raw = { population: ["tuberculosis"], intervention: ["vitamin D"], comparison: [], outcome: [], designs: ["rct"] };
+
+  it("trims over-long model output instead of rejecting the plan", () => {
+    const plan = normalizePico({ ...raw, population: ["a1", "b2", "c3", "d4", "e5"], intervention: ["x".repeat(200)], designs: ["rct", "nonsense", "cohort"] });
+    expect(plan?.population).toEqual(["a1", "b2", "c3"]);
+    expect(plan?.intervention[0]).toHaveLength(60);
+    expect(plan?.designs).toEqual(["rct", "cohort"]);
+  });
+
+  it("returns null when no population or intervention was named", () => {
+    expect(normalizePico({ ...raw, population: [" ", "x"], intervention: [] })).toBeNull();
   });
 });

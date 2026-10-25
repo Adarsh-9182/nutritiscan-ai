@@ -7,7 +7,7 @@ import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type SearchA
 import { executeReadPlugin } from "./plugins";
 import { renderBrief, summarize, validateSummary } from "./brief";
 import { planResearch } from "./plan";
-import { planPubmedQuery } from "./query";
+import { planQueries } from "./query";
 
 export const RUN_LIMITS = { steps: 6, milliseconds: 45_000, sources: 13 } as const;
 type Emit = (event: RunEvent) => void;
@@ -16,7 +16,7 @@ type Dependencies = {
   emit: Emit;
   read?: typeof executeReadPlugin;
   synthesize?: typeof summarize;
-  planQuery?: typeof planPubmedQuery;
+  planQuery?: typeof planQueries;
 };
 
 /** A budget expiry also stops waiting for a queued or misbehaving plugin. */
@@ -74,12 +74,13 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     const sources: AgentSource[] = [];
     const searches: SearchAudit[] = [];
     const query = request.searchTerms ?? request.task;
-    // The user's own search terms win. Otherwise PubMed alone gets a PICO-based
-    // query, shown in the audit; every other source keeps the plain question.
-    const pubmedQuery = !request.searchTerms && readers.includes("pubmed")
-      ? await abortable((dependencies.planQuery ?? planPubmedQuery)(request.task, signal), signal) ?? query
-      : query;
-    const queryFor = (id: typeof readers[number]) => (id === "pubmed" ? pubmedQuery : query);
+    // The user's own search terms win. Otherwise PubMed and the trial registry
+    // get a plan built from the question's concepts, shown in the audit; the
+    // health library keeps the plain question.
+    const planned = !request.searchTerms && (readers.includes("pubmed") || readers.includes("trials"))
+      ? await abortable((dependencies.planQuery ?? planQueries)(request.task, signal), signal)
+      : null;
+    const queryFor = (id: typeof readers[number]) => (id === "pubmed" || id === "trials" ? planned?.[id] : undefined) ?? query;
     const retryCandidates: typeof readers = [];
     const readOne = async (id: typeof readers[number], retry = false) => {
       const label = `${PLUGINS.find((plugin) => plugin.id === id)!.name}${retry ? " (retry)" : ""}`;
