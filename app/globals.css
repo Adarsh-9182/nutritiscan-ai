@@ -4046,3 +4046,29 @@ dialog.ha-draft::backdrop { background:#ced6ce70; }
   .nl-mascot * { animation: none !important; }
   .nl-m-spark-a, .nl-m-spark-b { opacity: .8; }
 }
+
+/* Landing hero backdrop: drifting glass research cards (components/hero-backdrop.tsx). */
+main:has(> .nl-hero) { overflow-x: clip; }
+.nl-hero { position: relative; isolation: isolate; }
+.nl-hero > :not(.nl-backdrop) { position: relative; z-index: 1; }
+.nl-backdrop { position: absolute; z-index: 0; top: -66px; bottom: -40px; left: 50%; width: 100vw; transform: translateX(-50%); overflow: hidden; pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 44% 56% at 50% 44%, #0000 42%, #000 92%), linear-gradient(#0000 0, #000 20%, #000 56%, #0000 90%);
+  -webkit-mask-composite: source-in; mask-image: radial-gradient(ellipse 44% 56% at 50% 44%, #0000 42%, #000 92%), linear-gradient(#0000 0, #000 20%, #000 56%, #0000 90%); mask-composite: intersect; }
+.nl-backdrop::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 50% 30%, #6fe8b41f, transparent 70%), radial-gradient(ellipse 40% 40% at 85% 70%, #c9fa6314, transparent 70%); }
+.nl-bd-grid { position: absolute; inset: -4% -3%; display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 16px; transform: rotate(-3deg) scale(1.06); }
+.nl-bd-col { display: flex; flex-direction: column; gap: 16px; padding-bottom: 16px; animation: nl-bd-drift linear infinite; will-change: transform; }
+.nl-bd-card { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 14px; min-height: 138px; border: 1px solid var(--nl-line); border-radius: 18px;
+  background: linear-gradient(160deg, #ffffff12, #ffffff05); backdrop-filter: blur(2px); text-align: left; }
+.nl-bd-card.tall { min-height: 196px; }
+.nl-bd-tag { align-self: flex-start; padding: 3px 9px; border-radius: 999px; background: #ffffff12; color: var(--nl-muted); font: 500 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.nl-bd-card p { margin: 0; color: #e9f2ecb8; font-size: 14px; font-weight: 600; line-height: 1.35; }
+.nl-bd-line { display: block; height: 6px; border-radius: 4px; background: #ffffff0f; }
+.nl-bd-line.short { width: 58%; }
+.nl-bd-card small { margin-top: auto; color: var(--nl-muted); font: 400 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.nl-bd-card.hot { border-color: #c9fa6388; background: linear-gradient(160deg, #c9fa6326, #6fe8b40d); box-shadow: 0 18px 48px -14px #c9fa6340; }
+.nl-bd-card.hot .nl-bd-tag { background: #c9fa6322; color: var(--nl-lime); }
+.nl-bd-card.hot p { color: var(--nl-text); }
+.nl-bd-flag { position: absolute; top: -11px; right: 12px; padding: 4px 10px; border-radius: 6px; transform: rotate(3deg); background: var(--nl-lime); color: var(--nl-on-accent); font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
+@keyframes nl-bd-drift { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+@media (max-width: 760px) { .nl-bd-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); } .nl-bd-col:nth-child(n+5) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .nl-bd-col { animation: none; } }
