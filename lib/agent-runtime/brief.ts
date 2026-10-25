@@ -31,7 +31,7 @@ export function verifyQuotes(summary: Summary, sources: AgentSource[]): Summary 
   const kept = summary.points.filter((point) => point.quote && quoteFound(point.quote, point.sourceIds, sources)).map((point) => ({ ...point, check: "quote" as const }));
   if (!kept.length) return null;
   const removed = summary.points.length - kept.length;
-  const gaps = removed ? [...summary.gaps, `${removed} claim${removed > 1 ? "s were" : " was"} removed because its quoted passage could not be found in the cited source.`].slice(-5) : summary.gaps;
+  const gaps = removed ? [...summary.gaps, `${removed} claim${removed > 1 ? "s were" : " was"} removed because ${removed > 1 ? "their quoted passages" : "its quoted passage"} could not be found in the cited source.`].slice(-5) : summary.gaps;
   return { points: kept, gaps };
 }
 
@@ -79,7 +79,7 @@ export function applyJudgement(summary: Summary, verdicts: boolean[] | null): Su
   const kept = summary.points.filter((_, index) => verdicts[index]).map((point) => ({ ...point, check: "supported" as const }));
   if (!kept.length) return null;
   const removed = summary.points.length - kept.length;
-  const gaps = removed ? [...summary.gaps, `${removed} claim${removed > 1 ? "s were" : " was"} removed because its quote did not clearly support it.`].slice(-5) : summary.gaps;
+  const gaps = removed ? [...summary.gaps, `${removed} claim${removed > 1 ? "s were" : " was"} removed because ${removed > 1 ? "their quotes" : "its quote"} did not clearly support ${removed > 1 ? "them" : "it"}.`].slice(-5) : summary.gaps;
   return { points: kept, gaps };
 }
 
