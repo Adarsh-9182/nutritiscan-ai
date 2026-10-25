@@ -26,14 +26,14 @@ const POOL = 50;
 type Arm = { name: string; retrieve: (title: string, pico: Pico | null) => Promise<string[]> };
 const ladder = (withTrialFilter: boolean): Arm["retrieve"] => async (title, pico) => {
   if (!pico) return [];
-  const queries = composeQueries({ ...pico, designs: withTrialFilter ? ["rct"] : [] });
+  const queries = composeQueries({ ...pico, designs: withTrialFilter ? ["rct"] : [] });  // [] takes the default trials-and-reviews filter
   return (await searchLadder(queries, title, { limit: POOL, enough: 20, signal: signal() })).ids;
 };
 
 const arms: Arm[] = [
   { name: "raw title as typed", retrieve: (title) => searchPubMed(title, { limit: POOL }) },
-  { name: "title concepts, query ladder", retrieve: ladder(false) },
-  { name: "title concepts, ladder + trial filter", retrieve: ladder(true) },
+  { name: "title concepts, ladder (default filter)", retrieve: ladder(false) },
+  { name: "title concepts, ladder (RCT only)", retrieve: ladder(true) },
 ];
 if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
   arms.push({ name: "model-planned query (production path)", retrieve: async (title) => {

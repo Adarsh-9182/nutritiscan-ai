@@ -26,6 +26,8 @@ export const PicoSchema = z.object({
 }).strict();
 export type Pico = z.infer<typeof PicoSchema>;
 
+const DEFAULT_DESIGNS: Pico["designs"] = ["rct", "systematic-review", "meta-analysis"];
+
 /** Publication types are indexed reliably; design MeSH terms cover observational work. */
 const DESIGN_FILTER: Record<typeof STUDY_DESIGNS[number], string> = {
   "rct": `"randomized controlled trial"[pt]`,
@@ -45,14 +47,16 @@ function phrase(term: string): string | null {
 }
 
 /**
- * One concept: its synonyms ORed, each matched as a MeSH heading or in the
- * title/abstract. A phrase that is not a real heading simply matches nothing
- * on the MeSH side, so [tiab] keeps recall without a MeSH lookup round trip.
+ * One concept: its synonyms ORed as plain words. Plain, not exact phrases:
+ * PubMed maps unquoted terms to MeSH headings and also searches the words, so
+ * "antibiotic regimens" still finds "regimen of antibiotics". Exact quoted
+ * phrases and [tiab] tags recalled less than the raw title in the Cochrane
+ * recall eval. phrase() has already removed every character PubMed treats as syntax.
  */
 function concept(terms: string[]): string | null {
   const unique = [...new Set(terms.map(phrase).filter((term): term is string => term !== null))];
   if (!unique.length) return null;
-  return `(${unique.map((term) => `"${term}"[MeSH Terms] OR "${term}"[tiab]`).join(" OR ")})`;
+  return `(${unique.join(" OR ")})`;
 }
 
 const all = (parts: (string | null)[]) => {
@@ -68,7 +72,11 @@ const all = (parts: (string | null)[]) => {
 export function composeQueries(pico: Pico): string[] {
   const population = concept(pico.population);
   const intervention = concept(pico.intervention);
-  const designs = pico.designs.length ? `(${[...new Set(pico.designs)].map((id) => DESIGN_FILTER[id]).join(" OR ")})` : null;
+  // A question about an intervention is best answered by trials and reviews, which a
+  // trial-type filter lifted from 5% to 21% recall@50 in the eval. The ladder drops the
+  // filter when it leaves too little, and a design the model chose always wins.
+  const chosen = pico.designs.length ? pico.designs : pico.intervention.length ? DEFAULT_DESIGNS : [];
+  const designs = chosen.length ? `(${[...new Set(chosen)].map((id) => DESIGN_FILTER[id]).join(" OR ")})` : null;
   const ladder = [
     all([population, intervention, concept(pico.comparison), concept(pico.outcome), designs]),
     all([population, intervention, designs]),

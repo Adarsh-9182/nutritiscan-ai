@@ -12,7 +12,7 @@ const signal = () => new AbortController().signal;
 describe("composeQueries", () => {
   it("ANDs concepts, ORs synonyms, and starts with the strictest query", () => {
     const [strict] = composeQueries(pico());
-    expect(strict).toContain(`"vitamin d"[MeSH Terms] OR "vitamin d"[tiab] OR "cholecalciferol"[MeSH Terms]`);
+    expect(strict).toContain("(vitamin d OR cholecalciferol)");
     expect(strict).toContain(`"randomized controlled trial"[pt]`);
     expect(strict.split(" AND ")).toHaveLength(5);
   });
@@ -30,13 +30,23 @@ describe("composeQueries", () => {
   it("strips PubMed syntax so a hostile term cannot change the query", () => {
     const [query] = composeQueries(pico({ intervention: [`x"[All Fields] OR (aspirin) NOT *`], designs: [] }));
     expect(query).not.toMatch(/\(aspirin\)|\*|\bNOT\b/);
-    expect(query).toContain(`"x all fields aspirin"`);
+    expect(query).toContain("(x all fields aspirin)");
   });
 
   it("drops duplicate terms and never exceeds the audit length limit", () => {
     const wide = pico({ population: ["a long population phrase one", "a long population phrase two", "a long population phrase three"], intervention: ["intervention phrase number one", "intervention phrase number two", "intervention phrase number three"] });
     for (const query of composeQueries(wide)) expect(query.length).toBeLessThanOrEqual(MAX_QUERY_LENGTH);
-    expect(composeQueries(pico({ intervention: ["Aspirin", "aspirin"], designs: [] }))[0].match(/"aspirin"\[tiab\]/g)).toHaveLength(1);
+    expect(composeQueries(pico({ intervention: ["Aspirin", "aspirin"], designs: [] }))[0].match(/aspirin/g)).toHaveLength(1);
+  });
+
+  it("defaults to trials and reviews for an intervention question, unless the model chose designs", () => {
+    expect(composeQueries(pico({ designs: [] }))[0]).toContain(`"randomized controlled trial"[pt] OR "systematic review"[pt] OR "meta-analysis"[pt]`);
+    expect(composeQueries(pico({ designs: ["cohort"] }))[0]).toContain(`"cohort studies"[MeSH Terms]`);
+    expect(composeQueries(pico({ designs: ["cohort"] }))[0]).not.toContain("randomized controlled trial");
+  });
+
+  it("adds no design filter when there is no intervention to test", () => {
+    expect(composeQueries(pico({ intervention: [], comparison: [], outcome: [], designs: [] }))[0]).not.toContain("[pt]");
   });
 
   it("returns nothing for empty concepts", () => {
