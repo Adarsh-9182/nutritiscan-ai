@@ -1,7 +1,9 @@
 import { findReferences } from "@/lib/workspace/health-library";
 import { findPapers } from "@/lib/evidence/pubmed";
 import { searchTrials } from "@/lib/evidence/trials";
-import { RunRequestSchema, type AgentDefinition, type AgentSource, type PluginId } from "./contracts";
+import { z } from "zod";
+import { MAX_QUERY_LENGTH } from "./query";
+import { type AgentDefinition, type AgentSource, type PluginId } from "./contracts";
 
 type ReadPlugin = Exclude<PluginId, "artifact">;
 type Plugin = (question: string, signal: AbortSignal, quick: boolean) => Promise<AgentSource[]>;
@@ -28,7 +30,8 @@ export async function executeReadPlugin(agent: AgentDefinition, id: string, ques
   if (!agent.plugins.includes(id as PluginId) || !Object.hasOwn(registry, id)) {
     throw new Error("This agent does not have permission to use that read plugin.");
   }
-  const task = RunRequestSchema.shape.task.parse(question);
+  // A planned PubMed query is longer than a typed question, so it has its own bound.
+  const task = z.string().trim().min(3).max(MAX_QUERY_LENGTH).parse(question);
   signal.throwIfAborted();
   return registry[id as ReadPlugin](task, signal, agent.depth === "quick");
 }
