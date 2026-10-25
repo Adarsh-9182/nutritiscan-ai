@@ -40,14 +40,13 @@ const STRUCTURED_DATA = {
       applicationCategory: "HealthApplication",
       url: SITE_URL,
       description:
-        "An early-access AI scientist and hospital assistant for medical schools. Today it offers general health chat on the web and a local health journal in the Android beta. Shared cloud records, report uploads, lab interpretation and voice are not active in the current release.",
+        "An AI researcher for medical schools, in early access. A research workspace searches PubMed and ClinicalTrials.gov and returns a source-linked evidence index; synthesis, protocol drafting and participant screening are planned and not yet available.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },
-      operatingSystem: "Web, Android",
-      downloadUrl: "https://github.com/Adarsh-9182/nutritiscan/releases",
+      operatingSystem: "Web",
       disclaimer:
-        "Educational support for all ages. Younger users should involve a parent or guardian when sharing personal health information. Not a diagnosis, not a prescription and not emergency care.",
+        "Research support only. Search coverage is incomplete and abstracts can omit important details. Not a diagnosis, not a prescription, not emergency care and not a substitute for ethics review or a qualified clinician.",
     },
   ],
 };

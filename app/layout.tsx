@@ -18,9 +18,9 @@ import "./globals.css";
  */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.nutritiscan.com";
 
-const TITLE = "NutritiScan | Personal health journal & doctor visit prep";
+const TITLE = "NutritiScan | An AI researcher for medical schools";
 const DESCRIPTION =
-  "Keep health notes, meals and doctor-visit questions together. NutritiScan offers an educational web chat and an Android journal in beta; it does not diagnose or prescribe.";
+  "NutritiScan is building an AI researcher for medical schools. Today it offers a research workspace that searches PubMed and ClinicalTrials.gov and returns a source-linked evidence index; it does not diagnose or prescribe.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
