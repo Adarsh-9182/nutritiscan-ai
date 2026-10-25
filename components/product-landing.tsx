@@ -85,6 +85,28 @@ const BENTO = [
   },
 ] as const;
 
+/** The long-term ambition. Worded as a goal, not a capability: none of it ships today. */
+const AMBITION = [
+  {
+    icon: Stethoscope,
+    title: "Across hospital work",
+    body: "We want one supervised agent system that can take on the routine work around a hospital: records, documentation, handoffs, discharge, follow-up and paperwork. Each task would stay inside permissions a hospital sets, with a person approving anything clinical.",
+    tag: "Goal · not available today",
+  },
+  {
+    icon: Sparkles,
+    title: "Alongside researchers",
+    body: "We want to help doctors and researchers read and compare the evidence behind hard medical questions, including work from leading universities. Agents would search, cite and summarize sources, then show their work so a researcher can check it.",
+    tag: "Goal · early research tools in Agent Studio",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Trusted before it is large",
+    body: "We would rather be right than first. Every step has to be sourced, auditable and reviewable, and the agent has to say when it does not know. Capability is added only as fast as it can be checked.",
+    tag: "Principle · how we build",
+  },
+] as const;
+
 const STEPS = [
   [
     "01",
@@ -114,6 +136,7 @@ export default function ProductLanding() {
         <nav aria-label="Main navigation">
           <Link href="/agents">Build agents</Link>
           <a href="#engine">Hospital problems</a>
+          <a href="#ambition">Our goal</a>
           <a href="#how">How it works</a>
           <Link href="/privacy">Privacy</Link>
         </nav>
@@ -265,6 +288,33 @@ export default function ProductLanding() {
           <div className="nl-bento-grid">
             {BENTO.map(({ icon: Icon, tone, title, body, tag }) => (
               <article key={title} className={`nl-card nl-${tone}`}>
+                <Icon size={20} strokeWidth={1.6} />
+                <h3>{title}</h3>
+                <p>{body}</p>
+                <span>{tag}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="nl-bento" id="ambition">
+          <div className="nl-section-head">
+            <span className="nl-eyebrow">WHERE WE WANT TO GO</span>
+            <h2>
+              An agent for hospital work
+              <br />
+              and for the research behind it.
+            </h2>
+            <p>
+              This is our direction, not today&apos;s product. Today NutritiScan is
+              an educational health chat and an early research workspace. We are
+              building toward agents that can carry real hospital and research
+              work, one checked step at a time.
+            </p>
+          </div>
+          <div className="nl-bento-grid">
+            {AMBITION.map(({ icon: Icon, title, body, tag }) => (
+              <article key={title} className="nl-card nl-plain">
                 <Icon size={20} strokeWidth={1.6} />
                 <h3>{title}</h3>
                 <p>{body}</p>
