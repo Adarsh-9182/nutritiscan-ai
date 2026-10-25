@@ -40,7 +40,7 @@ const STRUCTURED_DATA = {
       applicationCategory: "HealthApplication",
       url: SITE_URL,
       description:
-        "An AI researcher for medical schools, in early access. A research workspace searches PubMed and ClinicalTrials.gov and returns a source-linked evidence index; synthesis, protocol drafting and participant screening are planned and not yet available.",
+        "An AI assistant for medical schools and hospitals, in early access. A research workspace searches PubMed and ClinicalTrials.gov and returns a source-linked evidence index; synthesis, protocol drafting, participant screening and hospital workflows are planned and not yet available.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },

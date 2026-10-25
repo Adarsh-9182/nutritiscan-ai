@@ -9,7 +9,7 @@ import { ImageResponse } from "next/og";
  * than committed as a PNG so the wording tracks the page instead of going stale
  * in a binary nobody opens.
  */
-export const alt = "NutritiScan — an AI researcher for medical schools";
+export const alt = "NutritiScan — an AI assistant for medical schools and hospitals";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -51,10 +51,10 @@ export default async function Image() {
 
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 68, lineHeight: 1.1, letterSpacing: -2.5, fontWeight: 600 }}>
-            An AI researcher,
+            An AI assistant for
           </div>
           <div style={{ fontSize: 68, lineHeight: 1.1, letterSpacing: -2.5, color: "#9be9c4" }}>
-            built for medical schools.
+            medical schools &amp; hospitals.
           </div>
         </div>
 
