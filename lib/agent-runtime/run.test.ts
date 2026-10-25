@@ -27,6 +27,23 @@ describe("bounded research agent", () => {
     expect(final.artifact.content).toContain(source.url);
   });
 
+  it("sends a planned query to PubMed only, records it in the audit, and keeps the plain question elsewhere", async () => {
+    const events: RunEvent[] = [];
+    const read = vi.fn().mockResolvedValue([source]);
+    const planQuery = vi.fn().mockResolvedValue('"vegetarian diet"[MeSH Terms] AND "protein"[tiab]');
+    await runAgent({ ...input(), agent: { ...RESEARCH_AGENT, plugins: ["library", "pubmed", "artifact"] } }, { signal: new AbortController().signal, emit: (event) => events.push(event), read, synthesize: async () => null, planQuery });
+    const queries = Object.fromEntries(read.mock.calls.map((call) => [call[1], call[2]]));
+    expect(queries).toEqual({ library: request.task, pubmed: '"vegetarian diet"[MeSH Terms] AND "protein"[tiab]' });
+  });
+
+  it("never replaces the user's own search terms with a planned query", async () => {
+    const read = vi.fn().mockResolvedValue([source]);
+    const planQuery = vi.fn();
+    await runAgent({ ...input(), searchTerms: "vegetarian protein", agent: { ...RESEARCH_AGENT, plugins: ["library", "pubmed", "artifact"] } }, { signal: new AbortController().signal, emit: () => undefined, read, synthesize: async () => null, planQuery });
+    expect(planQuery).not.toHaveBeenCalled();
+    expect(read.mock.calls.map((call) => call[2])).toEqual(["vegetarian protein", "vegetarian protein"]);
+  });
+
   it("uses explicit public search terms while retaining the original question and an audit", async () => {
     const events: RunEvent[] = [];
     const read = vi.fn().mockResolvedValue([source]);

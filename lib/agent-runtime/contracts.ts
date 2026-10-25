@@ -61,7 +61,8 @@ export type Summary = z.infer<typeof SummarySchema>;
 
 export const SearchAuditSchema = z.object({
   plugin: z.enum(["library", "pubmed", "trials"]),
-  query: z.string().min(3).max(300),
+  // A planned PubMed query (concepts, synonyms and filters) runs longer than a typed question.
+  query: z.string().min(3).max(700),
   status: z.enum(["done", "empty", "failed"]),
   returned: z.number().int().nonnegative().max(13),
   retry: z.boolean(),

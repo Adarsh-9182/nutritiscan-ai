@@ -7,6 +7,7 @@ import { PLUGINS, RunRequestSchema, SourceSchema, type AgentSource, type SearchA
 import { executeReadPlugin } from "./plugins";
 import { renderBrief, summarize, validateSummary } from "./brief";
 import { planResearch } from "./plan";
+import { planPubmedQuery } from "./query";
 
 export const RUN_LIMITS = { steps: 6, milliseconds: 45_000, sources: 13 } as const;
 type Emit = (event: RunEvent) => void;
@@ -15,6 +16,7 @@ type Dependencies = {
   emit: Emit;
   read?: typeof executeReadPlugin;
   synthesize?: typeof summarize;
+  planQuery?: typeof planPubmedQuery;
 };
 
 /** A budget expiry also stops waiting for a queued or misbehaving plugin. */
@@ -72,6 +74,12 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
     const sources: AgentSource[] = [];
     const searches: SearchAudit[] = [];
     const query = request.searchTerms ?? request.task;
+    // The user's own search terms win. Otherwise PubMed alone gets a PICO-based
+    // query, shown in the audit; every other source keeps the plain question.
+    const pubmedQuery = !request.searchTerms && readers.includes("pubmed")
+      ? await abortable((dependencies.planQuery ?? planPubmedQuery)(request.task, signal), signal) ?? query
+      : query;
+    const queryFor = (id: typeof readers[number]) => (id === "pubmed" ? pubmedQuery : query);
     const retryCandidates: typeof readers = [];
     const readOne = async (id: typeof readers[number], retry = false) => {
       const label = `${PLUGINS.find((plugin) => plugin.id === id)!.name}${retry ? " (retry)" : ""}`;
@@ -80,17 +88,17 @@ export async function runAgent(input: RunRequest, dependencies: Dependencies): P
       const readSignal = AbortSignal.any([signal, AbortSignal.timeout(retry ? 6_000 : 8_000)]);
       let result: AgentSource[];
       try {
-        result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, query, readSignal), readSignal);
+        result = await abortable((dependencies.read ?? executeReadPlugin)(request.agent, id, queryFor(id), readSignal), readSignal);
       } catch {
         signal.throwIfAborted();
-        searches.push({ plugin: id, query, status: "failed", returned: 0, retry });
+        searches.push({ plugin: id, query: queryFor(id), status: "failed", returned: 0, retry });
         send({ type: "step", id: stepId, label, status: "failed", detail: "This source could not be read. Other permitted sources will still be used." });
         if (!retry && id !== "library") retryCandidates.push(id);
         return;
       }
       signal.throwIfAborted();
       if (!result.every(validSource)) throw new Error("Plugin returned invalid source provenance");
-      searches.push({ plugin: id, query, status: result.length ? "done" : "empty", returned: result.length, retry });
+      searches.push({ plugin: id, query: queryFor(id), status: result.length ? "done" : "empty", returned: result.length, retry });
       for (const source of result) if (!sources.some((existing) => existing.id === source.id)) sources.push(source);
       if (sources.length > RUN_LIMITS.sources) throw new Error("Source budget exhausted");
       send({ type: "step", id: stepId, label, status: result.length ? "done" : "empty", detail: result.length ? `${result.length} sources retrieved` : "No results returned. This source may be unavailable or need different search terms." });
