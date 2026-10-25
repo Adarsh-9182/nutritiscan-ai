@@ -19,9 +19,9 @@ describe("extractPico with a model", () => {
     generateText.mockRejectedValueOnce(Object.assign(new Error("quota exceeded for key SECRET and question text"), { name: "RateLimitError" })).mockResolvedValueOnce({ output: plan });
     const pico = await extractPico("does vitamin D help TB patients", signal());
     expect(pico?.intervention).toEqual(["vitamin D"]);
-    expect(resolveModel.mock.calls.map((call) => call[1])).toEqual([0, 1]);
+    expect(resolveModel.mock.calls.map((call) => call[1])).toEqual([1, 0]);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toBe("[agent-runtime] search planning failed on tier 0: RateLimitError");
+    expect(String(warn.mock.calls[0][0])).toBe("[agent-runtime] search planning failed on tier 1: RateLimitError");
   });
 
   it("returns null after every model fails, so the question is searched as typed", async () => {
