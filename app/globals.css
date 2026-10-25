@@ -4070,5 +4070,9 @@ main:has(> .nl-hero) { overflow-x: clip; }
 .nl-bd-card.hot p { color: var(--nl-text); }
 .nl-bd-flag { position: absolute; top: -11px; right: 12px; padding: 4px 10px; border-radius: 6px; transform: rotate(3deg); background: var(--nl-lime); color: var(--nl-on-accent); font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
 @keyframes nl-bd-drift { from { transform: translateY(0); } to { transform: translateY(-50%); } }
-@media (max-width: 760px) { .nl-bd-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); } .nl-bd-col:nth-child(n+5) { display: none; } }
+@media (max-width: 760px) { .nl-backdrop { opacity: .38; -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 46%, #0000 55%, #000 100%), linear-gradient(#0000 0, #000 14%, #000 50%, #0000 88%); mask-image: radial-gradient(ellipse 70% 60% at 50% 46%, #0000 55%, #000 100%), linear-gradient(#0000 0, #000 14%, #000 50%, #0000 88%); } .nl-bd-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); } .nl-bd-col:nth-child(n+5) { display: none; } }
 @media (prefers-reduced-motion: reduce) { .nl-bd-col { animation: none; } }
+
+/* Sign in stays in the top bar on every width, including phones where the nav links are hidden. */
+.nl-signin { padding: 9px 18px; border: 1px solid var(--nl-line-strong); border-radius: 999px; color: var(--nl-text); font-weight: 500; white-space: nowrap; }
+.nl-signin:hover { background: #ffffff0f; }
