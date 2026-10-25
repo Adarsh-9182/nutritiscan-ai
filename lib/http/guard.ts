@@ -61,6 +61,36 @@ export function checkRate(key: string, limit: number, windowMs: number): RateVer
   return { ok: true };
 }
 
+/**
+ * Shared counter on Upstash Redis (REST, no dependency) when UPSTASH_REDIS_REST_URL
+ * and _TOKEN are set, so the limit holds across the whole fleet. INCR plus
+ * PEXPIRE NX makes a fixed window. Any Redis failure falls back to the
+ * per-instance counter: a limiter outage must not take the product down.
+ */
+export async function checkRateShared(key: string, limit: number, windowMs: number): Promise<RateVerdict> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return checkRate(key, limit, windowMs);
+  try {
+    const redisKey = `rate:${key}`;
+    const res = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify([["INCR", redisKey], ["PEXPIRE", redisKey, String(windowMs), "NX"], ["PTTL", redisKey]]),
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!res.ok) return checkRate(key, limit, windowMs);
+    const out = (await res.json()) as { result?: unknown }[];
+    const count = Number(out[0]?.result);
+    const ttl = Number(out[2]?.result);
+    if (!Number.isFinite(count)) return checkRate(key, limit, windowMs);
+    if (count > limit) return { ok: false, retryAfter: Math.max(1, Math.ceil((Number.isFinite(ttl) && ttl > 0 ? ttl : windowMs) / 1000)) };
+    return { ok: true };
+  } catch {
+    return checkRate(key, limit, windowMs);
+  }
+}
+
 /** A 429 that tells the client, and any proxy, exactly how long to wait. */
 export function tooManyRequests(retryAfter: number, message: string): Response {
   return Response.json(

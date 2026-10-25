@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { checkRate, clientKey, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
+import { checkRateShared, clientKey, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { findPapers } from "@/lib/evidence/pubmed";
 import { searchTrials } from "@/lib/evidence/trials";
 
@@ -10,7 +10,7 @@ const RequestSchema = z.object({
 }).strict();
 
 export async function POST(request: Request): Promise<Response> {
-  const rate = checkRate(`research:${clientKey(request)}`, 8, 60_000);
+  const rate = await checkRateShared(`research:${clientKey(request)}`, 8, 60_000);
   if (!rate.ok) return tooManyRequests(rate.retryAfter, "Research search limit reached. Try again shortly.");
 
   const body = await readJsonCapped(request, 4_096);

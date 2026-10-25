@@ -17,7 +17,7 @@ import { nutritionContext } from "@/lib/memory/nutrition-context";
 import { recallRelevant } from "@/lib/memory/recall";
 import { recordedSections, type HealthProfile } from "@/lib/memory/profile";
 import { type LoggedMeal } from "@/lib/memory/meals";
-import { checkRate, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
+import { checkRateShared, clientKey, hasModelCredential, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { assessTurn, halts } from "@/lib/safety/triage";
 import { isClinicalTurn, validateAnswer, withheldResponse } from "@/lib/safety/validate";
 import { clinicalBrief } from "@/lib/clinical/brief";
@@ -432,7 +432,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * Legacy /api/scan remains separately disabled unless explicitly enabled.
  */
 export async function POST(req: Request) {
-  const rate = checkRate(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
+  const rate = await checkRateShared(`chat:${clientKey(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rate.ok) {
     return tooManyRequests(rate.retryAfter, "You're sending messages faster than I can think. Give me a few seconds.");
   }

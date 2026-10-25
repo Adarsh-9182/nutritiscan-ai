@@ -1,4 +1,4 @@
-import { checkRate, clientKey, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
+import { checkRateShared, clientKey, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { RunRequestSchema } from "@/lib/agent-runtime/contracts";
 import { runAgent } from "@/lib/agent-runtime/run";
 
@@ -22,7 +22,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!matchesOrigin(request) || request.headers.get("sec-fetch-site") === "cross-site") {
     return Response.json({ error: "Open Agent Studio on this site to start a run." }, { status: 403 });
   }
-  const rate = checkRate(`agent-run:${clientKey(request)}`, 6, 60_000);
+  const rate = await checkRateShared(`agent-run:${clientKey(request)}`, 6, 60_000);
   if (!rate.ok) return tooManyRequests(rate.retryAfter, "Agent run limit reached. Please wait before starting another run.");
   const body = await readJsonCapped(request, 8192);
   if (!body.ok) return Response.json({ error: body.error }, { status: body.status });
