@@ -49,6 +49,8 @@ export default function ResearchBrief({ artifact, question }: { artifact: AgentA
       <h3 className="mb-3 text-sm font-semibold">What the sources say</h3>
       <ul className="space-y-4">{artifact.summary.points.map((point, index) => <li key={index} className="text-sm leading-6 text-[var(--text-muted)]">
         <p>{point.text}</p>
+        {point.quote && <blockquote className="mt-2 border-l-2 border-[var(--border)] pl-3 text-xs italic leading-5 text-[var(--text-dim)]">“{point.quote}”
+          <span className="ml-2 not-italic text-[var(--emerald)]">{point.check === "supported" ? "✓ quote found · support checked" : "✓ quote found in source"}</span></blockquote>}
         <div className="mt-2 flex flex-wrap gap-2">{point.sourceIds.map((id) => {
           const source = sources.get(id);
           return source ? <a key={id} href={source.url} target="_blank" rel="noreferrer" aria-label={`Citation ${source.number}: ${source.title}`} className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--emerald)]">[{source.number}] {source.kind} ↗</a> : null;

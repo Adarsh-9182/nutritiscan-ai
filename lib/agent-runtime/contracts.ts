@@ -50,14 +50,29 @@ export const SourceSchema = z.object({
 }).strict();
 export type AgentSource = z.infer<typeof SourceSchema>;
 
+/** quote: a passage copied from a cited source. check: "quote" = found verbatim, "supported" = also judged to back the claim. Both optional so saved older briefs still load. */
+const PointSchema = z.object({
+  text: z.string().min(1).max(700),
+  sourceIds: z.array(z.string().max(80)).min(1).max(3),
+  quote: z.string().min(1).max(400).optional(),
+  check: z.enum(["quote", "supported"]).optional(),
+}).strict();
+
 export const SummarySchema = z.object({
-  points: z.array(z.object({
-    text: z.string().min(1).max(700),
-    sourceIds: z.array(z.string().max(80)).min(1).max(3),
-  }).strict()).min(1).max(6),
+  points: z.array(PointSchema).min(1).max(6),
   gaps: z.array(z.string().max(500)).max(5),
 }).strict();
 export type Summary = z.infer<typeof SummarySchema>;
+
+/** What the model must return: every claim carries a quote, which code then checks against the source. */
+export const ModelSummarySchema = z.object({
+  points: z.array(z.object({
+    text: z.string().min(1).max(700),
+    sourceIds: z.array(z.string().max(80)).min(1).max(3),
+    quote: z.string().min(15).max(400),
+  }).strict()).min(1).max(6),
+  gaps: z.array(z.string().max(500)).max(5),
+}).strict();
 
 export const SearchAuditSchema = z.object({
   plugin: z.enum(["library", "pubmed", "trials"]),
