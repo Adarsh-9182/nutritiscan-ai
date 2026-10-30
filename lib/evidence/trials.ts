@@ -1,5 +1,7 @@
 /** Public ClinicalTrials.gov API v2 search. Returned records are registry
  * metadata, not proof that a treatment works. */
+import { EvidenceReadError } from "./errors";
+
 const API = "https://clinicaltrials.gov/api/v2/studies";
 const TIMEOUT_MS = 8_000;
 const MAX_LIMIT = 20;
@@ -25,7 +27,7 @@ type ApiStudy = {
   };
 };
 
-export async function searchTrials(query: string, options: { limit?: number; signal?: AbortSignal } = {}): Promise<Trial[]> {
+export async function searchTrials(query: string, options: { limit?: number; signal?: AbortSignal; strict?: boolean } = {}): Promise<Trial[]> {
   const term = query.trim().slice(0, 300);
   if (!term) return [];
   const pageSize = Math.min(Math.max(Math.floor(options.limit ?? 8), 1), MAX_LIMIT);
@@ -37,15 +39,25 @@ export async function searchTrials(query: string, options: { limit?: number; sig
     "NCTId", "BriefTitle", "OverallStatus", "StudyType", "StartDate", "Condition", "InterventionName",
   ].join(","));
 
+  const timeout = AbortSignal.timeout(TIMEOUT_MS);
   try {
-    const timeout = AbortSignal.timeout(TIMEOUT_MS);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     const response = await fetch(url, { signal, headers: { accept: "application/json" } });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      if (options.strict) throw new EvidenceReadError(response.status === 429 ? "quota" : "unavailable");
+      return [];
+    }
     const payload = await response.json() as { studies?: unknown };
-    if (!Array.isArray(payload.studies)) return [];
+    if (!Array.isArray(payload.studies)) {
+      if (options.strict) throw new EvidenceReadError("invalid-response");
+      return [];
+    }
     return payload.studies.map(toTrial).filter((trial): trial is Trial => trial !== null).slice(0, pageSize);
-  } catch {
+  } catch (error) {
+    if (options.strict) {
+      options.signal?.throwIfAborted();
+      throw error instanceof EvidenceReadError ? error : new EvidenceReadError(timeout.aborted ? "timeout" : "unavailable");
+    }
     return [];
   }
 }

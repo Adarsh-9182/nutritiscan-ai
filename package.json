@@ -11,6 +11,7 @@
     "test:watch": "node scripts/test-runner.mjs",
     "eval": "node scripts/test-runner.mjs run --config vitest.eval.config.ts",
     "eval:gate": "EVAL_GATE_ONLY=1 node scripts/test-runner.mjs run --config vitest.eval.config.ts",
+    "eval:research": "RESEARCH_EVAL_LIVE=1 node scripts/test-runner.mjs run --config vitest.eval.config.ts evals/research.eval.ts",
     "verify": "npm run lint && tsc --noEmit && npm test && npm run test:ui && npm run eval:gate && npm run build",
     "migrate": "node --experimental-strip-types scripts/migrate.ts",
     "test:ui": "node scripts/test-runner.mjs run --config vitest.ui.config.ts",

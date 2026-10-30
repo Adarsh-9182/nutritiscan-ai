@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { consumeResearch, readResearch, saveResearch, RESEARCH_STORAGE } from "./client";
+import { consumeResearch, readResearch, saveResearch, researchExport, RESEARCH_STORAGE } from "./client";
 import { reply, request, streamReply } from "./test-fixtures";
 
 describe("research transport and storage", () => {
+  it("exports the actual follow-up question with source passages and executed queries", () => {
+    const output = researchExport({ ...request, message: "Now compare independent cohorts", searchMode: "auto" }, { ...reply, searches: [{ source: "pubmed", query: "independent cohorts senescence", strategy: "planned", status: "done", count: 1 }] });
+    expect(output).toContain("Question: Now compare independent cohorts");
+    expect(output).toContain("An association was observed in this synthetic cohort.");
+    expect(output).toContain("independent cohorts senescence");
+    expect(output).toContain("Model: gemini-3.8-flash");
+  });
   it("accepts a complete stream and rejects a truncated or inconsistent stream", async () => {
     const emit = vi.fn(); await consumeResearch(streamReply(), emit);
     expect(emit.mock.calls.at(-1)?.[0]).toEqual({ type: "result", result: reply });

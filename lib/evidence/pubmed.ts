@@ -35,6 +35,8 @@
 //     with the lambda.
 // ============================================================
 
+import { EvidenceReadError } from "./errors";
+
 const EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 
 /**
@@ -103,6 +105,8 @@ export type SearchOptions = {
   /** How many PMIDs to bring back. Bounded because efetch takes them all. */
   limit?: number;
   signal?: AbortSignal;
+  /** Research distinguishes a service failure from a successful empty search. */
+  strict?: boolean;
 };
 
 const DEFAULT_LIMIT = 8;
@@ -121,16 +125,23 @@ function url(path: string, params: Record<string, string>): string {
  * the same call and says so — so a PubMed outage must degrade the answer,
  * not fail the request.
  */
-async function get(target: string, signal?: AbortSignal): Promise<string | null> {
+async function get(target: string, signal?: AbortSignal, strict = false): Promise<string | null> {
+  const timeout = AbortSignal.timeout(TIMEOUT_MS);
   try {
-    const timeout = AbortSignal.timeout(TIMEOUT_MS);
     const res = await fetch(target, {
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       headers: { accept: "application/json, text/xml" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (strict) throw new EvidenceReadError(res.status === 429 ? "quota" : "unavailable");
+      return null;
+    }
     return await res.text();
-  } catch {
+  } catch (error) {
+    if (strict) {
+      signal?.throwIfAborted();
+      throw error instanceof EvidenceReadError ? error : new EvidenceReadError(timeout.aborted ? "timeout" : "unavailable");
+    }
     return null;
   }
 }
@@ -149,32 +160,37 @@ export async function searchPubMed(query: string, opts: SearchOptions = {}): Pro
   const retmax = Math.min(Math.max(opts.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
 
   const body = await throttled(() =>
-    get(url("esearch.fcgi", { db: "pubmed", term, retmode: "json", retmax: String(retmax), sort: "relevance" }), opts.signal),
+    get(url("esearch.fcgi", { db: "pubmed", term, retmode: "json", retmax: String(retmax), sort: "relevance" }), opts.signal, opts.strict),
   );
   if (!body) return [];
 
   try {
     const json = JSON.parse(body) as { esearchresult?: { idlist?: unknown } };
     const ids = json.esearchresult?.idlist;
-    if (!Array.isArray(ids)) return [];
+    if (!Array.isArray(ids)) {
+      if (opts.strict) throw new EvidenceReadError("invalid-response");
+      return [];
+    }
     // NCBI has been known to return the string "0" in an empty idlist.
     return ids.filter((id): id is string => typeof id === "string" && /^\d+$/.test(id) && id !== "0");
   } catch {
+    if (opts.strict) throw new EvidenceReadError("invalid-response");
     return [];
   }
 }
 
 /** PMIDs → papers, in the order asked for. One request for the whole batch. */
-export async function fetchPapers(pmids: string[], opts: { signal?: AbortSignal } = {}): Promise<Paper[]> {
+export async function fetchPapers(pmids: string[], opts: { signal?: AbortSignal; strict?: boolean } = {}): Promise<Paper[]> {
   const ids = pmids.filter((id) => /^\d+$/.test(id)).slice(0, MAX_LIMIT);
   if (!ids.length) return [];
 
   const xml = await throttled(() =>
-    get(url("efetch.fcgi", { db: "pubmed", id: ids.join(","), retmode: "xml" }), opts.signal),
+    get(url("efetch.fcgi", { db: "pubmed", id: ids.join(","), retmode: "xml" }), opts.signal, opts.strict),
   );
   if (!xml) return [];
 
   const byId = new Map(parseArticles(xml).map((p) => [p.pmid, p]));
+  if (opts.strict && !byId.size) throw new EvidenceReadError("invalid-response");
   // efetch does not guarantee request order, and relevance order is the only
   // ranking signal this file has. Restore it explicitly.
   return ids.map((id) => byId.get(id)).filter((p): p is Paper => p !== undefined);
@@ -184,7 +200,7 @@ export async function fetchPapers(pmids: string[], opts: { signal?: AbortSignal 
 export async function findPapers(query: string, opts: SearchOptions = {}): Promise<Paper[]> {
   const ids = await searchPubMed(query, opts);
   if (!ids.length) return [];
-  return fetchPapers(ids, { signal: opts.signal });
+  return fetchPapers(ids, { signal: opts.signal, strict: opts.strict });
 }
 
 // ------------------------------------------------------------

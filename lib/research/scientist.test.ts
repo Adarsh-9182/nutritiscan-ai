@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateText } from "ai";
-import { draftScience, runScience, validateScientistDraft } from "./scientist";
+import { draftScience, runScience, validateScientistDraft, validateMode } from "./scientist";
+import { newTrace } from "./diagnostics";
+import { EvidenceReadError } from "@/lib/evidence/errors";
 import { researchProviderStatus, RESEARCH_MODELS } from "./provider";
 import { draft, request, source } from "./test-fixtures";
 
@@ -19,6 +21,22 @@ describe("research provenance", () => {
   it("requires an excerpt for every cited source", () => {
     const other = { ...source, id: "pubmed:456" };
     expect(validateScientistDraft({ ...draft, findings: [{ ...draft.findings[0], sourceIds: [source.id, other.id] }] }, [source, other])).toBeNull();
+  });
+  it("retains supported findings when another finding has fabricated passages", () => {
+    const bad = { ...draft.findings[0], text: "Unsupported second finding", excerpts: [{ sourceId: source.id, quote: "This passage does not exist in the retrieved source." }] };
+    const result = validateScientistDraft({ ...draft, findings: [draft.findings[0], bad] }, [source]);
+    expect(result?.findings).toEqual(draft.findings);
+    expect(result?.limitations.join(" ")).toContain("1 draft finding(s) omitted");
+  });
+  it("rejects findings based on a retracted publication", () => {
+    expect(validateScientistDraft(draft, [{ ...source, metadata: { hasAbstract: true, publicationTypes: ["Retracted Publication"] } }])).toBeNull();
+  });
+  it("requires the requested artifact and discards hypotheses without reviewed starting observations", () => {
+    expect(validateMode({ ...draft, hypotheses: [] }, "hypotheses")).toBeNull();
+    expect(validateMode(draft, "study-plan")).toBeNull();
+    expect(validateMode({ ...draft, plan: ["Define eligibility", "Control confounders", "Validate independently"] }, "study-plan")?.plan).toHaveLength(3);
+    expect(validateMode(draft, "evidence")).toMatchObject({ hypotheses: [], plan: [] });
+    expect(validateMode({ ...draft, hypotheses: [{ ...draft.hypotheses[0], sourceIds: ["pubmed:unknown"] }] }, "hypotheses")).toBeNull();
   });
 });
 
@@ -51,6 +69,13 @@ describe("research orchestration", () => {
     await expect(runScience(request, controller.signal, vi.fn(), { read })).rejects.toThrow();
     expect(read).not.toHaveBeenCalled();
   });
+  it("labels source outages as failures, not empty evidence, while retaining other reads", async () => {
+    const read = vi.fn().mockRejectedValueOnce(new EvidenceReadError("quota")).mockResolvedValueOnce([source]);
+    const result = await runScience(request, signal(), vi.fn(), { read, draft: vi.fn().mockResolvedValue(null) });
+    expect(result.coverage).toEqual([{ source: "pubmed", status: "failed", count: 0 }, { source: "trials", status: "done", count: 1 }]);
+    expect(result.searches?.find((s) => s.source === "pubmed")).toMatchObject({ status: "failed", error: "quota" });
+    expect(result.sources).toEqual([source]);
+  });
   it("uses the eligible model fallback and a separate source-support check", async () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
     vi.mocked(generateText).mockRejectedValueOnce(new Error("quota"));
@@ -72,5 +97,17 @@ describe("research orchestration", () => {
     vi.mocked(generateText).mockImplementation(async () => ({ output: ++calls % 2 ? draft : { items: [{ index: 0, verdict: "unsupported", reason: "The finding overstates the source.", evidence: [] }] } }) as never);
     expect(await draftScience(request, [source], signal(), vi.fn())).toBeNull();
     expect(generateText).toHaveBeenCalledTimes(RESEARCH_MODELS.length * 2);
+  });
+  it("distinguishes review timeouts from unsupported evidence without exposing upstream text", async () => {
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
+    let calls = 0;
+    vi.mocked(generateText).mockImplementation(async () => {
+      if (++calls % 2) return { output: draft } as never;
+      throw new DOMException("private provider payload", "TimeoutError");
+    });
+    const trace = newTrace();
+    expect(await draftScience(request, [source], signal(), vi.fn(), trace)).toBeNull();
+    expect(trace.diagnostics.every((d) => d.stage === "review" && d.code === "timeout")).toBe(true);
+    expect(JSON.stringify(trace)).not.toContain("private provider payload");
   });
 });

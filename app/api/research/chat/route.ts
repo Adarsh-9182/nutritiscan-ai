@@ -20,10 +20,10 @@ export async function POST(request: Request) {
   const body = await readJsonCapped(request, 40_000);
   if (!body.ok) return Response.json({ error: body.error }, { status: body.status });
   const parsed = ResearchChatRequest.safeParse(body.value);
-  if (!parsed.success) return Response.json({ error: "Enter a research question, valid search terms and at least one public source." }, { status: 400 });
+  if (!parsed.success || (parsed.data.searchMode === "manual" && parsed.data.query.length < 3)) return Response.json({ error: "Enter a research question, valid search terms and at least one public source." }, { status: 400 });
 
   const cancel = new AbortController();
-  const signal = AbortSignal.any([request.signal, cancel.signal, AbortSignal.timeout(50_000)]);
+  const signal = AbortSignal.any([request.signal, cancel.signal, AbortSignal.timeout(55_000)]);
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

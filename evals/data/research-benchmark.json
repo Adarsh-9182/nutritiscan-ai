@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "scientificReview": "pending-domain-expert-review",
+  "purpose": "Live completion, retrieval, provenance and mode checks. Passing is not evidence of scientific validity or novelty.",
+  "cases": [
+    {
+      "id": "hinglish-mechanism",
+      "request": { "message": "Insulin resistance aur cellular senescence ke beech humans mein kya evidence hai? Ek concise finding aur limitations do.", "query": "", "searchMode": "auto", "mode": "evidence", "sources": ["pubmed"], "history": [] },
+      "referenceUrls": ["https://pubmed.ncbi.nlm.nih.gov/"],
+      "reviewQuestions": ["Did the search retain both biological concepts?", "Were human and preclinical observations distinguished?", "Does the finding follow from its cited passage without asserting causation?"]
+    },
+    {
+      "id": "trial-methods",
+      "request": { "message": "Describe one aspect of the TREAT trial design. Use one exact supporting passage. Do not infer treatment efficacy.", "query": "32986097[uid]", "searchMode": "manual", "mode": "evidence", "sources": ["pubmed"], "history": [] },
+      "referenceUrls": ["https://pubmed.ncbi.nlm.nih.gov/32986097/"],
+      "expectedSourceIds": ["pubmed:32986097"],
+      "reviewQuestions": ["Does the design description match this trial rather than another paper?", "Is the quoted passage sufficient for the whole finding?"]
+    },
+    {
+      "id": "comparison-boundaries",
+      "request": { "message": "Compare the questions studied in these two time-restricted eating trials. Give two source-grounded findings and explain why their designs should not be treated as identical.", "query": "32986097[uid] OR 35443107[uid]", "searchMode": "manual", "mode": "evidence", "sources": ["pubmed"], "history": [] },
+      "referenceUrls": ["https://pubmed.ncbi.nlm.nih.gov/32986097/", "https://pubmed.ncbi.nlm.nih.gov/35443107/"],
+      "expectedSourceIds": ["pubmed:32986097", "pubmed:35443107"],
+      "reviewQuestions": ["Are differences in interventions, comparators and duration represented accurately?", "Are missing full-text details acknowledged?", "Does the synthesis avoid manufacturing a pooled effect?"]
+    },
+    {
+      "id": "testable-hypothesis",
+      "request": { "message": "Develop one testable non-operational hypothesis about metabolic dysfunction and age-related inflammation. Cite starting observations and give a prediction, competing explanation and falsification criterion.", "query": "metabolic dysfunction age related inflammation humans", "searchMode": "manual", "mode": "hypotheses", "sources": ["pubmed"], "history": [] },
+      "referenceUrls": ["https://pubmed.ncbi.nlm.nih.gov/"],
+      "reviewQuestions": ["Are the starting observations supported?", "Is the prediction falsifiable and distinguishable from the competing explanation?", "Is novelty explicitly unestablished?", "Are proposed hypotheses separated from observed results?"]
+    },
+    {
+      "id": "replication-plan",
+      "request": { "message": "Propose an independent replication plan for human DNA methylation aging biomarkers. Include eligibility, confounders, suitable endpoints and independent validation. No experiments are being performed.", "query": "DNA methylation aging biomarker validation human", "searchMode": "manual", "mode": "study-plan", "sources": ["pubmed", "trials"], "history": [] },
+      "referenceUrls": ["https://www.ncbi.nlm.nih.gov/books/NBK453484/"],
+      "reviewQuestions": ["Does the plan address confounding and independent validation?", "Are clock changes distinguished from demonstrated clinical benefit?", "Are analyses clearly proposed rather than executed?", "Is the plan feasible and methodologically coherent?"]
+    },
+    {
+      "id": "contextual-followup",
+      "request": { "message": "Now focus on evidence in women. Give one finding and explain coverage limitations.", "query": "", "searchMode": "auto", "mode": "evidence", "sources": ["pubmed"], "history": [{ "role": "user", "content": "What human trials studied time-restricted eating?" }] },
+      "referenceUrls": ["https://pubmed.ncbi.nlm.nih.gov/"],
+      "reviewQuestions": ["Did the search retain time-restricted eating and adapt to women?", "Were mixed-sex samples distinguished from women-only analyses?", "Were gaps labelled as retrieval uncertainty rather than absence of evidence?"]
+    }
+  ]
+}

@@ -12,3 +12,8 @@ export function researchProviderStatus() {
 export function researchModel(id: typeof RESEARCH_MODELS[number]) {
   return createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })(id);
 }
+
+/** Gemini 3 uses levels. Review/planning must not inherit medium thinking. */
+export function researchOptions(id: typeof RESEARCH_MODELS[number], stage: "planning" | "draft" | "review") {
+  return { google: { thinkingConfig: { thinkingLevel: id === "gemini-3.8-flash" || stage === "draft" ? "low" as const : "minimal" as const } } };
+}

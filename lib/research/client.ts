@@ -8,7 +8,7 @@ export const ResearchTurnSchema = z.object({
 }).strict();
 export type ResearchTurn = z.infer<typeof ResearchTurnSchema>;
 export const ResearchThreadSchema = z.object({
-  id: z.string().max(80), title: z.string().max(160), query: z.string().max(300),
+  id: z.string().max(80), title: z.string().max(160), query: z.string().max(700),
   updatedAt: z.number(), turns: z.array(ResearchTurnSchema).max(12),
 }).strict();
 export type ResearchThread = z.infer<typeof ResearchThreadSchema>;
@@ -36,12 +36,20 @@ export function saveResearch(threads: ResearchThread[], activeId: string | null)
 
 export function replyText(reply: ResearchReply): string {
   const lines = [reply.status === "model-assisted" ? "Research draft — researcher review required" : "Source collection — no model answer", reply.notice];
-  for (const finding of reply.answer?.findings ?? []) lines.push(`${finding.text} [${finding.sourceIds.join(", ")}]`);
+  if (reply.model) lines.push(`Model: ${reply.model}`);
+  for (const finding of reply.answer?.findings ?? []) lines.push(`${finding.text} [${finding.sourceIds.join(", ")}]`, ...finding.excerpts.map((e) => `Quoted passage [${e.sourceId}]: ${e.quote}`));
   for (const h of reply.answer?.hypotheses ?? []) lines.push(`Untested hypothesis: ${h.title}\nRationale: ${h.rationale}\nPrediction: ${h.prediction}\nAlternative: ${h.alternative}\nFalsification: ${h.falsification}\nSources: ${h.sourceIds.join(", ")}`);
   if (reply.answer?.plan.length) lines.push("Proposed study plan — not executed", ...reply.answer.plan.map((p, i) => `${i + 1}. ${p}`));
   if (reply.answer) lines.push("Limitations", ...reply.answer.limitations);
+  if (reply.searches?.length) lines.push("Executed searches", ...reply.searches.map((s) => `${s.source}: ${s.query}\nStrategy: ${s.strategy}; status: ${s.status}; records: ${s.count}${s.error ? `; issue: ${s.error}` : ""}`));
+  if (reply.diagnostics?.length) lines.push("Run issues", ...reply.diagnostics.map((d) => `${d.stage}: ${d.code}${d.model ? ` (${d.model})` : ""}`));
+  if (reply.metrics) lines.push(`Model requests: ${reply.metrics.modelCalls}; reported input tokens: ${reply.metrics.inputTokens}; reported output tokens: ${reply.metrics.outputTokens}; duration: ${reply.metrics.durationMs} ms. Token counts exclude failed responses without usage data.`);
   lines.push(`Retrieved: ${reply.retrievedAt}`, ...reply.sources.map((s) => `${s.id}: ${s.title}\n${s.url}`));
   return lines.join("\n\n");
+}
+
+export function researchExport(request: ResearchTurn["request"], reply: ResearchReply) {
+  return `NutritiScan research draft\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}`;
 }
 
 /** Bounded NDJSON consumer: an interrupted stream never becomes a completed turn. */
@@ -55,7 +63,7 @@ export async function consumeResearch(response: Response, emit: (event: Research
   let buffer = "", bytes = 0, count = 0, terminal = false;
   const accept = (line: string) => {
     if (!line.trim()) return;
-    if (terminal || ++count > 16) throw new Error("The research stream was inconsistent.");
+    if (terminal || ++count > 32) throw new Error("The research stream was inconsistent.");
     const event = ResearchEvent.parse(JSON.parse(line)); terminal = event.type !== "step"; emit(event);
   };
   try {
