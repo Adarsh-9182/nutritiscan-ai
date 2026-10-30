@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { ArrowUp, BookOpen, ChevronRight, Copy, Download, FlaskConical, History, Lightbulb, LoaderCircle, PanelLeft, Plus, Search, SlidersHorizontal, Square, Trash2, X } from "lucide-react";
+import { ArrowUp, BookOpen, ChevronRight, Copy, Download, FlaskConical, HeartPulse, History, Lightbulb, LoaderCircle, Moon, PanelLeft, Plus, Search, SlidersHorizontal, Square, Sun, Trash2, X } from "lucide-react";
 import type { AgentSource } from "@/lib/agent-runtime/contracts";
 import type { ResearchReply, ResearchRequest } from "@/lib/research/contracts";
 import { consumeResearch, readResearch, replyText, researchExport, researchTimestamp, saveResearch, type ResearchThread, type ResearchTurn } from "@/lib/research/client";
@@ -16,6 +16,11 @@ const EXAMPLES = [
 ] as const;
 const messageOf = (e: unknown) => e instanceof Error ? e.message : "Research could not be completed. Please retry.";
 const subscribeHydration = () => () => {};
+const THEME_KEY = "ns-research-theme";
+function initialTheme(): "light" | "dark" {
+  try { return typeof window !== "undefined" && localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark"; }
+  catch { return "dark"; }
+}
 function initialResearch() {
   const empty = { threads: [] as ResearchThread[], activeId: null as string | null, notice: "" };
   if (typeof window === "undefined") return empty;
@@ -24,6 +29,7 @@ function initialResearch() {
 }
 
 export default function ResearchWorkspace() {
+  const [theme, setTheme] = useState(initialTheme);
   const [initial] = useState(initialResearch);
   const [threads, setThreads] = useState<ResearchThread[]>(initial.threads);
   const [activeId, setActiveId] = useState<string | null>(initial.activeId);
@@ -107,6 +113,11 @@ export default function ResearchWorkspace() {
     finally { locked.current = false; setBusy(false); controller.current = null; }
   }
   function submit(e: FormEvent) { e.preventDefault(); void send(input); }
+  function changeTheme(value: "light" | "dark") {
+    setTheme(value);
+    try { localStorage.setItem(THEME_KEY, value); }
+    catch { setNotice("Theme changed for this tab. This device could not save your theme preference."); }
+  }
   function remove(id: string) { if (locked.current) return; const next = snapshot.current.filter((t) => t.id !== id); const selected = activeId === id ? null : activeId; persist(next, selected); if (!selected) { setActiveId(null); setQuery(""); setInspected(null); } }
   async function copy(request: ResearchTurn["request"], reply: ResearchReply) { try { await navigator.clipboard.writeText(researchExport(request, reply)); setNotice("Research draft copied with sources and limitations."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
   function download(request: ResearchTurn["request"], reply: ResearchReply) {
@@ -117,13 +128,16 @@ export default function ResearchWorkspace() {
     } catch { setNotice("The browser could not prepare the research export."); }
   }
 
-  if (!hydrated) return <div className="grid h-[100svh] place-items-center text-sm text-[var(--text-dim)]">Loading research conversations…</div>;
-  return <div className="flex h-[100svh] flex-col overflow-hidden">
-    <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 py-2.5 sm:gap-3">
+  if (!hydrated) return <div className="ns-research-theme grid h-[100svh] place-items-center text-sm text-[var(--text-dim)]">Loading research conversations…</div>;
+  return <div data-research-theme={theme} className="ns-research-theme flex h-[100svh] flex-col overflow-hidden">
+    <header className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] px-3 py-2.5 sm:gap-3">
       <button type="button" className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-lg" aria-label="Show or hide research conversations" aria-expanded={rail} onClick={() => setRail(!rail)}><PanelLeft size={17} /></button>
-      <Link href="/" className="flex min-w-0 items-center gap-2 rounded-lg focus-ring"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-[#07130c]"><FlaskConical size={16} /></span><span className="text-[13px] font-semibold">NutritiScan <span className="hidden font-normal text-[var(--text-dim)] sm:inline">/ Research</span></span></Link>
-      <span className="ml-auto hidden rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] text-[var(--text-muted)] md:inline">{provider === false ? "Sources ready · AI not configured" : provider ? "Gemini · free-tier eligible" : "Public research"}</span>
-      <Link href="/chat" className="btn-ghost ml-auto rounded-full px-3 py-2 text-xs md:ml-0">Health chat</Link>
+      <Link href="/" aria-label="NutritiScan home" className="flex min-w-0 items-center gap-2 rounded-lg focus-ring"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-[var(--research-on-accent)]"><FlaskConical size={16} /></span><span className="hidden whitespace-nowrap text-[13px] font-semibold min-[480px]:inline">NutritiScan <span className="hidden font-normal text-[var(--text-dim)] sm:inline">/ Research</span></span></Link>
+      <span className="hidden rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] text-[var(--text-muted)] lg:inline">{provider === false ? "Sources ready · AI not configured" : provider ? "Gemini · free-tier eligible" : "Public research"}</span>
+      <div role="group" aria-label="Research colour theme" className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
+        {([{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }] as const).map(({ value, label, icon: Icon }) => <button key={value} type="button" aria-pressed={theme === value} onClick={() => changeTheme(value)} className={`flex min-h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors ${theme === value ? "bg-[var(--said)] text-[var(--text)]" : "text-[var(--text-dim)] hover:text-[var(--text)]"}`}><Icon size={12} aria-hidden />{label}</button>)}
+      </div>
+      <Link href="/chat" aria-label="Health chat" className="btn-ghost flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs sm:px-3"><HeartPulse size={15} className="sm:hidden" /><span className="hidden sm:inline">Health chat</span></Link>
       <button type="button" aria-label="New research conversation" onClick={newConversation} disabled={busy} className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-lg disabled:opacity-40"><Plus size={18} /></button>
     </header>
     <div className="relative flex min-h-0 flex-1">
@@ -162,7 +176,7 @@ export default function ResearchWorkspace() {
             <div className="mb-2 flex flex-wrap gap-1" aria-label="Research objective">{MODES.map(({ id, label, icon: Icon }) => <button type="button" key={id} disabled={busy} aria-pressed={mode === id} onClick={() => setMode(id)} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] ${mode === id ? "bg-[var(--said)] text-[var(--emerald)]" : "text-[var(--text-dim)]"}`}><Icon size={12} />{label}</button>)}</div>
             <label htmlFor="research-message" className="sr-only">Research message</label><textarea ref={composer} id="research-message" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void send(input); } }} disabled={busy} maxLength={2000} rows={2} placeholder={thread ? "Continue the investigation…" : "Ask a biology or disease-research question…"} className="max-h-36 min-h-16 w-full resize-y bg-transparent px-2 py-2 text-base leading-6 text-[var(--text)] outline-none placeholder:text-[var(--text-dim)]" />
             <div className="flex items-end justify-between gap-2 border-t border-[var(--border)] pt-2"><details className="min-w-0 flex-1"><summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 text-[11px] text-[var(--text-dim)]"><SlidersHorizontal size={13} /> Research settings · {enabled.length} sources</summary><div className="space-y-3 px-2 pb-2 pt-3 text-xs"><label className="block">Public search terms · optional override<input aria-label="Public search terms" disabled={busy} value={query} onChange={(e) => setQuery(e.target.value)} maxLength={700} placeholder="Automatic: English concepts adapted to each question" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-base" /></label><div className="flex flex-wrap gap-4">{(["pubmed", "trials"] as const).map((s) => <label key={s} className="flex items-center gap-2"><input type="checkbox" checked={enabled.includes(s)} disabled={busy} onChange={(e) => setEnabled((v) => e.target.checked ? [...v, s] : v.filter((x) => x !== s))} />{s === "pubmed" ? "PubMed" : "ClinicalTrials.gov"}</label>)}</div><p className="text-[11px] leading-5 text-[var(--text-dim)]">Leave the override empty for automatic English scientific searches that adapt to follow-ups. A custom override stays fixed until you clear it. Executed terms appear in Search activity and go to the enabled public sources. Research messages, selected conversation history and evidence go to Google when AI is configured. Free-tier content may be used for product improvement. Use public research data.</p></div></details>
-              {busy ? <button type="button" aria-label="Stop research" onClick={() => controller.current?.abort()} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border-strong)]"><Square size={14} fill="currentColor" /></button> : <button type="submit" disabled={input.trim().length < 3 || !enabled.length} aria-label="Send research message" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--emerald)] text-[#07130c] disabled:opacity-30"><ArrowUp size={19} /></button>}
+              {busy ? <button type="button" aria-label="Stop research" onClick={() => controller.current?.abort()} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border-strong)]"><Square size={14} fill="currentColor" /></button> : <button type="submit" disabled={input.trim().length < 3 || !enabled.length} aria-label="Send research message" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--emerald)] text-[var(--research-on-accent)] disabled:opacity-30"><ArrowUp size={19} /></button>}
             </div>
           </form>
           <p className="px-2 pt-2 text-center text-[10px] leading-4 text-[var(--text-dim)]">Research assistance · Hypotheses and study plans are proposals · No experiments or code are executed</p>

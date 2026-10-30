@@ -153,3 +153,12 @@ Improvement-release verification: `npm run verify` passed lint (the existing
 migration-script warning remains), TypeScript, 623 unit tests, 36 UI tests,
 44 evaluation-gate checks and the optimized production build. The six new live
 benchmark cases are opt-in and are not counted as scientific validation.
+
+## Research appearance
+
+The header includes explicit Light and Dark buttons with selected-state labels.
+The preference is stored separately as `ns-research-theme` on this device. Light
+mode scopes its backgrounds, panels, text, borders, citations, controls and hero
+heading to Research; the original dark green palette remains selectable. The
+light text/accent palette clears 4.5:1 contrast on its intended surfaces. Saved
+appearance does not enter research requests or Health profile data.
