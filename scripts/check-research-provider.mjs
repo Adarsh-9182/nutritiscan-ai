@@ -1,6 +1,6 @@
 // Run with an ignored environment file; never print keys or provider bodies.
 // Inventory is read-only. --generate adds one small public connectivity prompt.
-const candidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+const candidates = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
 const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 if (!key) { console.log("Google credential: missing"); process.exit(1); }
 if (key === "[SENSITIVE]") { console.log("Google credential is a Vercel redaction placeholder. Verify the deployed runtime; this is not a usable local secret."); process.exit(1); }

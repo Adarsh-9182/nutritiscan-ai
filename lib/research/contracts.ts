@@ -47,6 +47,7 @@ export const ResearchResult = z.object({
   sources: z.array(SourceSchema).max(10),
   answer: ScientistDraft.nullable(),
   model: z.string().max(100).nullable(),
+  reviewModel: z.string().max(100).optional(),
   status: z.enum(["model-assisted", "sources-only"]),
   notice: z.string().max(1000),
   coverage: z.array(z.object({ source: z.enum(["pubmed", "trials"]), status: z.enum(["done", "empty", "failed"]), count: z.number().int().min(0).max(10) }).strict()).max(2),

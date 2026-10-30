@@ -80,7 +80,7 @@ describe("research orchestration", () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
     vi.mocked(generateText).mockRejectedValueOnce(new Error("quota"));
     vi.mocked(generateText).mockResolvedValueOnce({ output: draft } as never);
-    vi.mocked(generateText).mockResolvedValueOnce({ output: { items: [{ index: 0, verdict: "supported", reason: "The passage supports the association statement.", evidence: draft.findings[0].excerpts }] } } as never);
+    vi.mocked(generateText).mockResolvedValueOnce({ output: { items: [{ index: 0, verdict: "supported", reason: "The passage supports the association statement.", evidenceIndexes: [0] }] } } as never);
     const result = await draftScience(request, [source], signal(), vi.fn());
     expect(result?.model).toBe(RESEARCH_MODELS[1]);
     expect(result?.answer.findings).toHaveLength(1);
@@ -94,7 +94,7 @@ describe("research orchestration", () => {
   it("withholds a draft when the separate source-support review rejects its claim", async () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
     let calls = 0;
-    vi.mocked(generateText).mockImplementation(async () => ({ output: ++calls % 2 ? draft : { items: [{ index: 0, verdict: "unsupported", reason: "The finding overstates the source.", evidence: [] }] } }) as never);
+    vi.mocked(generateText).mockImplementation(async () => ({ output: ++calls % 2 ? draft : { items: [{ index: 0, verdict: "unsupported", reason: "The finding overstates the source.", evidenceIndexes: [] }] } }) as never);
     expect(await draftScience(request, [source], signal(), vi.fn())).toBeNull();
     expect(generateText).toHaveBeenCalledTimes(RESEARCH_MODELS.length * 2);
   });

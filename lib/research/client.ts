@@ -37,6 +37,7 @@ export function saveResearch(threads: ResearchThread[], activeId: string | null)
 export function replyText(reply: ResearchReply): string {
   const lines = [reply.status === "model-assisted" ? "Research draft — researcher review required" : "Source collection — no model answer", reply.notice];
   if (reply.model) lines.push(`Model: ${reply.model}`);
+  if (reply.reviewModel) lines.push(`Source-review model: ${reply.reviewModel}`);
   for (const finding of reply.answer?.findings ?? []) lines.push(`${finding.text} [${finding.sourceIds.join(", ")}]`, ...finding.excerpts.map((e) => `Quoted passage [${e.sourceId}]: ${e.quote}`));
   for (const h of reply.answer?.hypotheses ?? []) lines.push(`Untested hypothesis: ${h.title}\nRationale: ${h.rationale}\nPrediction: ${h.prediction}\nAlternative: ${h.alternative}\nFalsification: ${h.falsification}\nSources: ${h.sourceIds.join(", ")}`);
   if (reply.answer?.plan.length) lines.push("Proposed study plan — not executed", ...reply.answer.plan.map((p, i) => `${i + 1}. ${p}`));

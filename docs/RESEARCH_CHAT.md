@@ -61,6 +61,12 @@ source support, incomplete mode output and source outage. Logs include only stag
 model and reason code, never provider exception messages or source/user text.
 The Google thinking level is explicit for all three models and all stages;
 review/planning no longer inherit default medium thinking.
+Live diagnostics showed repeated 12-second draft timeouts on Gemini 3.8, so
+Gemini 3.6 is now tried first, then 3.5 Flash-Lite, then 3.8. Source review uses 3.5 Flash-Lite to keep the bounded check fast and spread model-specific quota; if Lite quota was already reported in this run, review uses the drafting model. Both model IDs are retained in successful results and exports. The review
+model selects indexes of the draft's already verified passages rather than
+retyping quotes. It must still judge whole-claim support in source context;
+supported findings require passages for every cited source, and selected passages
+are validated again against the retrieved text in code.
 Per-run metrics report model-request count, elapsed time and usage returned by
 successful responses. Failed responses may omit usage. Remaining project quota
 and actual billing are not available; these counters are not billing estimates.
@@ -137,6 +143,6 @@ passing the automated benchmark must never be presented as validated research.
 It is skipped during the deterministic release gate.
 
 Improvement-release verification: `npm run verify` passed lint (the existing
-migration-script warning remains), TypeScript, 618 unit tests, 36 UI tests,
+migration-script warning remains), TypeScript, 621 unit tests, 36 UI tests,
 44 evaluation-gate checks and the optimized production build. The six new live
 benchmark cases are opt-in and are not counted as scientific validation.
