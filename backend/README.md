@@ -28,7 +28,7 @@ PYTHONPATH=backend .venv/bin/python -m nutritiscan.migrate
 PYTHONPATH=backend .venv/bin/uvicorn nutritiscan.main:app --port 8000 --no-access-log
 ```
 
-Set `HEALTH_API_URL=http://127.0.0.1:8000` in the web app's ignored `.env.local`, then run `npm run dev`. To enable Google sign-in, create a Google OAuth **Web application** client, allow the exact NutritiScan web origins in Google Cloud, and set the same client ID as `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in the web deployment and `GOOGLE_CLIENT_ID` in the FastAPI service. The backend validates Google's signature, issuer, expiry and audience before creating a session; the browser never supplies a trusted email by itself. Email/password works independently. Local development uses SQLite and encrypted files under ignored `.local/`; production startup refuses SQLite or an absent private S3 bucket.
+Set `HEALTH_API_URL=http://127.0.0.1:8000` in the web app's ignored `.env.local`, then run `npm run dev`. Google and GitHub use authorization code flow with PKCE; provider credentials stay on the API. Follow [social sign-in setup](../docs/SOCIAL_SIGN_IN.md) for exact callbacks, credentials, account linking and deployment checks. The API verifies provider identity before creating a session; the browser never supplies a trusted email. Email/password works independently. Local development uses SQLite and encrypted files under ignored `.local/`; production startup refuses SQLite or an absent private S3 bucket.
 
 ## Deploy
 

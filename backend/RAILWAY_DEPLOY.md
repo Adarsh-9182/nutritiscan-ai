@@ -30,7 +30,7 @@ Use Railway reference variables for the managed services, rather than copying ge
 | `HEALTH_LLM_PROVIDER` | `none` |
 | `HEALTH_MODEL_APPROVED` | `false` |
 
-For Google sign-in, set `GOOGLE_CLIENT_ID` on the API and set the same Web client ID as `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in the production Vercel project. Email/password can be tested without Google OAuth.
+For Google sign-in, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the API. For GitHub, set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` there. Register the exact callbacks in [social sign-in setup](../docs/SOCIAL_SIGN_IN.md). Client secrets stay on the API; the web UI reads readiness at runtime. Email/password can be tested without OAuth.
 
 ## Connect Vercel and verify
 

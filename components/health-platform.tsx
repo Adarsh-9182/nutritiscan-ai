@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import Script from "next/script";
-import { useCallback, useEffect, useRef, useState } from "react";
+import SocialSignIn from "./social-sign-in";
+import { useCallback, useEffect, useState } from "react";
 import { Activity, ArrowRight, Check, FileText, Leaf, LogOut, MessageCircle, Plus, RefreshCw, ShieldCheck, Upload, UserRound } from "lucide-react";
 
 type FhirRecord = { id: string; resourceType: string; code?: { text: string }; medication?: { concept: { text: string } }; effectiveDateTime?: string; recordedDate?: string; actualPeriod?: { start: string }; valueQuantity?: { value: number; unit: string }; note?: { text: string }[] };
@@ -21,32 +21,6 @@ async function api(path: string, options: RequestInit = {}) {
 const titleOf = (r: FhirRecord) => r.code?.text ?? r.medication?.concept.text ?? r.resourceType;
 const dateOf = (r: FhirRecord) => r.effectiveDateTime ?? r.recordedDate ?? r.actualPeriod?.start ?? "";
 const reportStatus = (status: string) => ({ queued: "Waiting to process", processing: "Reading report", review: "Ready for your review", manual_review: "Manual review needed", confirmed: "Confirmed" }[status] ?? status.replaceAll("_", " "));
-
-type GoogleCredentialResponse = { credential: string };
-declare global {
-  interface Window {
-    google?: { accounts: { id: {
-      initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void;
-      renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
-    } } };
-  }
-}
-
-function GoogleSignIn({ onCredential }: { onCredential: (credential: string) => void }) {
-  const root = useRef<HTMLDivElement>(null);
-  const onCredentialRef = useRef(onCredential);
-  const [loaded, setLoaded] = useState(false);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  useEffect(() => { onCredentialRef.current = onCredential; }, [onCredential]);
-  useEffect(() => {
-    if (!loaded || !clientId || !root.current || !window.google) return;
-    window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => onCredentialRef.current(credential) });
-    window.google.accounts.id.renderButton(root.current, { theme: "outline", size: "large", shape: "rect", text: "continue_with", width: 360 });
-  }, [clientId, loaded]);
-  return <div className="hp-google-wrap">
-    {clientId ? <><Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={() => setLoaded(true)} /><div ref={root} className="hp-google-button" /></> : <button className="hp-google-unconfigured" type="button" disabled title="Google sign-in is not configured yet"><svg aria-hidden="true" viewBox="0 0 48 48"><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20.4 20.4 0 0 0 24 44z"/><path fill="#FBBC05" d="M12.6 27.6a12.1 12.1 0 0 1 0-7.2v-5.3H5.8a20.3 20.3 0 0 0 0 17.8l6.8-5.3z"/><path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.8-5.8A19.4 19.4 0 0 0 24 4 20.4 20.4 0 0 0 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12z"/></svg><span>Continue with Google</span></button>}
-  </div>;
-}
 
 export default function HealthPlatform() {
   const [service, setService] = useState<"checking" | "available" | "unavailable">("checking");
@@ -91,7 +65,6 @@ export default function HealthPlatform() {
     }
   };
   const signIn = (event: React.FormEvent) => { event.preventDefault(); if (emailStep) { setEmailStep(false); return; } void run(async () => { await api(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify({ email, password }) }); setPassword(""); await finishSignIn(); }); };
-  const googleSignIn = (credential: string) => { void run(async () => { await api("auth/google", { method: "POST", body: JSON.stringify({ credential }) }); await finishSignIn(); }); };
   const upload = async (file: File) => { if (file.size > 10 * 1024 * 1024) throw new Error("Use a report smaller than 10 MB."); const body = new FormData(); body.append("file", file); await api("documents", { method: "POST", body }); await refresh(); setNotice("Report uploaded privately. We’ll update its status here when extraction is ready; check every proposed value against the original before saving."); };
   const review = (report: Report) => { setSelected(report); setDrafts(report.candidates.map((c) => ({ ...c }))); setCompared(false); setCollectionDate(""); };
   const logout = async () => { await api("auth/logout", { method: "POST" }); setSignedIn(false); setRecords([]); setReports([]); setAnswer(null); setSummary(null); setSelected(null); setConversationId(undefined); };
@@ -107,7 +80,7 @@ export default function HealthPlatform() {
         <form onSubmit={signIn}><label>Email<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>{!emailStep && <><label>Password · at least 12 characters<input type="password" autoComplete={register ? "new-password" : "current-password"} minLength={12} maxLength={128} required value={password} onChange={(e) => setPassword(e.target.value)} /></label>{register && <p className="hp-muted">Younger users should ask a parent or guardian to create and manage their account. Verified guardian consent for a child&apos;s health records is not available yet.</p>}</>}<button className="hp-primary" disabled={busy}>{busy ? "Please wait…" : emailStep ? "Continue" : register ? "Create account" : "Sign in"}<ArrowRight size={16} /></button></form>
         {!emailStep && <button className="hp-link" onClick={() => { setEmailStep(true); setPassword(""); }}>Use a different email</button>}
         <div className="hp-auth-divider"><span>or continue with</span></div>
-        <GoogleSignIn onCredential={googleSignIn} />
+        <SocialSignIn next="/health" />
         <button className="hp-link" onClick={() => { setRegister(!register); setEmailStep(false); setPassword(""); }}>{register ? "Already have an account? Sign in" : "New here? Create an account with email"}</button>
         <p className="hp-legal-note">By continuing, you agree to NutritiScan&apos;s <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.</p>
       </section>

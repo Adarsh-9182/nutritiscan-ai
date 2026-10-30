@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, FlaskConical, LockKeyhole } from "lucide-react";
+import SocialSignIn from "./social-sign-in";
 
-export default function AccountLogin({ next }: { next: string }) {
+export default function AccountLogin({ next, statusMessage }: { next: string; statusMessage?: string }) {
   const [register, setRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +30,9 @@ export default function AccountLogin({ next }: { next: string }) {
       <Link href="/" className="mb-9 inline-flex items-center gap-2 text-sm font-semibold"><FlaskConical size={20} className="text-[var(--emerald)]" /> NutritiScan</Link>
       <h1 className="text-3xl font-medium tracking-tight">{register ? "Create your account" : "Welcome back"}</h1>
       <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">One sign-in for Health chat, Research and your subscription.</p>
+      {statusMessage && <p role="status" className="mt-5 rounded-xl border border-[var(--border-strong)] p-3 text-xs leading-6">{statusMessage}</p>}
+      <div className="mt-7"><SocialSignIn next={next} /></div>
+      <div className="mt-6 flex items-center gap-3 text-[11px] text-[var(--text-dim)]"><span className="h-px flex-1 bg-[var(--border)]" />or continue with email<span className="h-px flex-1 bg-[var(--border)]" /></div>
       <form onSubmit={submit} className="mt-7 space-y-5">
         <label className="block text-xs font-medium">Email<input type="email" autoComplete="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] px-4 py-3 text-base outline-none focus:border-[var(--emerald)]" /></label>
         <label className="block text-xs font-medium">Password<input type="password" autoComplete={register ? "new-password" : "current-password"} required minLength={12} maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] px-4 py-3 text-base outline-none focus:border-[var(--emerald)]" /></label>
@@ -38,7 +42,7 @@ export default function AccountLogin({ next }: { next: string }) {
       </form>
       <button type="button" disabled={busy} onClick={() => { setRegister(!register); setPassword(""); setError(""); }} className="mt-6 text-xs text-[var(--emerald)]">{register ? "Already have an account? Sign in" : "New here? Create an account"}</button>
       <p className="mt-7 flex items-start gap-2 text-[11px] leading-6 text-[var(--text-dim)]"><LockKeyhole size={14} className="mt-1 shrink-0" />Signing in does not upload your device-local chats or health profile. Health-record storage has its own consent controls.</p>
-      <div className="mt-6 flex gap-5 text-[11px] text-[var(--text-dim)]"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href={next}>Continue with free chat</Link></div>
+      <div className="mt-6 flex gap-5 text-[11px] text-[var(--text-dim)]"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href={next === "/research" ? "/research" : "/chat"}>Continue with free chat</Link></div>
     </section>
   </main>;
 }

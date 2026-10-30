@@ -17,6 +17,9 @@ class Settings:
     model_approved: bool = False
     origins: tuple[str, ...] = ("http://localhost:3000",)
     google_client_id: str = ""
+    google_client_secret: str = ""
+    github_client_id: str = ""
+    github_client_secret: str = ""
 
     @classmethod
     def from_env(cls):
@@ -54,4 +57,7 @@ class Settings:
                 ).split(",")
             ),
             google_client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
+            google_client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
+            github_client_id=os.getenv("GITHUB_CLIENT_ID", ""),
+            github_client_secret=os.getenv("GITHUB_CLIENT_SECRET", ""),
         )

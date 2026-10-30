@@ -20,6 +20,7 @@ export async function createLocalDatabase(path?: string): Promise<Database> {
   for (const migration of migrations)
     await instance.exec(await readFile(join(migrationsDir, migration), "utf8"));
   await instance.exec(await readFile(join(process.cwd(), "migrations", "billing", "0001_subscriptions.sql"), "utf8"));
+  await instance.exec(await readFile(join(process.cwd(), "migrations", "account", "0001_oauth.sql"), "utf8"));
   return {
     query: async <T>(sql: string, values: unknown[] = []) =>
       (await instance.query<T>(sql, values)).rows,

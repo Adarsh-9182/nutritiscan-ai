@@ -19,7 +19,7 @@ describe("shared account and subscription experience", () => {
     expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method !== "POST")).toBe(true);
   });
   it("uses the existing account service and reports incorrect credentials", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ detail: "Email or password is incorrect." },{ status: 401 }));
+    vi.mocked(fetch).mockImplementation(async (url) => String(url).includes("/auth/login") ? Response.json({ detail: "Email or password is incorrect." },{ status: 401 }) : Response.json({ available: true, google: { enabled: false }, github: { enabled: false } }));
     render(<AccountLogin next="/research" />);
     fireEvent.change(screen.getByLabelText("Email"),{ target: { value: "synthetic@example.com" } });
     fireEvent.change(screen.getByLabelText("Password"),{ target: { value: "synthetic-password-123" } });

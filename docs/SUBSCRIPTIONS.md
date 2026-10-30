@@ -1,6 +1,6 @@
 # Accounts and subscriptions
 
-The canonical identity remains the FastAPI health account. Browser sign-in sets a root HttpOnly opaque session and a separately signed account proof, bound to the session hash. Public account/billing checks verify revocation through `/consent`; they do not read health records. Existing scoped sessions still work in the health space; signing in again bridges them to public chats. Native bearer authentication is unchanged. Google sign-in additionally requires matching Google OAuth client IDs on the site and health service; these cannot be generated from an email/password account.
+The canonical identity remains the FastAPI health account. Browser sign-in sets a root HttpOnly opaque session and a separately signed account proof, bound to the session hash. Public account/billing checks verify revocation through `/consent`; they do not read health records. Existing scoped sessions still work in the health space; signing in again bridges them to public chats. Native bearer authentication is unchanged. Google and GitHub sign-in require registered OAuth apps configured on the health service; see SOCIAL_SIGN_IN.md. These credentials cannot be generated from an email/password account.
 
 Billing uses the existing site Neon connection. `node scripts/migrate-billing.mjs` adds only `ns_billing_*` tables. No password, medical content or chat text is copied. Local PGlite installs the same schema. The migration is safe to rerun. Never print or commit production connection strings.
 

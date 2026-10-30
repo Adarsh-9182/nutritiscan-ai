@@ -52,6 +52,22 @@ class LoginSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class GitHubIdentity(Base):
+    __tablename__ = "health_github_identities"
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    owner: Mapped[str] = mapped_column(ForeignKey("health_accounts.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class OAuthLinkIntent(Base):
+    __tablename__ = "health_oauth_link_intents"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner: Mapped[str] = mapped_column(ForeignKey("health_accounts.id"), index=True)
+    session_hash: Mapped[str] = mapped_column(String(64))
+    provider: Mapped[str] = mapped_column(String(20))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class Consent(Base):
     __tablename__ = "health_consents"
     owner: Mapped[str] = mapped_column(

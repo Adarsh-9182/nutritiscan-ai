@@ -40,6 +40,8 @@ from .database import (
     Document,
     LoginSession,
     GoogleIdentity,
+    GitHubIdentity,
+    OAuthLinkIntent,
     Resource,
     audit,
     connect,
@@ -58,6 +60,7 @@ from .schemas import (
     ObservationInput,
     RecordInput,
 )
+from .social import install_social_routes, social_account
 from .storage import DocumentStorage
 from .supervisor import supervisor
 
@@ -78,7 +81,7 @@ def verify_google_credential(credential, client_id):
         claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com")
         or claims.get("aud") != client_id
         or not claims.get("sub")
-        or not claims.get("email_verified")
+        or claims.get("email_verified") is not True
         or not claims.get("email")
     ):
         raise HTTPException(401, "Google sign-in could not be verified. Please retry.")
@@ -159,6 +162,8 @@ def create_app(settings=None):
         user, _ = authenticate(db, request.headers.get("authorization"))
         rate_limit("account:" + user.id, 120)
         return user
+
+    install_social_routes(app, settings, cipher, db_session, account, rate_limit, lambda token, client_id: verify_google_credential(token, client_id))
 
     def permitted(user=Depends(account), db=Depends(db_session)):
         consent = db.get(Consent, user.id)
@@ -284,33 +289,7 @@ def create_app(settings=None):
     def google_login(data: GoogleCredential, request: Request, db=Depends(db_session)):
         rate_limit("auth:" + (request.client.host if request.client else "unknown"), 10)
         claims = verify_google_credential(data.credential, settings.google_client_id)
-        subject = str(claims["sub"])
-        identity = db.get(GoogleIdentity, subject)
-        if identity:
-            user = db.get(Account, identity.owner)
-            if not user:
-                raise HTTPException(401, "This Google account is not linked. Please contact support.")
-        else:
-            address = str(claims["email"]).casefold()
-            index = email_index(address, settings.data_key)
-            user = db.scalar(select(Account).where(Account.email_index == index))
-            if user:
-                # Only attach a verified Google identity to an existing account
-                # when Google is authoritative for the address.
-                authoritative = address.endswith("@gmail.com") or bool(claims.get("hd"))
-                if not authoritative:
-                    raise HTTPException(409, "Sign in with email first to protect this existing account.")
-            else:
-                user = Account(
-                    id=new_id(),
-                    email_index=index,
-                    email_cipher=b"",
-                    password_hash=password_hash(secrets.token_urlsafe(48)),
-                )
-                user.email_cipher = cipher.seal(address, user.id)
-                db.add(user)
-                db.add(Consent(owner=user.id, storage=False, cloud_ai=False))
-            db.add(GoogleIdentity(subject=subject, owner=user.id))
+        user = social_account(db, settings, cipher, "google", str(claims["sub"]), str(claims["email"]).casefold())
         result = start_session(db, user)
         audit(db, user.id, "account.google_login")
         try:
@@ -748,7 +727,8 @@ def create_app(settings=None):
                 raise HTTPException(401, "Sign in again before deleting your account.")
         for d in db.scalars(select(Document).where(Document.owner == user.id)).all():
             storage.delete(d.object_key)
-        db.execute(delete(GoogleIdentity).where(GoogleIdentity.owner == user.id))
+        for identity_model in (GoogleIdentity, GitHubIdentity, OAuthLinkIntent):
+            db.execute(delete(identity_model).where(identity_model.owner == user.id))
         for model in (Resource, Document, Conversation, Consent, LoginSession, Audit):
             db.execute(delete(model).where(model.owner == user.id))
         db.delete(user)

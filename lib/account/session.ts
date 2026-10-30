@@ -19,6 +19,23 @@ function signingKey() {
   throw new AccountUnavailable("Account sessions are not configured yet.");
 }
 
+/** Domain-separated keys for transient OAuth state; never expose the root key. */
+export function accountPurposeKey(purpose: "oauth-state") {
+  return createHmac("sha256", signingKey()).update(`nutritiscan/${purpose}/v1`).digest();
+}
+
+export const AccountAuthResult = z.object({ access_token: z.string().min(1).max(256), expires_in: z.number().int().positive().max(AUTH_SESSION_SECONDS), user_id: z.string().uuid() });
+export function browserSessionCookies(value: unknown) {
+  const result = AccountAuthResult.parse(value);
+  const proof = createAccountProof(result.user_id, result.access_token, result.expires_in);
+  const options = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" as const, path: "/", maxAge: result.expires_in };
+  return [
+    { name: SESSION_COOKIE, value: result.access_token, options },
+    { name: ACCOUNT_COOKIE, value: proof, options },
+    { name: LEGACY_HEALTH_COOKIE, value: "", options: { ...options, path: "/api/health", maxAge: 0 } },
+  ];
+}
+
 export class AccountUnavailable extends Error {
   readonly status = 503;
 }
@@ -50,7 +67,7 @@ export function verifyAccountProof(proof: string | undefined, upstreamToken: str
   } catch { return null; }
 }
 
-function cookieValue(request: Request, name: string) {
+export function cookieValue(request: Request, name: string) {
   const matches = (request.headers.get("cookie") ?? "").split(";").map((s) => s.trim()).filter((s) => s.startsWith(`${name}=`));
   if (matches.length !== 1) return undefined;
   try { return decodeURIComponent(matches[0].slice(name.length + 1)); } catch { return undefined; }

@@ -1,11 +1,9 @@
 import { cookies } from "next/headers";
-import { z } from "zod";
-import { ACCOUNT_COOKIE, SESSION_COOKIE, LEGACY_HEALTH_COOKIE, AUTH_SESSION_SECONDS, createAccountProof } from "@/lib/account/session";
+import { ACCOUNT_COOKIE, SESSION_COOKIE, LEGACY_HEALTH_COOKIE, AccountAuthResult, browserSessionCookies } from "@/lib/account/session";
 import { authenticatedAccount } from "@/lib/account/session";
 import { billingStore } from "@/lib/billing/store";
 
 export const maxDuration = 60;
-const AuthResult = z.object({ access_token: z.string().min(1).max(256), expires_in: z.number().int().positive().max(AUTH_SESSION_SECONDS), user_id: z.string().uuid() });
 const MAX_BODY = 11 * 1024 * 1024;
 const allowed = /^(status|consent|records(?:\/[^/]+)?|observations|timeline|trends|documents(?:\/[^/]+(?:\/(?:original|confirm))?)?|chat|conversations|doctor-summary|voice|export|account|auth\/(?:login|register|google|logout))$/;
 
@@ -59,13 +57,9 @@ async function proxy(req: Request, context: { params: Promise<{ path: string[] }
     if (["auth/login", "auth/register", "auth/google"].includes(joined) && upstream.ok) {
       const result = await upstream.json();
       if (!native) {
-        const checked = AuthResult.safeParse(result);
+        const checked = AccountAuthResult.safeParse(result);
         if (!checked.success) return Response.json({ error: "The sign-in response could not be validated. Please retry." }, { status: 502 });
-        const proof = createAccountProof(checked.data.user_id, checked.data.access_token, checked.data.expires_in);
-        const options = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" as const, path: "/", maxAge: checked.data.expires_in };
-        jar.set(SESSION_COOKIE, checked.data.access_token, options);
-        jar.set(ACCOUNT_COOKIE, proof, options);
-        jar.set(LEGACY_HEALTH_COOKIE, "", { ...options, path: "/api/health", maxAge: 0 });
+        for (const cookie of browserSessionCookies(checked.data)) jar.set(cookie.name, cookie.value, cookie.options);
         delete result.access_token;
       }
       return Response.json(result, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
