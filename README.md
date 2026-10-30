@@ -36,3 +36,31 @@ PYTHONPATH=backend .venv/bin/pytest backend/tests -q
 The GitHub workflow checks both web and backend. Tests use synthetic data and do not establish clinical validity.
 
 Educational prototype for all ages. Younger users should involve a parent or guardian when sharing personal health information. Not a diagnosis, prescription, emergency service or replacement for a clinician. Clinical evaluation, security/privacy review, provider processing review and intended-use regulatory review are required before real patient use. Do not commit API keys, signing keys or patient records.
+
+## Research chat
+
+Open `/research` for the chat-first human-biology research workspace. It reuses
+the public-source plugin gateway while keeping research conversations separate
+from health memory. Follow-ups carry a bounded selection of the current research
+conversation, and the public search query is separately visible and editable.
+
+Configure `GOOGLE_GENERATIVE_AI_API_KEY` on the server to enable model reasoning.
+Research uses direct Gemini only: `gemini-3.8-flash`, then `gemini-3.6-flash`, then
+`gemini-3.5-flash-lite`. These models have advertised free-tier access; eligibility,
+availability and quota depend on your Google project. A paid Google project can
+still be billed. Research never falls back to the paid AI Gateway. Free-tier
+content may be used for product improvement; use public research data.
+
+Each finding must cite retrieved sources and exact excerpts. A separate model
+pass checks source support; unsupported findings are withheld. These checks do
+not establish scientific truth, clinical efficacy or hypothesis novelty. Missing
+credentials, failed checks and exhausted quotas produce a labelled source
+collection rather than an invented AI answer. Local tests use synthetic sources;
+a live provider call is not verified by those tests.
+
+This release supports literature-based research, hypothesis drafting and study
+planning. It does not execute code, analyze uploaded datasets, conduct lab
+experiments, validate disease cures or establish human age reversal. Research
+history is device-local (eight conversations, twelve turns each, 1 MB total), not
+account-synced or a background execution service. Interrupted runs can be retried
+as fresh searches. See [research chat implementation](docs/RESEARCH_CHAT.md).
