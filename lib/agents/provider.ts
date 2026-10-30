@@ -1,31 +1,6 @@
-// ============================================================
-// MODEL PROVIDER
-//
-// The product shipped pointing at `anthropic/claude-sonnet-5` through
-// Vercel's AI Gateway, and production has no credential at all — so
-// `hasModelCredential()` was false, the real supervisor never ran, and every
-// answer in production came from the keyless demo brain. The comment in
-// app/api/chat/route.ts records the other half of it: when the Gateway was
-// reachable it answered 403 "requires a valid credit card".
-//
-// So the model was never the thing that was broken. The way it was reached
-// was.
-//
-// Resolution order, first credential wins:
-//
-//   1. GOOGLE_GENERATIVE_AI_API_KEY — Gemini. A real free tier, no card,
-//      obtained from aistudio.google.com. This is the default for a product
-//      that has not earned a bill yet.
-//   2. AI_GATEWAY_API_KEY / VERCEL_OIDC_TOKEN — the Gateway, for when there
-//      is a card and a better model is wanted.
-//   3. Nothing — the demo brain answers, as it does today.
-//
-// Chosen at call time rather than module load, because a serverless instance
-// can outlive an environment change and a stale provider is a silent one.
-// ============================================================
-
+import { premiumModel } from "@/lib/billing/models";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import type { EmbeddingModel, LanguageModel } from "ai";
+import type { LanguageModel } from "ai";
 import type { SharedV4ProviderOptions } from "@ai-sdk/provider";
 
 /**
@@ -87,10 +62,10 @@ function ladderIndex(role: "supervisor" | "specialist", tier: number): number {
 const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
 
 /** Used only when a Gateway credential is present. */
-const GATEWAY_MODEL = "anthropic/claude-sonnet-5";
+
 
 /** Anthropic serves no embeddings endpoint; the Gateway routes this elsewhere. */
-const GATEWAY_EMBEDDING_MODEL = "openai/text-embedding-3-small";
+
 
 export type ProviderChoice = {
   model: LanguageModel;
@@ -152,7 +127,7 @@ export function hasGateway(): boolean {
 
 /** Whether any real model can be reached. The demo brain answers when false. */
 export function hasAnyModel(): boolean {
-  return hasGemini() || hasGateway();
+  return hasGemini() || Boolean(premiumModel());
 }
 
 /**
@@ -170,6 +145,8 @@ export function resolveModel(
   /** Rungs to step down the ladder. Raised by the caller after a failed attempt. */
   tier = 0,
 ): ProviderChoice {
+  const premium = premiumModel();
+  if (premium && tier === 0) return { ...premium, providerOptions: {} };
   if (hasGemini()) {
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -183,9 +160,9 @@ export function resolveModel(
       ),
     };
   }
-  // The Gateway resolves a bare string itself; no client to construct. Also
-  // the fallback when nothing is configured, which keeps construction total.
-  return { model: GATEWAY_MODEL as unknown as LanguageModel, id: GATEWAY_MODEL, providerOptions: {} };
+  // Construction stays total for prompt inspection; no credential means
+  // hasAnyModel() is false. Gateway credentials NEVER upgrade Free callers.
+  return { model: createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })(MODEL_LADDER[0]), id: `google/${MODEL_LADDER[0]}`, providerOptions: {} };
 }
 
 /**
@@ -202,8 +179,5 @@ export function resolveEmbeddingModel() {
     });
     return google.textEmbeddingModel(GEMINI_EMBEDDING_MODEL);
   }
-  // Same reasoning as resolveModel: total rather than nullable. Recall
-  // already degrades to null on a failed call, which covers the no-credential
-  // case without a second branch.
-  return GATEWAY_EMBEDDING_MODEL as unknown as EmbeddingModel;
+  return createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY }).textEmbeddingModel(GEMINI_EMBEDDING_MODEL);
 }

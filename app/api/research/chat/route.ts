@@ -1,3 +1,4 @@
+import { premiumForRequest, withPremium } from "@/lib/billing/models";
 import { matchesOrigin } from "@/lib/agent-runtime/origin";
 import { checkRateShared, clientKey, readJsonCapped, tooManyRequests } from "@/lib/http/guard";
 import { ResearchChatRequest, type ResearchStreamEvent } from "@/lib/research/contracts";
@@ -28,7 +29,12 @@ export async function POST(request: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (event: ResearchStreamEvent) => { if (!signal.aborted) controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)); };
-      try { emit({ type: "step", text: "Preparing your research question…" }); emit({ type: "result", result: await runScience(parsed.data, signal, emit) }); }
+      try {
+        let premium = null;
+        try { premium = await premiumForRequest(request); } catch { emit({ type: "step", text: "Premium access could not be confirmed or its allowance is exhausted. Continuing with basic access…" }); }
+        emit({ type: "step", text: "Preparing your research question…" });
+        emit({ type: "result", result: await withPremium(premium, () => runScience(parsed.data, signal, emit)) });
+      }
       catch { if (!cancel.signal.aborted && !request.signal.aborted) controller.enqueue(encoder.encode(`${JSON.stringify({ type: "error", error: "Research stopped before completion. Your question is retained; retry when source or model access returns." })}\n`)); }
       finally { if (!cancel.signal.aborted) controller.close(); }
     },

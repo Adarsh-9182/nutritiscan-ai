@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 // Node 26 exposes its own localStorage accessor. Vitest's jsdom bridge can
 // leave that accessor in front of jsdom's storage, so use deterministic

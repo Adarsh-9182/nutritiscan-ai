@@ -6,6 +6,7 @@ import { DAY_MS, useStartOfToday } from "@/lib/clock";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deleteAllThreads, deleteThread, newThread, renameThread, selectThread, useActiveThreadId, useThreads } from "@/lib/memory/store";
 import { searchThreads, textOf, type Thread } from "@/lib/memory/threads";
+import { PlanUpsell } from "./plan-cards";
 
 /**
  * Group conversations the way a person remembers them — by when, not by id.
@@ -194,6 +195,7 @@ export default function ThreadSidebar({ onNavigate }: { onNavigate?: () => void 
           a mis-click, so it asks — inline, rather than through a dialog that
           would trap focus over a chat someone may be mid-sentence in. */}
       <div className="border-t border-[var(--border)] p-2">
+        <PlanUpsell />
         {/*
           The way back to the marketing page.
           `/` redirects a returning browser straight here (see proxy.ts), so

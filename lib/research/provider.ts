@@ -1,3 +1,5 @@
+import { premiumModel } from "@/lib/billing/models";
+import type { SharedV4ProviderOptions } from "@ai-sdk/provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 // Pinned models listed with free-tier token access in Google's pricing docs.
@@ -11,11 +13,14 @@ export function researchProviderStatus() {
   return { configured: Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY), models: [...RESEARCH_MODELS] };
 }
 
-export function researchModel(id: typeof RESEARCH_MODELS[number]) {
+export function researchModel(id: string) {
+  const premium = premiumModel();
+  if (premium?.id === id) return premium.model;
   return createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })(id);
 }
 
 /** Gemini 3 uses levels. Review/planning must not inherit medium thinking. */
-export function researchOptions(id: typeof RESEARCH_MODELS[number], stage: "planning" | "draft" | "review") {
+export function researchOptions(id: string, stage: "planning" | "draft" | "review"): SharedV4ProviderOptions {
+  if (id.startsWith("openai/")) return {};
   return { google: { thinkingConfig: { thinkingLevel: id === "gemini-3.8-flash" || stage === "draft" ? "low" as const : "minimal" as const } } };
 }

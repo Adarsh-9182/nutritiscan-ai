@@ -8,6 +8,7 @@ import {
 } from "./cloud-model";
 import { runHealthAgent } from "./health-agent";
 import { DEMO } from "./demo";
+import { hasGateway } from "@/lib/agents/provider";
 
 const generateText = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (importOriginal) => ({
@@ -42,10 +43,11 @@ describe("hosted engine selection", () => {
     vi.stubEnv("VERCEL_OIDC_TOKEN", `header.${payload}.signature`);
     expect(hostedModelReady()).toBe(false);
   });
-  it("accepts a fresh OIDC token when it has time for a request", () => {
+  it("recognizes a fresh OIDC token without granting public premium access", () => {
     const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url");
     vi.stubEnv("VERCEL_OIDC_TOKEN", `header.${payload}.signature`);
-    expect(hostedModelReady()).toBe(true);
+    expect(hasGateway()).toBe(true);
+    expect(hostedModelReady()).toBe(false);
   });
   it("falls back to the operator endpoint, and says which engine ran", async () => {
     endpoint();

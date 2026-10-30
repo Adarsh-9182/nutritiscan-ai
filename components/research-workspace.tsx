@@ -7,6 +7,8 @@ import type { AgentSource } from "@/lib/agent-runtime/contracts";
 import type { ResearchReply, ResearchRequest } from "@/lib/research/contracts";
 import { consumeResearch, readResearch, replyText, researchExport, researchTimestamp, saveResearch, type ResearchThread, type ResearchTurn } from "@/lib/research/client";
 import { ResearchEvidence } from "./research-evidence";
+import AccountControls from "./account-controls";
+import { PlanUpsell } from "./plan-cards";
 
 const MODES = [{ id: "evidence", label: "Evidence review", icon: BookOpen }, { id: "hypotheses", label: "Develop hypotheses", icon: Lightbulb }, { id: "study-plan", label: "Plan a study", icon: FlaskConical }] as const;
 const EXAMPLES = [
@@ -42,7 +44,6 @@ export default function ResearchWorkspace() {
   const [busy, setBusy] = useState(false);
   const [steps, setSteps] = useState<string[]>([]);
   const [notice, setNotice] = useState(initial.notice);
-  const [provider, setProvider] = useState<boolean | null>(null);
   const [inspected, setInspected] = useState<{ source: AgentSource; quote?: string } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const locked = useRef(false);
@@ -51,13 +52,7 @@ export default function ResearchWorkspace() {
   const composer = useRef<HTMLTextAreaElement>(null);
   const thread = threads.find((t) => t.id === activeId);
 
-  useEffect(() => {
-    const abort = new AbortController();
-    fetch("/api/research/chat", { cache: "no-store", signal: abort.signal }).then(async (r) => {
-      if (r.ok) { const s = await r.json(); if (!abort.signal.aborted) setProvider(s.configured === true); }
-    }).catch(() => {});
-    return () => { abort.abort(); controller.current?.abort(); };
-  }, []);
+  useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => { end.current?.scrollIntoView?.({ block: "end", behavior: "auto" }); }, [activeId, thread?.turns.length, busy]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setRail(false); setInspected(null); } };
@@ -130,21 +125,22 @@ export default function ResearchWorkspace() {
 
   if (!hydrated) return <div className="ns-research-theme grid h-[100svh] place-items-center text-sm text-[var(--text-dim)]">Loading research conversations…</div>;
   return <div data-research-theme={theme} className="ns-research-theme flex h-[100svh] flex-col overflow-hidden">
-    <header className="flex shrink-0 items-center gap-1.5 border-b border-[var(--border)] px-3 py-2.5 sm:gap-3">
+    <header className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-[var(--border)] px-3 py-2.5 sm:gap-3">
       <button type="button" className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-lg" aria-label="Show or hide research conversations" aria-expanded={rail} onClick={() => setRail(!rail)}><PanelLeft size={17} /></button>
       <Link href="/" aria-label="NutritiScan home" className="flex min-w-0 items-center gap-2 rounded-lg focus-ring"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-[var(--research-on-accent)]"><FlaskConical size={16} /></span><span className="hidden whitespace-nowrap text-[13px] font-semibold min-[480px]:inline">NutritiScan <span className="hidden font-normal text-[var(--text-dim)] sm:inline">/ Research</span></span></Link>
-      <span className="hidden rounded-full border border-[var(--border)] px-2.5 py-1 text-[10px] text-[var(--text-muted)] lg:inline">{provider === false ? "Sources ready · AI not configured" : provider ? "Gemini · free-tier eligible" : "Public research"}</span>
       <div role="group" aria-label="Research colour theme" className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
         {([{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }] as const).map(({ value, label, icon: Icon }) => <button key={value} type="button" aria-pressed={theme === value} onClick={() => changeTheme(value)} className={`flex min-h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors ${theme === value ? "bg-[var(--said)] text-[var(--text)]" : "text-[var(--text-dim)] hover:text-[var(--text)]"}`}><Icon size={12} aria-hidden />{label}</button>)}
       </div>
       <Link href="/chat" aria-label="Health chat" className="btn-ghost flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs sm:px-3"><HeartPulse size={15} className="sm:hidden" /><span className="hidden sm:inline">Health chat</span></Link>
       <button type="button" aria-label="New research conversation" onClick={newConversation} disabled={busy} className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-lg disabled:opacity-40"><Plus size={18} /></button>
+      <AccountControls returnTo="/research" />
     </header>
     <div className="relative flex min-h-0 flex-1">
       {rail && <><button type="button" aria-label="Close research conversations" onClick={() => setRail(false)} className="absolute inset-0 z-20 bg-black/60 lg:hidden" /><aside aria-label="Research conversations" className="ns-float ns-float-solid absolute bottom-3 left-3 top-3 z-30 flex w-[264px] max-w-[calc(100vw-24px)] shrink-0 flex-col p-4 lg:relative lg:inset-auto lg:m-3">
         <div className="mb-4 flex items-center justify-between"><p className="t-label text-[var(--text-dim)]">RESEARCH CONVERSATIONS</p><button type="button" aria-label="Close conversation history" onClick={() => setRail(false)} className="btn-ghost rounded p-1"><X size={15} /></button></div>
         <button type="button" onClick={newConversation} disabled={busy} className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium disabled:opacity-40"><Plus size={14} /> New research</button>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">{threads.map((t) => <div key={t.id} className={`group flex items-center rounded-xl border ${t.id === activeId ? "border-[var(--border-strong)] bg-[var(--surface)]" : "border-transparent"}`}><button type="button" disabled={busy} onClick={() => open(t)} className="min-w-0 flex-1 px-3 py-3 text-left"><span className="block truncate text-xs">{t.title}</span><span className="mt-1 block text-[10px] text-[var(--text-dim)]">{t.turns.length} questions · on this device</span></button><button type="button" disabled={busy} onClick={() => remove(t.id)} aria-label={`Delete research conversation: ${t.title}`} className="btn-ghost mr-1 rounded-lg p-2"><Trash2 size={13} /></button></div>)}{!threads.length && <p className="text-xs leading-6 text-[var(--text-dim)]">Your research conversations appear here. Health chats are kept separately.</p>}</div>
+        <PlanUpsell />
         <p className="mt-4 border-t border-[var(--border)] pt-4 text-[11px] leading-5 text-[var(--text-dim)]">Saved on this device, up to eight conversations. Selected research history goes to the model on follow-up. Your health profile is not included.</p>
       </aside></>}
       <main className="flex min-w-0 flex-1 flex-col">

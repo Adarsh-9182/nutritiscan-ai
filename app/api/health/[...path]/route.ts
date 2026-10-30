@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
+import { z } from "zod";
+import { ACCOUNT_COOKIE, SESSION_COOKIE, LEGACY_HEALTH_COOKIE, AUTH_SESSION_SECONDS, createAccountProof } from "@/lib/account/session";
+import { authenticatedAccount } from "@/lib/account/session";
+import { billingStore } from "@/lib/billing/store";
 
 export const maxDuration = 60;
-const SESSION = "nutritiscan-health-session";
+const AuthResult = z.object({ access_token: z.string().min(1).max(256), expires_in: z.number().int().positive().max(AUTH_SESSION_SECONDS), user_id: z.string().uuid() });
 const MAX_BODY = 11 * 1024 * 1024;
 const allowed = /^(status|consent|records(?:\/[^/]+)?|observations|timeline|trends|documents(?:\/[^/]+(?:\/(?:original|confirm))?)?|chat|conversations|doctor-summary|voice|export|account|auth\/(?:login|register|google|logout))$/;
 
@@ -19,7 +23,15 @@ async function proxy(req: Request, context: { params: Promise<{ path: string[] }
     const origin = req.headers.get("origin");
     if (!origin || origin !== new URL(req.url).origin) return Response.json({ error: "This request must come from NutritiScan." }, { status: 403 });
   }
-  const token = native ? req.headers.get("authorization") : jar.get(SESSION)?.value ? `Bearer ${jar.get(SESSION)!.value}` : null;
+  const webToken = jar.get(SESSION_COOKIE)?.value ?? jar.get(LEGACY_HEALTH_COOKIE)?.value;
+  if (joined === "account" && req.method === "DELETE" && process.env.BILLING_ENABLED === "true") {
+    try {
+      const account = native ? null : await authenticatedAccount(req);
+      if (!account) return Response.json({ error: "Open Account & billing in the browser to check subscriptions before deleting this account." }, { status: 409 });
+      if (await (await billingStore()).management(account.id)) return Response.json({ error: "Cancel renewal in Account & billing, then wait for the subscription to end before deleting this account." }, { status: 409 });
+    } catch { return Response.json({ error: "Subscription status could not be checked. Retry account deletion later." }, { status: 503 }); }
+  }
+  const token = native ? req.headers.get("authorization") : webToken ? `Bearer ${webToken}` : null;
   const headers = new Headers();
   if (token) headers.set("Authorization", token);
   const contentType = req.headers.get("content-type");
@@ -47,13 +59,22 @@ async function proxy(req: Request, context: { params: Promise<{ path: string[] }
     if (["auth/login", "auth/register", "auth/google"].includes(joined) && upstream.ok) {
       const result = await upstream.json();
       if (!native) {
-        jar.set(SESSION, result.access_token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/api/health", maxAge: result.expires_in });
+        const checked = AuthResult.safeParse(result);
+        if (!checked.success) return Response.json({ error: "The sign-in response could not be validated. Please retry." }, { status: 502 });
+        const proof = createAccountProof(checked.data.user_id, checked.data.access_token, checked.data.expires_in);
+        const options = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" as const, path: "/", maxAge: checked.data.expires_in };
+        jar.set(SESSION_COOKIE, checked.data.access_token, options);
+        jar.set(ACCOUNT_COOKIE, proof, options);
+        jar.set(LEGACY_HEALTH_COOKIE, "", { ...options, path: "/api/health", maxAge: 0 });
         delete result.access_token;
       }
       return Response.json(result, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
     }
     if (!native && (upstream.status === 401 || ((joined === "auth/logout" || joined === "account") && upstream.ok))) {
-      jar.set(SESSION, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/api/health", maxAge: 0 });
+      const options = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" as const, path: "/", maxAge: 0 };
+      jar.set(SESSION_COOKIE, "", options);
+      jar.set(ACCOUNT_COOKIE, "", options);
+      jar.set(LEGACY_HEALTH_COOKIE, "", { ...options, path: "/api/health" });
     }
     const outgoing = new Headers({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
     for (const name of ["content-type", "content-disposition", "retry-after"]) { const value = upstream.headers.get(name); if (value) outgoing.set(name, value); }

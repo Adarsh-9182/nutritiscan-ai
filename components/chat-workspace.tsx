@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Chat from "@/components/chat";
 import ThreadSidebar from "@/components/thread-sidebar";
+import AccountControls from "@/components/account-controls";
 import { newThread, useProfile } from "@/lib/memory/store";
 
 /**
@@ -64,7 +65,7 @@ export default function ChatWorkspace() {
       */}
 
       {/* Slim top bar — the conversation owns the rest of the screen. */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
+      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
         <button
           type="button"
           onClick={toggleRail}
@@ -80,7 +81,7 @@ export default function ChatWorkspace() {
           <span className="text-[13px] font-semibold">NutritiScan</span>
         </Link>
 
-        <span className="ml-auto hidden t-label text-[var(--text-dim)] sm:block">
+        <span className="ml-auto hidden t-label text-[var(--text-dim)] xl:block">
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
@@ -91,6 +92,7 @@ export default function ChatWorkspace() {
         <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
           Research
         </Link>
+        <AccountControls returnTo="/chat" />
       </header>
 
       <div className="flex min-h-0 flex-1">

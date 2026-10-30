@@ -1,3 +1,4 @@
+import { premiumForRequest, withPremium } from "@/lib/billing/models";
 import {
   createAgentUIStream,
   createUIMessageStream,
@@ -522,7 +523,9 @@ export async function POST(req: Request) {
 
       const directive = state.triage.verdict === "urgent" ? urgentAgentDirective(state) : null;
 
-      if (hasModelCredential()) {
+      let premium = null;
+      try { premium = await premiumForRequest(req); } catch { writeFixed(writer, "_Premium access could not be confirmed or its allowance is exhausted. Continuing with basic access._\n\n"); }
+      if (hasModelCredential() || premium) {
         // Best-effort: a failed or slow embedding call must not cost the
         // user their answer, so recall degrades to null rather than
         // propagating a rejection into the supervisor call below it.
@@ -546,7 +549,8 @@ export async function POST(req: Request) {
          */
         for (let tier = 0; tier < MODEL_TIERS; tier++) {
           if (signal.aborted) break;
-          const outcome = await streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal, tier, requestBody.data.allowActions !== false);
+          if (premium && tier === 1) writeFixed(writer, "_The premium model could not complete this turn. Trying the basic model._\n\n");
+          const outcome = await withPremium(premium, () => streamRealSupervisor(writer, recent, profile, nutrition, recalled, directive, state, signal, tier, requestBody.data.allowActions !== false));
           if (outcome !== "unavailable") {
             // A partial turn still gets its note: the record of what the system
             // concluded is independent of whether the prose finished.

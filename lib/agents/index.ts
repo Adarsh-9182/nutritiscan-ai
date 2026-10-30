@@ -78,6 +78,7 @@ function specialist(name: string, expertise: string, profile: HealthProfile, sec
   const resolved = resolveModel("specialist", tier);
   return new ToolLoopAgent({
     model: resolved.model,
+    maxRetries: 0,
     providerOptions: resolved.providerOptions,
     instructions: `You are the ${name} inside NutritiScan AI, a health operating system.
 ${expertise}
@@ -192,6 +193,7 @@ export function buildSoloist(
   const resolved = resolveModel("supervisor", tier);
   return new ToolLoopAgent({
     model: resolved.model,
+    maxRetries: 0,
     providerOptions: resolved.providerOptions,
     tools: allowActions ? actionTools(profile) : {},
     stopWhen: stepCountIs(4),
@@ -231,6 +233,7 @@ export function buildGeneralist(
   const resolved = resolveModel("specialist", tier);
   return new ToolLoopAgent({
     model: resolved.model,
+    maxRetries: 0,
     providerOptions: resolved.providerOptions,
     tools: allowActions ? actionTools(profile) : {},
     stopWhen: stepCountIs(3),
@@ -284,6 +287,7 @@ export function buildSupervisor(
   if (process.env.HEALTH_MULTI_AGENT_ENABLED !== "true") {
     return new ToolLoopAgent<never, ToolSet>({
       model: resolved.model,
+    maxRetries: 0,
       providerOptions: resolved.providerOptions,
       tools: allowActions ? actionTools(profile) : {},
       stopWhen: stepCountIs(4),
@@ -315,6 +319,7 @@ ${recalled ? `\n${recalled}\n` : ""}`,
 
   return new ToolLoopAgent<never, ToolSet>({
     model: resolved.model,
+    maxRetries: 0,
     providerOptions: resolved.providerOptions,
     // Save → consult (in parallel) → answer. Anything longer is the model
     // wandering, and every extra step is seconds against the response budget.
