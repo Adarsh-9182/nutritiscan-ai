@@ -96,7 +96,19 @@ describe("research orchestration", () => {
     let calls = 0;
     vi.mocked(generateText).mockImplementation(async () => ({ output: ++calls % 2 ? draft : { items: [{ index: 0, verdict: "unsupported", reason: "The finding overstates the source.", evidenceIndexes: [] }] } }) as never);
     expect(await draftScience(request, [source], signal(), vi.fn())).toBeNull();
-    expect(generateText).toHaveBeenCalledTimes(RESEARCH_MODELS.length * 2);
+    expect(generateText).toHaveBeenCalledTimes((RESEARCH_MODELS.length + 1) * 2);
+  });
+  it("revises once after source-support feedback and requires another full review", async () => {
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({ output: draft } as never)
+      .mockResolvedValueOnce({ output: { items: [{ index: 0, verdict: "partial", reason: "Keep the association claim narrow.", evidenceIndexes: [0] }] } } as never)
+      .mockResolvedValueOnce({ output: draft } as never)
+      .mockResolvedValueOnce({ output: { items: [{ index: 0, verdict: "supported", reason: "The narrow claim follows from the passage.", evidenceIndexes: [0] }] } } as never);
+    const result = await draftScience(request, [source], signal(), vi.fn());
+    expect(result?.answer.findings).toHaveLength(1);
+    expect(generateText).toHaveBeenCalledTimes(4);
+    expect(vi.mocked(generateText).mock.calls[2][0].prompt).toContain("Keep the association claim narrow.");
   });
   it("distinguishes review timeouts from unsupported evidence without exposing upstream text", async () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");

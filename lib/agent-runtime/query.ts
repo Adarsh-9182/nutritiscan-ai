@@ -69,13 +69,13 @@ const all = (parts: (string | null)[]) => {
  * outcomes and comparators are frequently unindexed, and a design filter
  * hides everything for a question no trial has studied yet.
  */
-export function composeQueries(pico: Pico): string[] {
+export function composeQueries(pico: Pico, options: { defaultTrialFilter?: boolean } = {}): string[] {
   const population = concept(pico.population);
   const intervention = concept(pico.intervention);
   // A question about an intervention is best answered by trials and reviews, which a
   // trial-type filter lifted from 5% to 21% recall@50 in the eval. The ladder drops the
   // filter when it leaves too little, and a design the model chose always wins.
-  const chosen = pico.designs.length ? pico.designs : pico.intervention.length ? DEFAULT_DESIGNS : [];
+  const chosen = pico.designs.length ? pico.designs : options.defaultTrialFilter !== false && pico.intervention.length ? DEFAULT_DESIGNS : [];
   const designs = chosen.length ? `(${[...new Set(chosen)].map((id) => DESIGN_FILTER[id]).join(" OR ")})` : null;
   const ladder = [
     all([population, intervention, concept(pico.comparison), concept(pico.outcome), designs]),

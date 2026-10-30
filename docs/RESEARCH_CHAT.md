@@ -14,6 +14,8 @@ profiles, meals, health conversations or Agent Studio saved results.
    If planning fails, a bounded keyword fallback removes common Hinglish/English
    question words; it is not a general Hindi translator. A custom Public search
    terms override pins the query until cleared. Executed queries are visible.
+   Research does not inherit the intervention-review default trial filter;
+   study-design filters apply only when explicitly requested in the concepts.
 3. Select PubMed and/or ClinicalTrials.gov. Disabled sources cannot execute.
 4. See actual retrieval/model/check activity in the conversation; Stop aborts the
    request. All work shares a 55-second server deadline. Planning has 6 seconds;
@@ -67,6 +69,11 @@ model selects indexes of the draft's already verified passages rather than
 retyping quotes. It must still judge whole-claim support in source context;
 supported findings require passages for every cited source, and selected passages
 are validated again against the retrieved text in code.
+Each run allows at most one revision using source-review or mode-validation
+feedback. The revision is treated as untrusted context and must pass all the
+same provenance, source-support and selected-mode checks. Provider outages,
+quotas and timeouts do not trigger this revision. The existing overall deadline
+still applies, and unsupported results remain withheld.
 Per-run metrics report model-request count, elapsed time and usage returned by
 successful responses. Failed responses may omit usage. Remaining project quota
 and actual billing are not available; these counters are not billing estimates.
@@ -143,6 +150,6 @@ passing the automated benchmark must never be presented as validated research.
 It is skipped during the deterministic release gate.
 
 Improvement-release verification: `npm run verify` passed lint (the existing
-migration-script warning remains), TypeScript, 621 unit tests, 36 UI tests,
+migration-script warning remains), TypeScript, 623 unit tests, 36 UI tests,
 44 evaluation-gate checks and the optimized production build. The six new live
 benchmark cases are opt-in and are not counted as scientific validation.

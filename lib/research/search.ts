@@ -10,10 +10,10 @@ export type SearchPlan = { strategy: ResearchSearch["strategy"]; pubmed: string[
 
 /** A limited keyword fallback, not a general Hindi translator. */
 export function keywordQuery(message: string, history: ResearchRequest["history"] = []): string {
-  const followup = /\b(above|previous|current explanation|findings|replication|isse|isko)\b/i.test(message);
+  const followup = /\b(above|previous|current explanation|findings|replication|isse|isko)\b|^now\b/i.test(message);
   const prior = followup ? history.filter((m) => m.role === "user").at(-1)?.content.slice(0, 700) ?? "" : "";
   const words = `${prior} ${message}`.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/);
-  const stop = new Set("a an the is are was were do does how what which about with between and or of in on for to can could should give me please summarize explain evidence research studies study papers source sources citation citations short finding findings using retrieved abstracts kya hai hain mein me ka ki ke ko aur beech se par bata batao karo do ham humansmein independent replication plan propose develop testable hypothesis hypotheses include keep brief question relation relationship".split(" "));
+  const stop = new Set("a an the is are was were do does how what which about with between and or of in on for to can could should give me please summarize explain evidence research studies study papers source sources citation citations short finding findings using retrieved abstracts kya hai hain mein me ka ki ke ko aur beech se par bata batao karo do ham humansmein independent replication plan propose develop testable hypothesis hypotheses include keep brief question relation relationship now focus".split(" "));
   const aliases: Record<string, string> = { budhapa: "aging", bimari: "disease", insaano: "humans", insan: "humans" };
   const query = [...new Set(words.filter((w) => w.length > 1 && !stop.has(w)).map((w) => aliases[w] ?? w))].join(" ").slice(0, 300).trim();
   return query.length >= 3 ? query : message.trim().slice(0, 300);
@@ -40,7 +40,8 @@ export async function planSearch(request: ResearchRequest, signal: AbortSignal, 
     recordUsage(trace, result.usage);
     const pico = normalizePico(result.output);
     if (!pico) throw Object.assign(new Error(), { name: "AI_TypeValidationError" });
-    const pubmed = composeQueries(pico).slice(0, 3);
+    // Mechanism/exposure questions are not automatically intervention reviews.
+    const pubmed = composeQueries(pico, { defaultTrialFilter: false }).slice(0, 3);
     const trialTerms = [pico.population[0], pico.intervention[0]].filter(Boolean).join(" ").slice(0, 300);
     return { strategy: "planned", pubmed: pubmed.length ? pubmed : [fallback], trials: [trialTerms.length >= 3 ? trialTerms : fallback] };
   } catch (error) {

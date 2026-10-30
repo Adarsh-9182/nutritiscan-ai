@@ -1,6 +1,6 @@
 import type { ResearchDiagnostic } from "./contracts";
 
-export type ResearchTrace = { startedAt: number; diagnostics: ResearchDiagnostic[]; modelCalls: number; inputTokens: number; outputTokens: number };
+export type ResearchTrace = { startedAt: number; diagnostics: ResearchDiagnostic[]; modelCalls: number; inputTokens: number; outputTokens: number; reviewFeedback?: string };
 export const newTrace = (): ResearchTrace => ({ startedAt: Date.now(), diagnostics: [], modelCalls: 0, inputTokens: 0, outputTokens: 0 });
 
 export function failureCode(error: unknown): ResearchDiagnostic["code"] {

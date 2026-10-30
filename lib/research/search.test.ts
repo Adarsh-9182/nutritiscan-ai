@@ -41,4 +41,12 @@ describe("research search planning", () => {
     expect(plan.strategy).toBe("keywords"); expect(trace.diagnostics).toEqual([{ stage: "planning", code: "quota", model: "gemini-3.5-flash-lite" }]);
     expect(JSON.stringify(warn.mock.calls)).not.toContain("SECRET"); warn.mockRestore();
   });
+  it("does not add an implicit RCT filter to a mechanism question", async () => {
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "synthetic-test-key");
+    vi.mocked(generateText).mockResolvedValue({ output: { population: ["humans"], intervention: ["cellular senescence"], comparison: [], outcome: ["insulin resistance"], designs: [] } } as never);
+    const plan = await planSearch({ ...request, searchMode: "auto" }, signal(), vi.fn(), newTrace());
+    expect(plan.pubmed[0]).toBe("(humans) AND (cellular senescence) AND (insulin resistance)");
+    expect(plan.pubmed[0]).not.toContain("randomized controlled trial");
+    expect(keywordQuery("Now focus on women", [{ role: "user", content: "time restricted eating trials" }])).toBe("time restricted eating trials women");
+  });
 });
