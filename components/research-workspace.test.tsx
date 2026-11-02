@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import ResearchWorkspace from "./research-workspace";
 import { reply, streamReply } from "@/lib/research/test-fixtures";
+import { researchBackup } from "@/lib/research/backup";
 import { readResearch } from "@/lib/research/client";
 
 const question = "Investigate metabolic aging in humans";
@@ -17,6 +18,36 @@ async function ask(text = question) {
 }
 
 describe("chat-first Research Workspace", () => {
+  it("previews a backup before merging it, preserves local work and rejects invalid files", async () => {
+    render(<ResearchWorkspace />); await ask();
+    const original = readResearch().threads[0];
+    const imported = { ...original, id: "another-project", title: "Synthetic imported project" };
+    fireEvent.click(screen.getByRole("button", { name: "Show or hide research conversations" }));
+    const file = new File(["fixture"], "research.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => researchBackup([imported]) });
+    fireEvent.change(screen.getByLabelText("Research backup file"), { target: { files: [file] } });
+    expect(await screen.findByRole("region", { name: "Research backup preview" })).toHaveTextContent("Synthetic imported project");
+    expect(readResearch().threads).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Import conversations" }));
+    const restored = readResearch();
+    expect(restored.threads).toHaveLength(2); expect(restored.threads[0]).toEqual(original);
+    expect(restored.threads[1].importedAt).toBeDefined();
+    const bad = new File(["fixture"], "bad.json", { type: "application/json" });
+    Object.defineProperty(bad, "text", { value: async () => '{"format":"unknown"}' });
+    fireEvent.change(screen.getByLabelText("Research backup file"), { target: { files: [bad] } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("not a supported");
+    expect(readResearch().threads).toHaveLength(2);
+  });
+
+  it("renames a research project and persists its name after reload", async () => {
+    const view = render(<ResearchWorkspace />); await ask();
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Research conversation name" }), { target: { value: "Synthetic replication project" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save name" }));
+    expect(readResearch().threads[0].title).toBe("Synthetic replication project");
+    view.unmount(); render(<ResearchWorkspace />);
+    expect(await screen.findByText("Synthetic replication project")).toBeInTheDocument();
+  });
   it("saves manual source decisions and notes, filters them, and restores them without changing the draft", async () => {
     const view = render(<ResearchWorkspace />); await ask();
     fireEvent.click(screen.getByText("Review sources"));
@@ -148,6 +179,6 @@ describe("chat-first Research Workspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Stop research" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Research stopped");
     expect(screen.getByRole("button", { name: "Retry question" })).toBeEnabled();
-    expect(screen.getByText(question)).toBeInTheDocument();
+    expect(screen.getAllByText(question).length).toBeGreaterThan(0);
   });
 });

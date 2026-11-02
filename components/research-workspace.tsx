@@ -6,6 +6,9 @@ import { ArrowUp, BookOpen, ChevronRight, Copy, Download, FlaskConical, HeartPul
 import type { AgentSource } from "@/lib/agent-runtime/contracts";
 import type { ResearchReply, ResearchRequest } from "@/lib/research/contracts";
 import { consumeResearch, readResearch, replyText, researchExport, researchTimestamp, saveResearch, type ResearchThread, type ResearchTurn } from "@/lib/research/client";
+import { researchBackup, mergeResearchBackup, type ResearchBackup } from "@/lib/research/backup";
+import { includedSourcesRis } from "@/lib/research/references";
+import { ResearchProjects, ResearchProjectTitle } from "./research-projects";
 import { ResearchEvidence } from "./research-evidence";
 import { ResearchSourceReview } from "./research-source-review";
 import { SourceReviewSchema, sourceReviewCsv, type SourceReview } from "@/lib/research/source-review";
@@ -124,7 +127,19 @@ export default function ResearchWorkspace() {
     const review = value ? SourceReviewSchema.parse({ ...value, sourceId, updatedAt }) : null;
     update(activeId, (t) => ({ ...t, turns: t.turns.map((v) => v.id === turnId ? { ...v, sourceReviews: [...(v.sourceReviews ?? []).filter((r) => r.sourceId !== sourceId), ...(review ? [review] : [])] } : v) }));
   }
-  async function copy(request: ResearchTurn["request"], reply: ResearchReply, reviews?: SourceReview[]) { try { await navigator.clipboard.writeText(researchExport(request, reply, reviews)); setNotice("Research draft copied with sources, limitations and researcher decisions."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
+  function restoreBackup(backup: ResearchBackup) {
+    if (locked.current) throw new Error("Wait for research to finish before importing.");
+    const merged = mergeResearchBackup(snapshot.current, backup);
+    // Commit device storage before changing UI, so quota failures leave current work intact.
+    saveResearch(merged.threads, activeId);
+    snapshot.current = merged.threads; setThreads(merged.threads);
+    setNotice(`${merged.added} conversations imported. Existing work was preserved. Imported source content has not been revalidated.`);
+  }
+  function exportBackup() {
+    try { download(researchBackup(snapshot.current), "nutritiscan-research-backup.json", "application/json;charset=utf-8"); }
+    catch (e) { setNotice(messageOf(e)); }
+  }
+  async function copy(request: ResearchTurn["request"], reply: ResearchReply, reviews?: SourceReview[], importedAt?: string) { try { await navigator.clipboard.writeText(researchExport(request, reply, reviews, importedAt)); setNotice("Research draft copied with sources, limitations and researcher decisions."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
   function download(content: string, filename: string, type: string) {
     try {
       const url = URL.createObjectURL(new Blob([content], { type }));
@@ -146,16 +161,18 @@ export default function ResearchWorkspace() {
       <AccountControls returnTo="/research" />
     </header>
     <div className="relative flex min-h-0 flex-1">
-      {rail && <><button type="button" aria-label="Close research conversations" onClick={() => setRail(false)} className="absolute inset-0 z-20 bg-black/60 lg:hidden" /><aside aria-label="Research conversations" className="ns-float ns-float-solid absolute bottom-3 left-3 top-3 z-30 flex w-[264px] max-w-[calc(100vw-24px)] shrink-0 flex-col p-4 lg:relative lg:inset-auto lg:m-3">
+      {rail && <><button type="button" aria-label="Close research conversations" onClick={() => setRail(false)} className="absolute inset-0 z-20 bg-black/60 lg:hidden" /><aside aria-label="Research conversations" className="ns-float ns-float-solid absolute bottom-3 left-3 top-3 z-30 flex w-[264px] max-w-[calc(100vw-24px)] shrink-0 flex-col overflow-y-auto p-4 lg:relative lg:inset-auto lg:m-3">
         <div className="mb-4 flex items-center justify-between"><p className="t-label text-[var(--text-dim)]">RESEARCH CONVERSATIONS</p><button type="button" aria-label="Close conversation history" onClick={() => setRail(false)} className="btn-ghost rounded p-1"><X size={15} /></button></div>
         <button type="button" onClick={newConversation} disabled={busy} className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium disabled:opacity-40"><Plus size={14} /> New research</button>
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">{threads.map((t) => <div key={t.id} className={`group flex items-center rounded-xl border ${t.id === activeId ? "border-[var(--border-strong)] bg-[var(--surface)]" : "border-transparent"}`}><button type="button" disabled={busy} onClick={() => open(t)} className="min-w-0 flex-1 px-3 py-3 text-left"><span className="block truncate text-xs">{t.title}</span><span className="mt-1 block text-[10px] text-[var(--text-dim)]">{t.turns.length} questions · on this device</span></button><button type="button" disabled={busy} onClick={() => remove(t.id)} aria-label={`Delete research conversation: ${t.title}`} className="btn-ghost mr-1 rounded-lg p-2"><Trash2 size={13} /></button></div>)}{!threads.length && <p className="text-xs leading-6 text-[var(--text-dim)]">Your research conversations appear here. Health chats are kept separately.</p>}</div>
+        <div className="max-h-[35svh] shrink-0 space-y-2 overflow-y-auto">{threads.map((t) => <div key={t.id} className={`group flex items-center rounded-xl border ${t.id === activeId ? "border-[var(--border-strong)] bg-[var(--surface)]" : "border-transparent"}`}><button type="button" disabled={busy} onClick={() => open(t)} className="min-w-0 flex-1 px-3 py-3 text-left"><span className="block truncate text-xs">{t.title}</span><span className="mt-1 block text-[10px] text-[var(--text-dim)]">{t.turns.length} questions · on this device</span></button><button type="button" disabled={busy} onClick={() => remove(t.id)} aria-label={`Delete research conversation: ${t.title}`} className="btn-ghost mr-1 rounded-lg p-2"><Trash2 size={13} /></button></div>)}{!threads.length && <p className="text-xs leading-6 text-[var(--text-dim)]">Your research conversations appear here. Health chats are kept separately.</p>}</div>
+        <ResearchProjects threads={threads} disabled={busy} onExport={exportBackup} onImport={restoreBackup} />
         <PlanUpsell />
         <p className="mt-4 border-t border-[var(--border)] pt-4 text-[11px] leading-5 text-[var(--text-dim)]">Saved on this device, up to eight conversations. Selected research history goes to the model on follow-up. Your health profile is not included.</p>
       </aside></>}
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-8 sm:py-9">
+            {thread && <ResearchProjectTitle key={thread.id} thread={thread} disabled={busy} onRename={(title) => update(thread.id, (t) => ({ ...t, title, updatedAt: researchTimestamp() }))} />}
             {!thread?.turns.length ? <section className="pb-6 pt-7 sm:pt-14">
               <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--emerald)]"><FlaskConical size={25} strokeWidth={1.5} /></div>
               <p className="t-label mb-3 text-[var(--emerald)]">YOUR HUMAN-BIOLOGY RESEARCH PARTNER</p>
@@ -168,7 +185,7 @@ export default function ResearchWorkspace() {
               <div><div className="mb-4 flex items-center gap-2.5 text-xs font-medium"><span className="grid h-7 w-7 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--emerald)]"><FlaskConical size={14} /></span>NutritiScan Research<span className="ml-auto text-[10px] font-normal text-[var(--text-dim)]">{turn.reply?.model ?? (turn.phase === "working" ? "Researching" : "Public evidence")}</span></div>
                 {turn.phase === "working" && <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="flex items-center gap-2 text-xs text-[var(--emerald)]"><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />{steps.at(-1) ?? "Preparing your research question…"}</p>{steps.length > 1 && <details className="mt-3 text-xs text-[var(--text-dim)]"><summary className="cursor-pointer">View tool activity</summary><ol className="mt-2 space-y-2">{steps.slice(0, -1).map((s, i) => <li key={i}>{s}</li>)}</ol></details>}</div>}
                 {turn.error && <div role="alert" className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-sm leading-6"><p>{turn.error}</p>{index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-3 text-xs font-medium text-[var(--emerald)]">Retry question</button>}</div>}
-                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
+                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExportReferences={() => download(includedSourcesRis(turn.reply!, turn.sourceReviews), "nutritiscan-included-sources.ris", "application/x-research-info-systems;charset=utf-8")} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
                 {turn.reply?.status === "sources-only" && index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--emerald)] disabled:opacity-40">Retry research</button>}
                 {turn.reply && index === thread.turns.length - 1 && <div className="mt-5 flex flex-wrap gap-2">{[{ label: "Challenge the hypothesis", mode: "hypotheses" as const, text: "Challenge the current explanation. Propose competing hypotheses and what evidence would falsify them." }, { label: "Plan an independent test", mode: "study-plan" as const, text: "Plan an independent replication test for the findings above, including confounders, controls and appropriate endpoints." }].map((f) => <button key={f.label} disabled={busy} type="button" onClick={() => { setMode(f.mode); setInput(f.text); composer.current?.focus(); }} className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">{f.label} →</button>)}</div>}
               </div>

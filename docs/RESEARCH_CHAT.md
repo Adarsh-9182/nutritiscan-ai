@@ -36,6 +36,27 @@ information only.
 
 ## Implemented journey
 
+Research conversations can be renamed from the project header. Open conversation
+history to use **Back up all** (versioned JSON) and **Restore backup**. Imports
+preview conversation names before confirmation, preserve existing work, skip
+identical content and keep changed versions separately when IDs collide. Imports
+are rejected atomically if combined history exceeds eight conversations or 1 MB.
+Interrupted runs become stopped and never restart an API call on restore.
+Questions, source metadata, drafts and saved relevance notes roundtrip; unrelated
+health storage, account credentials and cookies are not included.
+
+Imported conversations show a provenance notice: the file's source content and
+earlier AI checks have not been revalidated. A supported schema is not evidence
+of authenticity or scientific accuracy. Use backups from trusted sources.
+
+**Export included · RIS** downloads only records explicitly marked Include,
+regardless of the current list filter. It uses available titles, URLs, IDs, years
+and researcher notes, without inventing author names, journals or DOIs. Trial
+records are generic registry entries, not journal articles or efficacy claims.
+RIS can be imported through Zotero's File → Import; see
+[Zotero's import documentation](https://www.zotero.org/support/kb/importing_standardized_formats).
+Exports are device downloads; automatic account sync is not implemented.
+
 1. Choose Evidence review, Develop hypotheses or Plan a study.
 2. Enter a research message. Automatic search extracts English scientific concepts
    from the current question and earlier user questions when needed. It reuses the

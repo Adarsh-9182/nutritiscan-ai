@@ -18,9 +18,10 @@ export type ResearchTurn = z.infer<typeof ResearchTurnSchema>;
 export const ResearchThreadSchema = z.object({
   id: z.string().max(80), title: z.string().max(160), query: z.string().max(700),
   updatedAt: z.number(), turns: z.array(ResearchTurnSchema).max(12),
+  importedAt: z.iso.datetime().optional(),
 }).strict();
 export type ResearchThread = z.infer<typeof ResearchThreadSchema>;
-const Stored = z.object({ version: z.literal(1), activeId: z.string().nullable(), threads: z.array(ResearchThreadSchema).max(8) }).strict();
+export const ResearchStored = z.object({ version: z.literal(1), activeId: z.string().nullable(), threads: z.array(ResearchThreadSchema).max(8) }).strict();
 export const RESEARCH_STORAGE = "ns-research-chat-v1";
 /** Event-time clock, kept outside React render/state updaters. */
 export const researchTimestamp = () => Date.now();
@@ -29,7 +30,7 @@ export function readResearch() {
   const raw = localStorage.getItem(RESEARCH_STORAGE);
   if (!raw) return { version: 1 as const, activeId: null, threads: [] as ResearchThread[] };
   if (new TextEncoder().encode(raw).length > 1_000_000) throw new Error("Saved research exceeds the storage limit.");
-  const value = Stored.parse(JSON.parse(raw));
+  const value = ResearchStored.parse(JSON.parse(raw));
   value.threads.forEach((thread) => thread.turns.forEach((turn) => {
     if (turn.phase === "working") { turn.phase = "stopped"; turn.reply = null; turn.error = "This run was interrupted. Retry the question to perform a fresh search."; }
   }));
@@ -37,7 +38,7 @@ export function readResearch() {
 }
 
 export function saveResearch(threads: ResearchThread[], activeId: string | null) {
-  const raw = JSON.stringify(Stored.parse({ version: 1, activeId, threads }));
+  const raw = JSON.stringify(ResearchStored.parse({ version: 1, activeId, threads }));
   if (new TextEncoder().encode(raw).length > 1_000_000) throw new Error("Research is open in this tab, but device storage is full. Export your work before closing.");
   localStorage.setItem(RESEARCH_STORAGE, raw);
 }
@@ -57,8 +58,8 @@ export function replyText(reply: ResearchReply): string {
   return lines.join("\n\n");
 }
 
-export function researchExport(request: ResearchTurn["request"], reply: ResearchReply, reviews: SourceReview[] = []) {
-  return `NutritiScan research draft\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}\n\n${sourceReviewText(reply, reviews)}`;
+export function researchExport(request: ResearchTurn["request"], reply: ResearchReply, reviews: SourceReview[] = [], importedAt?: string) {
+  return `NutritiScan research draft${importedAt ? " — imported backup; sources and AI checks have not been revalidated" : ""}\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}\n\n${sourceReviewText(reply, reviews)}`;
 }
 
 /** Bounded NDJSON consumer: an interrupted stream never becomes a completed turn. */

@@ -7,10 +7,10 @@ import { REVIEW_LABELS, sourceReviewCounts, type SourceReview } from "@/lib/rese
 const CHOICES = [{ decision: "include", icon: Check }, { decision: "exclude", icon: X }, { decision: "needs-review", icon: CircleHelp }] as const;
 type Filter = "all" | "unreviewed" | SourceReview["decision"];
 
-export function ResearchSourceReview({ reply, reviews = [], disabled, onReview, onInspect, onExport }: {
+export function ResearchSourceReview({ reply, reviews = [], disabled, onReview, onInspect, onExport, onExportReferences }: {
   reply: ResearchReply; reviews?: SourceReview[]; disabled: boolean;
   onReview: (sourceId: string, value: { decision: SourceReview["decision"]; note: string } | null) => void;
-  onInspect: (source: AgentSource) => void; onExport: () => void;
+  onInspect: (source: AgentSource) => void; onExport: () => void; onExportReferences: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   if (!reply.sources.length) return null;
@@ -26,9 +26,10 @@ export function ResearchSourceReview({ reply, reviews = [], disabled, onReview, 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="text-[11px] text-[var(--text-dim)]">Show records<select aria-label="Filter source decisions" value={filter} onChange={(e) => setFilter(e.target.value as Filter)} className="ml-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-xs text-[var(--text)]"><option value="all">All ({reply.sources.length})</option><option value="unreviewed">Unreviewed ({counts.unreviewed})</option>{Object.entries(REVIEW_LABELS).map(([key, label]) => <option key={key} value={key}>{label} ({counts[key as SourceReview["decision"]]})</option>)}</select></label>
         <button type="button" onClick={onExport} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-[11px] text-[var(--emerald)]"><Download size={13} />Export all sources · CSV</button>
+        <button type="button" disabled={!counts.include} onClick={onExportReferences} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-[11px] text-[var(--emerald)] disabled:opacity-40"><Download size={13} />Export included · RIS</button>
       </div>
       <div className="space-y-3">{visible.map((source) => <SourceReviewRow key={source.id} source={source} review={reviews.find((r) => r.sourceId === source.id)} disabled={disabled} onReview={(value) => onReview(source.id, value)} onInspect={() => onInspect(source)} />)}{!visible.length && <p className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-xs text-[var(--text-dim)]">No records with this decision. Choose another filter to continue.</p>}</div>
-      <p className="text-[11px] leading-6 text-[var(--text-dim)]">Saved in this browser with this question. A fresh retry clears these decisions. Your marks do not change the AI draft, grade study quality or validate a result. Review notes stay on this device and are not sent to the AI.</p>
+      <p className="text-[11px] leading-6 text-[var(--text-dim)]">RIS exports included records for reference managers such as Zotero, using available metadata only. Saved in this browser with this question. A fresh retry clears these decisions. Your marks do not change the AI draft, grade study quality or validate a result. Review notes stay on this device and are not sent to the AI.</p>
     </div>
   </details>;
 }
