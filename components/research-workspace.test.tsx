@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import ResearchWorkspace from "./research-workspace";
 import { reply, streamReply } from "@/lib/research/test-fixtures";
+import { readResearch } from "@/lib/research/client";
 
 const question = "Investigate metabolic aging in humans";
 beforeEach(() => {
@@ -16,6 +17,49 @@ async function ask(text = question) {
 }
 
 describe("chat-first Research Workspace", () => {
+  it("saves manual source decisions and notes, filters them, and restores them without changing the draft", async () => {
+    const view = render(<ResearchWorkspace />); await ask();
+    fireEvent.click(screen.getByText("Review sources"));
+    const panel = screen.getByRole("region", { name: "Researcher source review" });
+    expect(within(panel).getByText("Unreviewed · 1")).toBeVisible();
+    fireEvent.click(within(panel).getByRole("button", { name: "Exclude" }));
+    fireEvent.change(within(panel).getByRole("textbox", { name: "Review note: Synthetic cohort study" }), { target: { value: "Synthetic note: wrong population." } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Save note" }));
+    expect(readResearch().threads[0].turns[0].sourceReviews?.[0]).toMatchObject({ decision: "exclude", note: "Synthetic note: wrong population." });
+    expect(screen.getByRole("region", { name: "Evidence findings" })).toHaveTextContent(reply.answer!.findings[0].text);
+    fireEvent.change(within(panel).getByRole("combobox", { name: "Filter source decisions" }), { target: { value: "include" } });
+    expect(within(panel).getByText(/No records with this decision/)).toBeVisible();
+    view.unmount(); render(<ResearchWorkspace />);
+    fireEvent.click(await screen.findByText("Review sources"));
+    expect(screen.getByRole("button", { name: "Exclude" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "Review note: Synthetic cohort study" })).toHaveValue("Synthetic note: wrong population.");
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(readResearch().threads[0].turns[0].sourceReviews).toEqual([]);
+  });
+  it("keeps review notes out of model context and binds decisions to their own question", async () => {
+    render(<ResearchWorkspace />); await ask();
+    fireEvent.click(screen.getByText("Review sources"));
+    fireEvent.click(screen.getByRole("button", { name: "Include" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Review note: Synthetic cohort study" }), { target: { value: "local-review-marker-917" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    await ask("Compare with another synthetic population");
+    const calls = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(calls[1][1]?.body).not.toContain("local-review-marker-917");
+    const turns = readResearch().threads[0].turns;
+    expect(turns[0].sourceReviews?.[0].decision).toBe("include");
+    expect(turns[1].sourceReviews).toBeUndefined();
+  });
+  it("clears source decisions on a fresh retry even when source IDs are reused", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => init?.method === "POST" ? streamReply({ ...reply, answer: null, model: null, status: "sources-only" }) : Response.json({ configured: true })));
+    render(<ResearchWorkspace />); await screen.findByLabelText("Research message");
+    fireEvent.change(screen.getByLabelText("Research message"), { target: { value: question } });
+    fireEvent.click(screen.getByRole("button", { name: "Send research message" }));
+    fireEvent.click(await screen.findByText("Review sources"));
+    fireEvent.click(screen.getByRole("button", { name: "Needs review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry research" }));
+    expect(await screen.findByText("Review sources")).toBeInTheDocument();
+    expect(readResearch().threads[0].turns[0].sourceReviews).toBeUndefined();
+  });
   it("renders the health-chat style entry and sends a source-grounded research turn", async () => {
     render(<ResearchWorkspace />);
     expect(await screen.findByRole("heading", { name: /What should we investigate together/ })).toBeVisible();

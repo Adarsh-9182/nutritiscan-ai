@@ -5,6 +5,35 @@ dark/mint theme, full-height transcript and bottom composer as Health chat.
 Research conversations have their own storage key and do not read health
 profiles, meals, health conversations or Agent Studio saved results.
 
+## Manual source review
+
+Each completed question has a **Review sources** panel, including sources-only
+results when AI drafting is unavailable. Researchers can mark each record Include,
+Exclude or Needs review, add a reason (up to 1,000 characters), and reset a mark.
+Unreviewed means no decision has been made; it is distinct from Needs review.
+Counts and a filter help work through up to ten retrieved records.
+
+Decisions belong to that question's retrieved result. They persist in the existing
+browser history, with source IDs and UTC decision timestamps. Old histories without
+decisions still load. A fresh retry clears decisions even if the new retrieval
+returns the same source IDs. Storage rejects unknown source references, duplicate
+marks, invalid timestamps and oversized notes. Existing history limits still apply:
+eight conversations, twelve questions each and one megabyte total. Storage failures
+are surfaced in the workspace; this is not account sync or a durable audit log.
+
+**Export all sources · CSV** exports every source regardless of the active filter,
+including the question, original URL, retrieval time, decision, note and review
+time. CSV cells are quoted and spreadsheet formula prefixes are neutralized.
+Copy with sources and Export research also include saved decisions after the AI
+draft. Review notes are never included in model context or research API requests;
+review actions make no model calls.
+
+These are manual relevance decisions. They do not remove findings from the AI
+draft, rate evidence certainty or risk of bias, validate a result, or constitute a
+systematic review. AI source checking and researcher relevance decisions remain
+separate. Notes become part of downloaded/copied exports, so use public research
+information only.
+
 ## Implemented journey
 
 1. Choose Evidence review, Develop hypotheses or Plan a study.

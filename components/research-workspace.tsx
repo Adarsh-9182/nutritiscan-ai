@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { ArrowUp, BookOpen, ChevronRight, Copy, Download, FlaskConical, HeartPulse, History, Lightbulb, LoaderCircle, Moon, PanelLeft, Plus, Search, SlidersHorizontal, Square, Sun, Trash2, X } from "lucide-react";
 import type { AgentSource } from "@/lib/agent-runtime/contracts";
 import type { ResearchReply, ResearchRequest } from "@/lib/research/contracts";
 import { consumeResearch, readResearch, replyText, researchExport, researchTimestamp, saveResearch, type ResearchThread, type ResearchTurn } from "@/lib/research/client";
 import { ResearchEvidence } from "./research-evidence";
+import { ResearchSourceReview } from "./research-source-review";
+import { SourceReviewSchema, sourceReviewCsv, type SourceReview } from "@/lib/research/source-review";
 import AccountControls from "./account-controls";
 import { PlanUpsell } from "./plan-cards";
 
@@ -114,11 +116,19 @@ export default function ResearchWorkspace() {
     catch { setNotice("Theme changed for this tab. This device could not save your theme preference."); }
   }
   function remove(id: string) { if (locked.current) return; const next = snapshot.current.filter((t) => t.id !== id); const selected = activeId === id ? null : activeId; persist(next, selected); if (!selected) { setActiveId(null); setQuery(""); setInspected(null); } }
-  async function copy(request: ResearchTurn["request"], reply: ResearchReply) { try { await navigator.clipboard.writeText(researchExport(request, reply)); setNotice("Research draft copied with sources and limitations."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
-  function download(request: ResearchTurn["request"], reply: ResearchReply) {
+  function reviewSource(turnId: string, sourceId: string, value: { decision: SourceReview["decision"]; note: string } | null) {
+    if (locked.current || !activeId) return;
+    const current = snapshot.current.find((t) => t.id === activeId)?.turns.find((t) => t.id === turnId);
+    if (current?.phase !== "done" || !current.reply?.sources.some((s) => s.id === sourceId)) return;
+    const updatedAt = new Date(researchTimestamp()).toISOString();
+    const review = value ? SourceReviewSchema.parse({ ...value, sourceId, updatedAt }) : null;
+    update(activeId, (t) => ({ ...t, turns: t.turns.map((v) => v.id === turnId ? { ...v, sourceReviews: [...(v.sourceReviews ?? []).filter((r) => r.sourceId !== sourceId), ...(review ? [review] : [])] } : v) }));
+  }
+  async function copy(request: ResearchTurn["request"], reply: ResearchReply, reviews?: SourceReview[]) { try { await navigator.clipboard.writeText(researchExport(request, reply, reviews)); setNotice("Research draft copied with sources, limitations and researcher decisions."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
+  function download(content: string, filename: string, type: string) {
     try {
-      const url = URL.createObjectURL(new Blob([researchExport(request, reply)], { type: "text/plain;charset=utf-8" }));
-      const a = document.createElement("a"); a.href = url; a.download = "nutritiscan-research.txt"; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setNotice("Research export prepared; browser download requested.");
     } catch { setNotice("The browser could not prepare the research export."); }
   }
@@ -158,7 +168,7 @@ export default function ResearchWorkspace() {
               <div><div className="mb-4 flex items-center gap-2.5 text-xs font-medium"><span className="grid h-7 w-7 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--emerald)]"><FlaskConical size={14} /></span>NutritiScan Research<span className="ml-auto text-[10px] font-normal text-[var(--text-dim)]">{turn.reply?.model ?? (turn.phase === "working" ? "Researching" : "Public evidence")}</span></div>
                 {turn.phase === "working" && <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="flex items-center gap-2 text-xs text-[var(--emerald)]"><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />{steps.at(-1) ?? "Preparing your research question…"}</p>{steps.length > 1 && <details className="mt-3 text-xs text-[var(--text-dim)]"><summary className="cursor-pointer">View tool activity</summary><ol className="mt-2 space-y-2">{steps.slice(0, -1).map((s, i) => <li key={i}>{s}</li>)}</ol></details>}</div>}
                 {turn.error && <div role="alert" className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-sm leading-6"><p>{turn.error}</p>{index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-3 text-xs font-medium text-[var(--emerald)]">Retry question</button>}</div>}
-                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!)} onExport={() => download(turn.request, turn.reply!)} />}
+                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
                 {turn.reply?.status === "sources-only" && index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--emerald)] disabled:opacity-40">Retry research</button>}
                 {turn.reply && index === thread.turns.length - 1 && <div className="mt-5 flex flex-wrap gap-2">{[{ label: "Challenge the hypothesis", mode: "hypotheses" as const, text: "Challenge the current explanation. Propose competing hypotheses and what evidence would falsify them." }, { label: "Plan an independent test", mode: "study-plan" as const, text: "Plan an independent replication test for the findings above, including confounders, controls and appropriate endpoints." }].map((f) => <button key={f.label} disabled={busy} type="button" onClick={() => { setMode(f.mode); setInput(f.text); composer.current?.focus(); }} className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">{f.label} →</button>)}</div>}
               </div>
@@ -183,7 +193,7 @@ export default function ResearchWorkspace() {
   </div>;
 }
 
-function ResearchAnswer({ reply, onInspect, onCopy, onExport }: { reply: ResearchReply; onInspect: (source: AgentSource, quote?: string) => void; onCopy: () => void; onExport: () => void }) {
+function ResearchAnswer({ reply, onInspect, onCopy, onExport, sourceReview }: { reply: ResearchReply; onInspect: (source: AgentSource, quote?: string) => void; onCopy: () => void; onExport: () => void; sourceReview: ReactNode }) {
   const answer = reply.answer;
   const citations = (ids: string[], excerpts?: { sourceId: string; quote: string }[]) => <div className="mt-2 flex flex-wrap gap-2">{ids.map((id) => { const index = reply.sources.findIndex((s) => s.id === id); const source = reply.sources[index]; return source ? <button key={id} type="button" onClick={() => onInspect(source, excerpts?.find((e) => e.sourceId === id)?.quote)} aria-label={`Inspect citation ${index + 1}: ${source.title}`} className="rounded-md border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--emerald)]">[{index + 1}] {source.kind === "trial" ? "Registry" : "PubMed"} ↗</button> : null; })}</div>;
   return <div className="space-y-5 break-words">
@@ -191,6 +201,7 @@ function ResearchAnswer({ reply, onInspect, onCopy, onExport }: { reply: Researc
     {answer?.findings.length ? <section aria-label="Evidence findings" className="space-y-4">{answer.findings.map((finding, i) => <div key={i}><p className="whitespace-pre-wrap text-sm leading-7 text-[var(--text-muted)]">{finding.text}</p>{citations(finding.sourceIds, finding.excerpts)}</div>)}</section> : null}
     {answer?.hypotheses.length ? <section aria-label="Untested hypotheses" className="space-y-3"><h3 className="flex items-center gap-2 text-xs font-medium"><Lightbulb size={14} className="text-[var(--emerald)]" /> Untested hypotheses</h3>{answer.hypotheses.map((h, i) => <details key={i} open className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><summary className="cursor-pointer text-sm font-medium leading-6">{h.title}</summary><p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">{h.rationale}</p><dl className="mt-4 space-y-3 text-xs leading-6">{[["Prediction", h.prediction], ["Competing explanation", h.alternative], ["What would falsify it?", h.falsification]].map(([label, text]) => <div key={label}><dt className="font-medium text-[var(--text)]">{label}</dt><dd className="text-[var(--text-muted)]">{text}</dd></div>)}</dl>{citations(h.sourceIds)}</details>)}</section> : null}
     {answer?.plan.length ? <section aria-label="Proposed study plan" className="rounded-xl border border-[var(--border)] p-4"><h3 className="mb-3 text-xs font-medium">Proposed study plan · not executed</h3><ol className="list-decimal space-y-3 pl-5 text-sm leading-7 text-[var(--text-muted)]">{answer.plan.map((step, i) => <li key={i}>{step}</li>)}</ol></section> : null}
+    {sourceReview}
     <ResearchEvidence reply={reply} onInspect={onInspect} />
     {answer && <details className="text-xs leading-6"><summary className="cursor-pointer font-medium text-[var(--text-muted)]">Uncertainty and limitations</summary><ul className="mt-3 list-disc space-y-2 pl-4 text-[var(--text-dim)]">{answer.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul></details>}
     <p className="rounded-xl bg-[var(--surface)] p-3 text-[11px] leading-6 text-[var(--text-dim)]">{reply.notice}</p>

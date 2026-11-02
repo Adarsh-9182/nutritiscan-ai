@@ -1,11 +1,19 @@
 import { z } from "zod";
 import { ResearchChatRequest, ResearchEvent, ResearchResult, type ResearchReply, type ResearchStreamEvent } from "./contracts";
+import { SourceReviewsSchema, sourceReviewText, type SourceReview } from "./source-review";
 
 export const ResearchTurnSchema = z.object({
   id: z.string().max(80), request: ResearchChatRequest.omit({ history: true }),
   phase: z.enum(["working", "done", "stopped", "failed"]),
   reply: ResearchResult.nullable(), error: z.string().max(1000).optional(),
-}).strict();
+  sourceReviews: SourceReviewsSchema.optional(),
+}).strict().superRefine((turn, context) => {
+  for (const review of turn.sourceReviews ?? []) {
+    if (turn.phase !== "done" || !turn.reply?.sources.some((source) => source.id === review.sourceId)) {
+      context.addIssue({ code: "custom", path: ["sourceReviews"], message: "Source decisions must refer to this completed research result." });
+    }
+  }
+});
 export type ResearchTurn = z.infer<typeof ResearchTurnSchema>;
 export const ResearchThreadSchema = z.object({
   id: z.string().max(80), title: z.string().max(160), query: z.string().max(700),
@@ -49,8 +57,8 @@ export function replyText(reply: ResearchReply): string {
   return lines.join("\n\n");
 }
 
-export function researchExport(request: ResearchTurn["request"], reply: ResearchReply) {
-  return `NutritiScan research draft\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}`;
+export function researchExport(request: ResearchTurn["request"], reply: ResearchReply, reviews: SourceReview[] = []) {
+  return `NutritiScan research draft\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}\n\n${sourceReviewText(reply, reviews)}`;
 }
 
 /** Bounded NDJSON consumer: an interrupted stream never becomes a completed turn. */
