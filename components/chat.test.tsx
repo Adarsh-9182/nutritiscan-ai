@@ -188,3 +188,17 @@ describe("conversations", () => {
     expect(screen.getByText(/what would you like help with/i)).toBeInTheDocument();
   });
 });
+
+
+describe("agent provenance in saved answers", () => {
+  it("labels reference content and hides simulated consultation activity", async () => {
+    const existing = readActiveThread();
+    const assistant = { id: "reference", role: "assistant", parts: [{ type: "data-mode", data: { mode: "demo" } }, { type: "data-trace", data: { agents: ["nutrition"], done: true } }, { type: "text", text: "Synthetic reference answer." }] } as UIMessage;
+    saveThread(existing.id, [msg("user", "Explain dietary fibre"), assistant]);
+    render(<Chat profile={demoProfile} />);
+    expect(await transcript().findByText("Reference guidance")).toBeInTheDocument();
+    expect(transcript().getByText(/No AI answer was generated/)).toBeInTheDocument();
+    expect(transcript().queryByText("consulted")).not.toBeInTheDocument();
+    expect(transcript().queryByText("Agent team")).not.toBeInTheDocument();
+  });
+});

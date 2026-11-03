@@ -387,16 +387,11 @@ function writeNote(writer: UIMessageStreamWriter, state: ClinicalState) {
 
 /**
  * Demo brain — a safe, structured, keyless answer streamed word by word,
- * with the specialist trace the UI renders.
+ * without claiming a model consultation.
  */
 async function streamDemo(writer: UIMessageStreamWriter, userText: string, profile: HealthProfile, meals: LoggedMeal[], state: ClinicalState, signal: AbortSignal) {
-  const route = routeOf(userText);
-  const consulting = route === "supervisor" ? [] : [route];
-
-  if (consulting.length) {
-    writer.write({ type: "data-trace", id: "trace", data: { agents: consulting, done: false } });
-    await sleep(550, signal);
-  }
+  // Clear any failed model-attempt trace. Reference lookup does not consult agents.
+  writer.write({ type: "data-trace", id: "trace", data: { agents: [], done: true } });
 
   const id = `msg-${Date.now()}`;
   writer.write({ type: "text-start", id });
@@ -407,9 +402,6 @@ async function streamDemo(writer: UIMessageStreamWriter, userText: string, profi
   }
   writer.write({ type: "text-end", id });
 
-  if (consulting.length) {
-    writer.write({ type: "data-trace", id: "trace", data: { agents: consulting, done: true } });
-  }
 }
 
 /** Abort-aware delay, so a disconnected client stops costing us a timer. */

@@ -24,7 +24,7 @@ not inferred. Scientific validity is not established by schema or software tests
 
 ## Verification
 
-- Full local suite: 667 unit/integration tests, 51 UI tests and 44 offline gate
+- Full local suite: 670 unit/integration tests, 52 UI tests and 44 offline gate
   checks passed; production build passed. All 31 API backend tests passed. Live model evals are separate from the
   offline gate and are not included in those numbers.
 - Isolated browser flow at 1440, 390 and 320 pixels: decisions, notes, source
@@ -35,6 +35,12 @@ not inferred. Scientific validity is not established by schema or software tests
 - Live synthetic account smoke: signup, root HttpOnly session cookies, shared
   identity and free-plan read, logout revocation, login, account deletion and
   session revocation. The temporary account was removed.
+- Live research account checks passed private reads, owner/account binding,
+  simultaneous-save conflicts, delete tombstones, logout revocation and sign-in
+  restoration. Both temporary accounts were removed.
+- Health chat roles are described in [HEALTH_AGENTS.md](HEALTH_AGENTS.md).
+  Reference fallback and deterministic safety responses do not claim AI specialist
+  consultations. The user-facing Doctor Agent label is Health information.
 - One live public research question returned six PubMed and four registry
   records and two model-assisted findings. Gemini 3.6 was unavailable; the
   existing Gemini 3.5 Flash-Lite fallback completed. This is a functional check,

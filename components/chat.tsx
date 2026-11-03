@@ -9,6 +9,7 @@ import { Plus } from "lucide-react";
 import { routeOf } from "@/lib/agents/demo";
 import { followUps } from "@/lib/agents/followups";
 import { attachedHealthFileFromMessage, questionWithoutHealthFile, withHealthFile, type AttachedHealthFile } from "@/lib/chat/file-context";
+import { answerMode, tracesFor, type AgentTrace as Trace } from "@/lib/chat/agent-trace";
 import { agentColor, agentGlyph, agentName } from "@/lib/agents-meta";
 import { AgentConstellation, AgentRun } from "@/components/agent-orbit";
 import { actionPartsOf, applyActions } from "@/lib/memory/apply-actions";
@@ -121,29 +122,6 @@ function ActionChips({ parts }: { parts: ReturnType<typeof actionPartsOf> }) {
   );
 }
 
-// Extract the "which specialists were consulted" trace from a message.
-// Demo mode → data-trace part; real mode → tool-ask* parts.
-const TOOL_MAP: Record<string, string> = {
-  asknutritionagent: "nutrition",
-  askfitnessagent: "fitness",
-  askdoctoragent: "doctor",
-  asklabagent: "lab",
-  askcoachagent: "coach",
-};
-type Trace = { agents: string[]; done: boolean; source: "demo" | "real" };
-
-function tracesFor(m: { parts: unknown[] }): Trace | null {
-  const parts = m.parts as { type: string; data?: { agents?: string[]; done?: boolean }; state?: string }[];
-  const d = parts.find((p) => p.type === "data-trace");
-  if (d?.data?.agents?.length) return { agents: d.data.agents, done: !!d.data.done, source: "demo" };
-  const toolParts = parts.filter((p) => typeof p.type === "string" && p.type.startsWith("tool-ask"));
-  if (toolParts.length) {
-    const agents = [...new Set(toolParts.map((p) => TOOL_MAP[p.type.slice(5).toLowerCase()]).filter(Boolean))];
-    const done = toolParts.every((p) => p.state === "output-available" || p.state === "output-error");
-    if (agents.length) return { agents, done, source: "real" };
-  }
-  return null;
-}
 
 /**
  * The consult note.
@@ -576,30 +554,8 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
     deleteThread(thread.id);
   };
 
-  /**
-   * Which specialist to credit an assistant message to.
-   *
-   * This used to run the *demo* router over the preceding user message
-   * regardless of which brain actually answered. In real multi-agent mode
-   * that meant the badge could read "Doctor Agent" on an answer the
-   * supervisor had routed to Nutrition — a wrong clinical attribution shown
-   * with full confidence.
-   *
-   * Now the demo trace is the only thing that licenses a specialist badge.
-   * A real answer is credited to the Supervisor, which is what actually
-   * composed it, and the consulted specialists appear in the trace chips
-   * where they are known for certain.
-   */
-  const badgeFor = (idx: number, trace: Trace | null) => {
-    if (trace?.source === "real") return "supervisor";
-    for (let i = idx - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        const t = messages[i].parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join(" ");
-        return routeOf(questionWithoutHealthFile(t));
-      }
-    }
-    return "supervisor";
-  };
+  /** Attribute direct model answers to their recorded role; synthesis stays with NutritiScan. */
+  const badgeFor = (trace: Trace | null) => trace?.source === "direct" && trace.agents.length === 1 ? trace.agents[0] : "supervisor";
 
   const empty = messages.length === 0;
 
@@ -816,9 +772,10 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                   );
                 }
 
+                const mode = answerMode(m);
                 const trace = tracesFor(m);
                 const note = noteFor(m);
-                const route = badgeFor(idx, trace);
+                const route = badgeFor(trace);
                 const color = agentColor(route);
                 return (
                   <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group">
@@ -827,7 +784,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                         {route === "supervisor" ? <Plus size={13} strokeWidth={2.5} aria-hidden="true" /> : agentGlyph(route)}
                       </span>
                       <span className="t-label font-medium" style={{ color }}>
-                        {route === "supervisor" ? "Supervisor" : agentName(route)}
+                        {mode === "demo" ? "Reference guidance" : mode === "safety" ? "Safety guidance" : route === "supervisor" ? "NutritiScan" : agentName(route)}
                       </span>
                       {trace && (
                         <span className="flex flex-wrap items-center gap-1.5">
@@ -860,7 +817,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                     <div className="pl-8">
                       {/* The live team readout: on the turn being answered, and
                           kept afterwards on any answer the specialists fed. */}
-                      {(trace || (busy && idx === messages.length - 1)) && (
+                      {trace && (
                         <AgentRun
                           agents={trace?.agents ?? []}
                           consultDone={trace?.done ?? false}
@@ -868,6 +825,7 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                           live={busy && idx === messages.length - 1}
                         />
                       )}
+                      {mode === "demo" && <p className="mb-3 text-[11px] leading-6 text-[var(--text-dim)]">Built-in educational reference content. No AI answer was generated for this turn.</p>}
                       <ActionChips parts={actionPartsOf(m)} />
                       {text ? <Markdown text={text} /> : <span className="typing-caret text-sm text-[var(--text-dim)]" />}
                       {note && <ConsultNote note={note} />}
