@@ -19,14 +19,15 @@ decisions still load. A fresh retry clears decisions even if the new retrieval
 returns the same source IDs. Storage rejects unknown source references, duplicate
 marks, invalid timestamps and oversized notes. Existing history limits still apply:
 eight conversations, twelve questions each and one megabyte total. Storage failures
-are surfaced in the workspace; this is not account sync or a durable audit log.
+are surfaced in the workspace. Optional encrypted account snapshots are described
+below; there is no automatic background sync or durable scientific audit log.
 
 **Export all sources · CSV** exports every source regardless of the active filter,
 including the question, original URL, retrieval time, decision, note and review
 time. CSV cells are quoted and spreadsheet formula prefixes are neutralized.
 Copy with sources and Export research also include saved decisions after the AI
-draft. Review notes are never included in model context or research API requests;
-review actions make no model calls.
+draft. Review notes are never included in model context or inference API requests;
+review actions make no model calls. Explicit account snapshots include saved notes.
 
 These are manual relevance decisions. They do not remove findings from the AI
 draft, rate evidence certainty or risk of bias, validate a result, or constitute a
@@ -55,7 +56,8 @@ and researcher notes, without inventing author names, journals or DOIs. Trial
 records are generic registry entries, not journal articles or efficacy claims.
 RIS can be imported through Zotero's File → Import; see
 [Zotero's import documentation](https://www.zotero.org/support/kb/importing_standardized_formats).
-Exports are device downloads; automatic account sync is not implemented.
+Exports are device downloads. Manual encrypted account snapshots are available;
+automatic background sync is not implemented.
 
 1. Choose Evidence review, Develop hypotheses or Plan a study.
 2. Enter a research message. Automatic search extracts English scientific concepts
@@ -212,3 +214,31 @@ mode scopes its backgrounds, panels, text, borders, citations, controls and hero
 heading to Research; the original dark green palette remains selectable. The
 light text/accent palette clears 4.5:1 contrast on its intended surfaces. Saved
 appearance does not enter research requests or Health profile data.
+
+## Account research snapshots
+
+Conversation history contains an Account research backup panel. Signed-in users
+first check the existing snapshot, then explicitly save device research or restore
+the account snapshot. Saving requires a fresh explicit storage choice; replacing
+an existing account snapshot is stated alongside that choice. Restore uses the
+same non-destructive merge/capacity checks as file imports. There is no automatic
+upload, automatic restore or background synchronization. Public research runs and
+file backups still work without signing in.
+
+The web `/api/research/backup` route validates the complete versioned backup,
+requires same-origin writes, verifies the live account session and binds mutations
+to the inspected account ID. A changed account or revision fails closed. The API
+service stores one encrypted snapshot in `research_workspaces`, using the existing
+account encryption key with owner-and-purpose associated data. It does not read
+health records, grant health-storage consent or send notes to a model. The API
+requires an explicit research-storage choice and caps uploads; web reads validate
+the full schema again before restoration. The backend stores a bounded opaque
+snapshot envelope, not independently verified scientific claims.
+
+Concurrent writes use a single conditional database update. Deletes retain an
+empty revision tombstone so stale clients cannot recreate deleted content. Account
+deletion removes the snapshot and tombstone in the account-deletion transaction.
+Research response bodies are never cached. The existing API pre-deploy migration
+adds only the new table; deployment requires updating the account API before the
+web UI. `node scripts/smoke-research-account.mjs` verifies isolated synthetic
+accounts, conflicts, delete/recreate, logout revocation and sign-in restoration.

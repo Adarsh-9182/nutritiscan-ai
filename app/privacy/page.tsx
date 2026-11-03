@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 9 OCTOBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 3 NOVEMBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
         NutritiScan offers a public health conversation, a local Android journal,
@@ -45,6 +45,24 @@ export default function Page() {
         to remove every saved demo case.
       </p>
 
+      <h2>Research conversations and account backups</h2>
+      <p>
+        Research history and saved source-review notes stay in this browser until
+        you choose to save an account snapshot or download a backup file. Account
+        snapshots contain the selected device research history, source records,
+        drafts and saved notes. They are stored encrypted by the account service
+        and accessed using your signed-in account. Health profiles, meal logs and
+        health chats are not included. Research backup actions do not call an AI model.
+      </p>
+      <p>
+        You can preview and restore the account snapshot on another device, or
+        explicitly delete it from Research conversation history. Deleting the
+        snapshot does not erase device copies or downloaded files. Account deletion
+        removes the stored research snapshot as well. Hosting backup copies follow
+        the host’s retention policy. Research searches and model-assisted follow-ups
+        still send their selected public research context to configured sources and
+        AI providers; saved source-review notes are excluded from model context.
+      </p>
       <h2>What is sent when you chat</h2>
       <p>
         When you send a message, the chat sends recent conversation messages

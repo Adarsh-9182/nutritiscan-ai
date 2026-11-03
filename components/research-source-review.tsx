@@ -29,7 +29,7 @@ export function ResearchSourceReview({ reply, reviews = [], disabled, onReview, 
         <button type="button" disabled={!counts.include} onClick={onExportReferences} className="flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-[11px] text-[var(--emerald)] disabled:opacity-40"><Download size={13} />Export included · RIS</button>
       </div>
       <div className="space-y-3">{visible.map((source) => <SourceReviewRow key={source.id} source={source} review={reviews.find((r) => r.sourceId === source.id)} disabled={disabled} onReview={(value) => onReview(source.id, value)} onInspect={() => onInspect(source)} />)}{!visible.length && <p className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-xs text-[var(--text-dim)]">No records with this decision. Choose another filter to continue.</p>}</div>
-      <p className="text-[11px] leading-6 text-[var(--text-dim)]">RIS exports included records for reference managers such as Zotero, using available metadata only. Saved in this browser with this question. A fresh retry clears these decisions. Your marks do not change the AI draft, grade study quality or validate a result. Review notes stay on this device and are not sent to the AI.</p>
+      <p className="text-[11px] leading-6 text-[var(--text-dim)]">RIS exports included records for reference managers such as Zotero, using available metadata only. Saved in this browser with this question. A fresh retry clears these decisions. Your marks do not change the AI draft, grade study quality or validate a result. Review notes are not sent to the AI. Account snapshots include saved notes only when you choose to save them.</p>
     </div>
   </details>;
 }

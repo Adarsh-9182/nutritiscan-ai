@@ -27,10 +27,10 @@ export const AGENTS: AgentMeta[] = [
   },
   {
     id: "doctor",
-    name: "Doctor Agent",
+    name: "Health information",
     glyph: "🩺",
     color: "#60a5fa",
-    tagline: "Reasons with care",
+    tagline: "Explains health questions",
     knows: ["Symptom triage", "Risk flags", "General conditions", "Follow-ups"],
   },
   {

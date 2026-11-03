@@ -43,6 +43,7 @@ from .database import (
     GitHubIdentity,
     OAuthLinkIntent,
     Resource,
+    ResearchWorkspace,
     audit,
     connect,
     new_id,
@@ -61,6 +62,7 @@ from .schemas import (
     RecordInput,
 )
 from .social import install_social_routes, social_account
+from .research import install_research_routes
 from .storage import DocumentStorage
 from .supervisor import supervisor
 
@@ -164,6 +166,7 @@ def create_app(settings=None):
         return user
 
     install_social_routes(app, settings, cipher, db_session, account, rate_limit, lambda token, client_id: verify_google_credential(token, client_id))
+    install_research_routes(app, cipher, db_session, account)
 
     def permitted(user=Depends(account), db=Depends(db_session)):
         consent = db.get(Consent, user.id)
@@ -729,7 +732,7 @@ def create_app(settings=None):
             storage.delete(d.object_key)
         for identity_model in (GoogleIdentity, GitHubIdentity, OAuthLinkIntent):
             db.execute(delete(identity_model).where(identity_model.owner == user.id))
-        for model in (Resource, Document, Conversation, Consent, LoginSession, Audit):
+        for model in (Resource, Document, Conversation, ResearchWorkspace, Consent, LoginSession, Audit):
             db.execute(delete(model).where(model.owner == user.id))
         db.delete(user)
         db.commit()

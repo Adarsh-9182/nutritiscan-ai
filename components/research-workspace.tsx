@@ -9,6 +9,7 @@ import { consumeResearch, readResearch, replyText, researchExport, researchTimes
 import { researchBackup, mergeResearchBackup, type ResearchBackup } from "@/lib/research/backup";
 import { includedSourcesRis } from "@/lib/research/references";
 import { ResearchProjects, ResearchProjectTitle } from "./research-projects";
+import { ResearchCloud } from "./research-cloud";
 import { ResearchEvidence } from "./research-evidence";
 import { ResearchSourceReview } from "./research-source-review";
 import { SourceReviewSchema, sourceReviewCsv, type SourceReview } from "@/lib/research/source-review";
@@ -166,6 +167,7 @@ export default function ResearchWorkspace() {
         <button type="button" onClick={newConversation} disabled={busy} className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium disabled:opacity-40"><Plus size={14} /> New research</button>
         <div className="max-h-[35svh] shrink-0 space-y-2 overflow-y-auto">{threads.map((t) => <div key={t.id} className={`group flex items-center rounded-xl border ${t.id === activeId ? "border-[var(--border-strong)] bg-[var(--surface)]" : "border-transparent"}`}><button type="button" disabled={busy} onClick={() => open(t)} className="min-w-0 flex-1 px-3 py-3 text-left"><span className="block truncate text-xs">{t.title}</span><span className="mt-1 block text-[10px] text-[var(--text-dim)]">{t.turns.length} questions · on this device</span></button><button type="button" disabled={busy} onClick={() => remove(t.id)} aria-label={`Delete research conversation: ${t.title}`} className="btn-ghost mr-1 rounded-lg p-2"><Trash2 size={13} /></button></div>)}{!threads.length && <p className="text-xs leading-6 text-[var(--text-dim)]">Your research conversations appear here. Health chats are kept separately.</p>}</div>
         <ResearchProjects threads={threads} disabled={busy} onExport={exportBackup} onImport={restoreBackup} />
+        <ResearchCloud threads={threads} disabled={busy} onRestore={restoreBackup} />
         <PlanUpsell />
         <p className="mt-4 border-t border-[var(--border)] pt-4 text-[11px] leading-5 text-[var(--text-dim)]">Saved on this device, up to eight conversations. Selected research history goes to the model on follow-up. Your health profile is not included.</p>
       </aside></>}

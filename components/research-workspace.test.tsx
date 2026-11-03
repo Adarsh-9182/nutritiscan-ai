@@ -7,7 +7,7 @@ import { readResearch } from "@/lib/research/client";
 
 const question = "Investigate metabolic aging in humans";
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => init?.method === "POST" ? streamReply() : Response.json({ configured: false, models: ["gemini-3.8-flash"] })));
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => init?.method === "POST" ? streamReply() : Response.json({ configured: false, account: null, plans: [], models: ["gemini-3.8-flash"] })));
 });
 async function ask(text = question) {
   await screen.findByLabelText("Research message");

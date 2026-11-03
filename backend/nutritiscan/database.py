@@ -107,6 +107,14 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class ResearchWorkspace(Base):
+    __tablename__ = "research_workspaces"
+    owner: Mapped[str] = mapped_column(ForeignKey("health_accounts.id", ondelete="CASCADE"), primary_key=True)
+    revision: Mapped[str] = mapped_column(String(36))
+    cipher: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class Audit(Base):
     __tablename__ = "health_audit"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
