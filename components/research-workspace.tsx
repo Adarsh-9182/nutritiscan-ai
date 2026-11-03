@@ -10,6 +10,8 @@ import { researchBackup, mergeResearchBackup, type ResearchBackup } from "@/lib/
 import { includedSourcesRis } from "@/lib/research/references";
 import { ResearchProjects, ResearchProjectTitle } from "./research-projects";
 import { ResearchCloud } from "./research-cloud";
+import { ResearchBrief } from "./research-evidence-brief";
+import { EvidenceBriefSchema, type EvidenceBrief } from "@/lib/research/brief";
 import { ResearchEvidence } from "./research-evidence";
 import { ResearchSourceReview } from "./research-source-review";
 import { SourceReviewSchema, sourceReviewCsv, type SourceReview } from "@/lib/research/source-review";
@@ -48,6 +50,7 @@ export default function ResearchWorkspace() {
   const [query, setQuery] = useState(() => { const t = initial.threads.find((t) => t.id === initial.activeId); return t?.turns.at(-1)?.request.searchMode === "manual" ? t.query : ""; });
   const [enabled, setEnabled] = useState<ResearchRequest["sources"]>(["pubmed", "trials"]);
   const [busy, setBusy] = useState(false);
+  const [briefTurn, setBriefTurn] = useState<string | null>(null);
   const [steps, setSteps] = useState<string[]>([]);
   const [notice, setNotice] = useState(initial.notice);
   const [inspected, setInspected] = useState<{ source: AgentSource; quote?: string } | null>(null);
@@ -128,6 +131,34 @@ export default function ResearchWorkspace() {
     const review = value ? SourceReviewSchema.parse({ ...value, sourceId, updatedAt }) : null;
     update(activeId, (t) => ({ ...t, turns: t.turns.map((v) => v.id === turnId ? { ...v, sourceReviews: [...(v.sourceReviews ?? []).filter((r) => r.sourceId !== sourceId), ...(review ? [review] : [])] } : v) }));
   }
+  async function buildBrief(turnId: string) {
+    if (locked.current || !activeId) return;
+    const id = activeId;
+    const turn = snapshot.current.find((t) => t.id === id)?.turns.find((t) => t.id === turnId);
+    if (!turn?.reply || turn.phase !== "done" || (turn.briefs?.length ?? 0) >= 2) return;
+    const sourceIds = turn.reply.sources.filter((s) => turn.sourceReviews?.some((r) => r.sourceId === s.id && r.decision === "include")).map((s) => s.id);
+    if (!sourceIds.length || sourceIds.length > 6) return;
+    locked.current = true; setBusy(true); setBriefTurn(turnId); setNotice("");
+    const abort = new AbortController(); controller.current = abort;
+    try {
+      const response = await fetch("/api/research/brief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: turn.request.message, sourceIds }), signal: abort.signal });
+      const body = await response.json();
+      if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : "Brief could not finish. Retry later.");
+      const brief = EvidenceBriefSchema.parse(body);
+      abort.signal.throwIfAborted();
+      if (brief.question !== turn.request.message || brief.selectedIds.length !== sourceIds.length || brief.selectedIds.some((sourceId) => !sourceIds.includes(sourceId))) throw new Error("Brief selection did not match this question. Existing work is unchanged.");
+      update(id, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: [...(v.briefs ?? []), brief] } : v) }));
+    } catch (e) { setNotice(abort.signal.aborted ? "Brief generation stopped. Saved versions are unchanged." : messageOf(e)); }
+    finally { locked.current = false; setBusy(false); setBriefTurn(null); controller.current = null; }
+  }
+  function editBrief(turnId: string, briefId: string, patch: Pick<EvidenceBrief, "title" | "notes" | "reviewedAt">) {
+    if (locked.current || !activeId) return;
+    update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: v.briefs?.map((b) => b.id === briefId ? EvidenceBriefSchema.parse({ ...b, ...patch }) : b) } : v) }));
+  }
+  function deleteBrief(turnId: string, briefId: string) {
+    if (locked.current || !activeId) return;
+    update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: v.briefs?.filter((b) => b.id !== briefId) } : v) }));
+  }
   function restoreBackup(backup: ResearchBackup) {
     if (locked.current) throw new Error("Wait for research to finish before importing.");
     const merged = mergeResearchBackup(snapshot.current, backup);
@@ -188,6 +219,7 @@ export default function ResearchWorkspace() {
                 {turn.phase === "working" && <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="flex items-center gap-2 text-xs text-[var(--emerald)]"><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />{steps.at(-1) ?? "Preparing your research question…"}</p>{steps.length > 1 && <details className="mt-3 text-xs text-[var(--text-dim)]"><summary className="cursor-pointer">View tool activity</summary><ol className="mt-2 space-y-2">{steps.slice(0, -1).map((s, i) => <li key={i}>{s}</li>)}</ol></details>}</div>}
                 {turn.error && <div role="alert" className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-sm leading-6"><p>{turn.error}</p>{index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-3 text-xs font-medium text-[var(--emerald)]">Retry question</button>}</div>}
                 {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExportReferences={() => download(includedSourcesRis(turn.reply!, turn.sourceReviews), "nutritiscan-included-sources.ris", "application/x-research-info-systems;charset=utf-8")} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
+                {turn.reply && <ResearchBrief turn={turn} disabled={busy} generating={briefTurn === turn.id} imported={Boolean(thread.importedAt)} onBuild={() => buildBrief(turn.id)} onEdit={(id, patch) => editBrief(turn.id, id, patch)} onDelete={(id) => deleteBrief(turn.id, id)} onInspect={(source, quote) => setInspected({ source, quote })} onDownload={download} onNotice={setNotice} />}
                 {turn.reply?.status === "sources-only" && index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--emerald)] disabled:opacity-40">Retry research</button>}
                 {turn.reply && index === thread.turns.length - 1 && <div className="mt-5 flex flex-wrap gap-2">{[{ label: "Challenge the hypothesis", mode: "hypotheses" as const, text: "Challenge the current explanation. Propose competing hypotheses and what evidence would falsify them." }, { label: "Plan an independent test", mode: "study-plan" as const, text: "Plan an independent replication test for the findings above, including confounders, controls and appropriate endpoints." }].map((f) => <button key={f.label} disabled={busy} type="button" onClick={() => { setMode(f.mode); setInput(f.text); composer.current?.focus(); }} className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">{f.label} →</button>)}</div>}
               </div>

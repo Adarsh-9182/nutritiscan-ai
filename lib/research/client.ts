@@ -1,17 +1,23 @@
 import { z } from "zod";
 import { ResearchChatRequest, ResearchEvent, ResearchResult, type ResearchReply, type ResearchStreamEvent } from "./contracts";
 import { SourceReviewsSchema, sourceReviewText, type SourceReview } from "./source-review";
+import { EvidenceBriefSchema } from "./brief";
 
 export const ResearchTurnSchema = z.object({
   id: z.string().max(80), request: ResearchChatRequest.omit({ history: true }),
   phase: z.enum(["working", "done", "stopped", "failed"]),
   reply: ResearchResult.nullable(), error: z.string().max(1000).optional(),
   sourceReviews: SourceReviewsSchema.optional(),
+  briefs: z.array(EvidenceBriefSchema).max(2).optional(),
 }).strict().superRefine((turn, context) => {
   for (const review of turn.sourceReviews ?? []) {
     if (turn.phase !== "done" || !turn.reply?.sources.some((source) => source.id === review.sourceId)) {
       context.addIssue({ code: "custom", path: ["sourceReviews"], message: "Source decisions must refer to this completed research result." });
     }
+  }
+  if (new Set(turn.briefs?.map((b) => b.id)).size !== (turn.briefs?.length ?? 0)) context.addIssue({ code: "custom", path: ["briefs"], message: "Brief versions must have distinct IDs." });
+  for (const brief of turn.briefs ?? []) {
+    if (turn.phase !== "done" || brief.question !== turn.request.message || brief.selectedIds.some((id) => !turn.reply?.sources.some((s) => s.id === id))) context.addIssue({ code: "custom", path: ["briefs"], message: "Briefs must belong to this question and its retrieved sources." });
   }
 });
 export type ResearchTurn = z.infer<typeof ResearchTurnSchema>;

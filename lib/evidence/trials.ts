@@ -15,15 +15,21 @@ export type Trial = {
   conditions: string[];
   interventions: string[];
   url: string;
+  enrollment?: string;
+  eligibility?: string;
+  endpoints?: string;
+  arms?: string;
 };
 
 type ApiStudy = {
   protocolSection?: {
     identificationModule?: { nctId?: string; briefTitle?: string };
     statusModule?: { overallStatus?: string; startDateStruct?: { date?: string } };
-    designModule?: { studyType?: string };
+    designModule?: { studyType?: string; enrollmentInfo?: { count?: number; type?: string } };
+    eligibilityModule?: { eligibilityCriteria?: string; sex?: string; minimumAge?: string; maximumAge?: string };
+    outcomesModule?: { primaryOutcomes?: { measure?: string; description?: string; timeFrame?: string }[] };
     conditionsModule?: { conditions?: string[] };
-    armsInterventionsModule?: { interventions?: { name?: string }[] };
+    armsInterventionsModule?: { interventions?: { name?: string }[]; armGroups?: { label?: string; type?: string; description?: string }[] };
   };
 };
 
@@ -79,7 +85,28 @@ function toTrial(value: unknown): Trial | null {
     interventions: (protocol?.armsInterventionsModule?.interventions ?? [])
       .map((item) => item.name).filter((name): name is string => typeof name === "string").slice(0, 8),
     url: `https://clinicaltrials.gov/study/${id}`,
+    ...(typeof protocol?.designModule?.enrollmentInfo?.count === "number" ? { enrollment: `${protocol.designModule.enrollmentInfo.count} (${protocol.designModule.enrollmentInfo.type ?? "type not reported"})` } : {}),
+    ...(protocol?.eligibilityModule ? { eligibility: [protocol.eligibilityModule.sex, protocol.eligibilityModule.minimumAge, protocol.eligibilityModule.maximumAge, protocol.eligibilityModule.eligibilityCriteria].filter((s) => typeof s === "string").join("; ").slice(0, 3500) } : {}),
+    ...(protocol?.outcomesModule?.primaryOutcomes ? { endpoints: protocol.outcomesModule.primaryOutcomes.slice(0, 5).map((p) => [p.measure, p.description, p.timeFrame].filter((s) => typeof s === "string").join("; ")).join("\n").slice(0, 3500) } : {}),
+    ...(protocol?.armsInterventionsModule?.armGroups ? { arms: protocol.armsInterventionsModule.armGroups.slice(0, 5).map((a) => [a.label, a.type, a.description].filter((s) => typeof s === "string").join("; ")).join("\n").slice(0, 2500) } : {}),
   };
+}
+
+/** Resolve only a canonical registry identifier, never a browser-supplied URL. */
+export async function fetchTrial(id: string, signal: AbortSignal): Promise<Trial | null> {
+  if (!/^NCT\d{8}$/.test(id)) throw new EvidenceReadError("invalid-response");
+  const timeout = AbortSignal.timeout(TIMEOUT_MS);
+  try {
+    const response = await fetch(`${API}/${id}?format=json`, { signal: AbortSignal.any([signal, timeout]), headers: { accept: "application/json" } });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new EvidenceReadError(response.status === 429 ? "quota" : "unavailable");
+    const trial = toTrial(await response.json());
+    if (!trial || trial.nctId !== id) throw new EvidenceReadError("invalid-response");
+    return trial;
+  } catch (error) {
+    signal.throwIfAborted();
+    throw error instanceof EvidenceReadError ? error : new EvidenceReadError(timeout.aborted ? "timeout" : "unavailable");
+  }
 }
 
 function strings(value: unknown): string[] {

@@ -77,12 +77,62 @@ automatic background sync is not implemented.
 5. Inspect source-linked findings, explicitly untested hypotheses, proposed study
    plans, source coverage and limitations in the assistant turn.
 6. Open a citation to inspect the exact excerpt and original source link.
-7. Compare metadata and source-checked findings in the evidence table. Population,
-   sample size and effect estimates are not systematically extracted or graded.
-   Full text is not read. Retraction publication types are flagged, and findings
+7. Compare metadata and source-checked findings in the evidence table. Mark relevant
+   records Include, then build the evidence brief described below for passage-based
+   population, sample and study comparisons. Effect sizes are not calculated or
+   pooled. Full text is not read. Retraction publication types are flagged, and findings
    based on such records are rejected. This is not complete retraction monitoring.
 8. Continue with bounded research history, copy/export with sources, or reopen a
    conversation from the device-local sidebar. A retry performs a fresh search.
+
+## Included-source evidence agent
+
+After marking one to six sources Include, choose **Build evidence brief**. The
+`POST /api/research/brief` endpoint accepts only a bounded question and canonical
+PubMed/trial IDs. It refuses client-supplied evidence, URLs and authority flags.
+It fetches those IDs again from fixed original database endpoints; saved or
+imported source text is never trusted as the input to a fresh extraction. PubMed
+IDs use one batch request; trial reads run independently. Successful records survive
+another database's deadline, while missing IDs remain visible in the brief.
+
+The agent proposes exact passages for design, population, sample size,
+intervention/exposure, comparator, outcome/planned endpoint and author-stated
+limitations. Each released cell must match its own source and pass a separate
+model check of field placement in context. Ambiguous duplicate cells, invented
+passages and negative checks are withheld. Retracted or abstract-less papers do
+not support substantive extraction. Trial enrollment types, eligibility, arms and
+planned endpoints are registry descriptions, never efficacy results.
+
+`not-found` means the extractor selected no passage in available text, not that
+the full paper lacks the information. `unavailable` means extraction/checking did
+not finish or could not run, including model quota failures. These states remain
+separate in the UI and CSV. A source-checked narrative is attempted within the
+remaining time budget; failure leaves successful extraction intact. Request and
+model text cannot authorize execution, experiments, prescribing or resource purchases.
+
+Each question keeps up to two brief versions, each retaining its own source
+snapshot, original selection, creation time, model IDs and run limitations.
+Changing Include decisions marks old versions as based on a different selection.
+The researcher can edit the title and interpretation, and mark a version reviewed;
+editing resets the review mark. Researcher notes are not AI verified and are never
+sent to the model. Generating or cancelling a new version preserves earlier work.
+File backups and explicit account snapshots include versions and interpretation;
+imports are marked unvalidated. Retrying the underlying question clears its source
+decisions and briefs. Existing 1 MB history/backup limits still apply.
+
+Exports include a full TXT brief, comparison CSV with per-cell status and formula
+escaping, and browser **Print / Save PDF**. Print content is escaped text with no
+remote assets or scripts; imported notes cannot inject HTML. PDF uses the browser
+print dialog, not a server document service. Full-text extraction, meta-analysis,
+formal risk-of-bias appraisal, lab automation and independent scientific validation
+are outside this workflow.
+
+The route has a 55-second deadline, at most six records, a 24-second extraction
+budget and at most 18 seconds for narrative. Existing shared rate limiting is used
+when configured, with per-instance fallback; this does not guarantee a fleet-wide
+quota without shared storage. The route uses existing basic research models and
+does not activate premium routing, new API services or billing. Free-provider quotas
+can still interrupt inference; sources and researcher work remain usable.
 
 ## Model and evidence boundaries
 

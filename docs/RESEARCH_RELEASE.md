@@ -7,7 +7,8 @@ roadmap documents are historical context.
 
 Public question → PubMed and ClinicalTrials.gov retrieval → bounded AI drafting
 and passage checking → source inspection → manual relevance decisions and notes
-→ CSV/text/RIS export → research backup → preview and restore → follow-up.
+→ included-source comparison and editable evidence brief → CSV/text/PDF/RIS
+export → research backup → preview and restore → follow-up.
 
 Research projects can be renamed. Backups contain only research conversations,
 source records, drafts and saved review notes. They do not include health storage
@@ -22,9 +23,15 @@ erases that snapshot. File backups remain available without sign-in. RIS include
 manually included records and available metadata; missing authors and DOIs are
 not inferred. Scientific validity is not established by schema or software tests.
 
+The included-source agent fetches selected IDs again from PubMed/ClinicalTrials.gov,
+checks exact extraction passages and field placement, and attempts a reviewed narrative.
+It keeps two versions per question and separates editable researcher interpretation
+from AI output. Quota failures leave source records usable; cancellation preserves
+previous versions. See [RESEARCH_CHAT.md](RESEARCH_CHAT.md) for scope and bounds.
+
 ## Verification
 
-- Full local suite: 670 unit/integration tests, 52 UI tests and 44 offline gate
+- Full local suite: 687 unit/integration tests, 59 UI tests and 44 offline gate
   checks passed; production build passed. All 31 API backend tests passed. Live model evals are separate from the
   offline gate and are not included in those numbers.
 - Isolated browser flow at 1440, 390 and 320 pixels: decisions, notes, source
@@ -32,6 +39,12 @@ not inferred. Scientific validity is not established by schema or software tests
   and reload. Mobile sidebar overlap found by the flow was fixed. Account snapshot
   UI checks also passed explicit save consent, empty-device restore, saved review
   notes and cloud deletion that preserves device copies at all three widths.
+- Included-source browser QA passed at 1440, 390 and 320 pixels: selection-only
+  inference requests, quote inspection, editable title/interpretation, review marks,
+  reload, two versions, both themes, TXT/CSV, backup restore and escaped print/PDF.
+  These checks use labelled synthetic fixtures. A separate keyless API smoke fetched
+  both real public PubMed/trial records, enrollment and planned endpoint metadata;
+  it correctly returned unavailable extraction without model credentials.
 - Live synthetic account smoke: signup, root HttpOnly session cookies, shared
   identity and free-plan read, logout revocation, login, account deletion and
   session revocation. The temporary account was removed.
