@@ -20,8 +20,16 @@ try {
       stage = `${route} at ${width}px`;
       const response = await page.goto(new URL(route, base).href);
       assert.equal(response.status(), 200);
-      await page.getByRole("link", { name: "Download for Mac", exact: true }).first().waitFor();
-      for (const link of await page.getByRole("link", { name: "Download for Mac", exact: true }).all()) assert.equal(await link.getAttribute("href"), route === "/download" ? release.url : "/download");
+      if (width < 640 && ["/chat", "/research"].includes(route)) {
+        const header = page.locator("header");
+        await header.getByRole("link", { name: "Sign in", exact: true }).waitFor();
+        await header.getByRole("link", { name: route === "/chat" ? "Research workspace" : "Health chat", exact: true }).waitFor();
+        assert.equal(await header.getByRole("link", { name: "Download for Mac", exact: true }).isVisible(), false);
+        assert.equal(await header.getByRole("button", { name: "Upgrade", exact: true }).isVisible(), false);
+      } else {
+        await page.getByRole("link", { name: "Download for Mac", exact: true }).first().waitFor();
+        for (const link of await page.getByRole("link", { name: "Download for Mac", exact: true }).all()) assert.equal(await link.getAttribute("href"), route === "/download" ? release.url : "/download");
+      }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Horizontal overflow on ${stage}`);
       if (route === "/download") {
         await page.waitForFunction(() => [...document.images].some((image) => image.alt.startsWith("NutritiScan Mac app") && image.complete && image.naturalWidth > 0));

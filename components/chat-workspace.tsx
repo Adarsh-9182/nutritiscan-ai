@@ -65,7 +65,7 @@ export default function ChatWorkspace() {
       */}
 
       {/* Slim top bar — the conversation owns the rest of the screen. */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--border)] px-3 py-2.5">
+      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--border)] px-3 py-2.5 max-sm:flex-nowrap max-sm:gap-1.5 max-sm:px-2">
         <button
           type="button"
           onClick={toggleRail}
@@ -76,24 +76,24 @@ export default function ChatWorkspace() {
           <span aria-hidden="true">☰</span>
         </button>
 
-        <Link href="/" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
+        <Link href="/" aria-label="NutritiScan home" className="flex items-center gap-2 rounded-lg px-1 py-0.5 focus-ring">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--emerald),var(--cyan))] text-xs font-bold text-[#07130c]">+</span>
-          <span className="text-[13px] font-semibold">NutritiScan</span>
+          <span className="text-[13px] font-semibold max-sm:hidden">NutritiScan</span>
         </Link>
 
         <span className="ml-auto hidden t-label text-[var(--text-dim)] xl:block">
           <kbd className="rounded border border-[var(--border-strong)] px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> new conversation
         </span>
 
-        <Link href="/" className="btn-ghost rounded-full px-3 py-1 t-label">
+        <Link href="/" className="btn-ghost rounded-full px-3 py-1 t-label max-sm:hidden">
           Home
         </Link>
 
-        <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
-          Research
+        <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label max-sm:ml-auto max-sm:whitespace-nowrap max-sm:px-2 max-sm:text-[11px] max-sm:normal-case max-sm:tracking-normal">
+          <span className="sm:hidden">Research workspace</span><span className="max-sm:hidden">Research</span>
         </Link>
-        <Link href="/download" className="btn-ghost rounded-full px-3 py-1 t-label">Download for Mac</Link>
-        <AccountControls returnTo="/chat" />
+        <Link href="/download" className="btn-ghost rounded-full px-3 py-1 t-label max-sm:hidden">Download for Mac</Link>
+        <AccountControls returnTo="/chat" compactOnMobile />
       </header>
 
       <div className="flex min-h-0 flex-1">

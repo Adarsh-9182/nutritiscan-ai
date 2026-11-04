@@ -1,7 +1,8 @@
 # Mac desktop preview and website downloads
 
-The website exposes **Download for Mac** on the homepage and in the Health and
-Research chat headers. `/download` shows the actual app, the supported platform,
+The website exposes **Download for Mac** on the homepage and in the desktop
+Health and Research chat headers. Phone chat headers keep Sign in and a shortcut
+to the other workspace together on one row. `/download` shows the actual app, the supported platform,
 installation instructions, model prerequisites, data boundaries and a versioned
 GitHub Releases download. It makes no performance comparison.
 
