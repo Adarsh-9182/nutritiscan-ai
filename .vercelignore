@@ -5,4 +5,4 @@ skills-lock.json
 playwright-report/
 test-results/
 .git/
-desktop/
+/desktop/
