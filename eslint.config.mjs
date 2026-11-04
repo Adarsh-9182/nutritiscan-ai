@@ -5,6 +5,11 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: ["desktop/src/preload.cjs"],
+    // Electron's sandboxed preload entry uses its supported CommonJS bridge.
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -15,6 +20,9 @@ const eslintConfig = defineConfig([
     "public/pdf.worker.min.mjs",
     "playwright-report/**",
     "test-results/**",
+    "desktop/dist/**",
+    "desktop/release/**",
+    "desktop/test-results/**",
   ]),
 ]);
 

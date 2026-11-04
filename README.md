@@ -1,5 +1,11 @@
 # NutritiScan
 
+The separate [local biology desktop prototype](desktop/README.md) adds an Electron
+research workspace with project files, literature tools, CSV/FHIR inspection,
+memory, a terminal and the user's existing Codex/ChatGPT sign-in. Its local Mac
+build, current limits and verification are documented there; it is separate from
+the web deployment below.
+
 An educational personal health companion for web and Android. The public health chat is live at [nutritiscan.com](https://nutritiscan.com); [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases) use the same midnight/lime/mint design.
 
 The `/health` workspace adds account-scoped reports, confirmed lab trends, health history, record questions, doctor summaries and privacy controls. It requires a separately deployed [FastAPI health service](backend/README.md); until `HEALTH_API_URL` is configured, the dashboard and Android shared-record screens clearly show that the service is not connected. Public chat and the app's local journal remain independent.
