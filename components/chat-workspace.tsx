@@ -92,6 +92,7 @@ export default function ChatWorkspace() {
         <Link href="/research" className="btn-ghost rounded-full px-3 py-1 t-label">
           Research
         </Link>
+        <Link href="/download" className="btn-ghost rounded-full px-3 py-1 t-label">Download for Mac</Link>
         <AccountControls returnTo="/chat" />
       </header>
 

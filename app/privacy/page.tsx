@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 3 NOVEMBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 4 NOVEMBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
         NutritiScan offers a public health conversation, a local Android journal,
@@ -63,6 +63,30 @@ export default function Page() {
         still send their selected public research context to configured sources and
         AI providers; saved source-review notes are excluded from model context.
       </p>
+      <h2>Mac desktop research preview</h2>
+      <p>
+        The separate <Link href="/download">Mac app</Link> keeps project files in
+        the folder you choose and saved app history in local Application Support
+        storage. App history is plain JSON with owner-only file permissions, not
+        encrypted by NutritiScan. Anyone with access to your macOS account may
+        be able to read it. Desktop work does not automatically sync with browser
+        chats or account research backups.
+      </p>
+      <p>
+        The desktop agent sends messages, requested file content, retrieved
+        evidence and project context to the model through your installed Codex
+        runtime. Public literature queries go to PubMed and ClinicalTrials.gov.
+        Codex keeps its own sign-in; NutritiScan does not copy its credentials.
+        The terminal can launch the original Claude Code CLI with its own
+        account and data handling. Use public or de-identified research data.
+      </p>
+      <p>
+        Archiving retains saved history. Removing archived work asks for
+        confirmation, then removes that history from this app; project files,
+        saved reports, exports and original Codex history remain separate.
+        Restore and export a conversation before removing it if you need a copy.
+      </p>
+
       <h2>What is sent when you chat</h2>
       <p>
         When you send a message, the chat sends recent conversation messages

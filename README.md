@@ -4,7 +4,9 @@ The separate [local biology desktop prototype](desktop/README.md) adds an Electr
 research workspace with project files, literature tools, CSV/FHIR inspection,
 memory, a terminal and the user's existing Codex/ChatGPT sign-in. Its local Mac
 build, current limits and verification are documented there; it is separate from
-the web deployment below.
+the web workspace below. The website's [Mac download page](https://www.nutritiscan.com/download)
+links a versioned GitHub Release ZIP, shows install requirements and the archive's
+SHA-256, and labels the build as an Apple Silicon preview that is not notarized.
 
 An educational personal health companion for web and Android. The public health chat is live at [nutritiscan.com](https://nutritiscan.com); [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases) use the same midnight/lime/mint design.
 

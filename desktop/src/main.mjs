@@ -18,9 +18,15 @@ function send(channel, ...data) { if (window && !window.isDestroyed()) window.we
 function changed() { if (notificationTimer) return; notificationTimer = setTimeout(() => { notificationTimer = null; send("biology:change"); }, 50); }
 function trusted(event) { return window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame; }
 const object = z.object({}).strict();
+const savedItem = z.object({ id: z.string().uuid() }).strict();
+const renamedItem = savedItem.extend({ name: z.string().trim().min(1).max(160) });
 const requests = {
   state: object, connect: object, login: object, "project.open": object, "project.sample": object,
   "project.select": z.object({ id: z.string().uuid() }).strict(), "session.new": object, "session.select": z.object({ id: z.string().uuid() }).strict(),
+  "project.rename": renamedItem, "session.rename": renamedItem,
+  "project.archive": savedItem, "project.restore": savedItem, "project.remove": savedItem,
+  "session.archive": savedItem, "session.restore": savedItem, "session.remove": savedItem,
+  "files.refresh": object,
   run: z.object({ text: z.string().trim().min(3).max(6000), model: z.string().max(160).optional() }).strict(), stop: object,
   "file.read": z.object({ path: z.string().min(1).max(500) }).strict(), "file.profile": z.object({ path: z.string().min(1).max(500) }).strict(),
   "memory.save": z.object({ memory: z.string().max(6000) }).strict(), "session.export": object,
@@ -42,7 +48,7 @@ async function invoke(action, value) {
     case "login": { const url = await controller.bridge.login(); if (url) await openExternal(url, true); return { opened: Boolean(url) }; }
     case "project.open": {
       controller.idle(); const result = await dialog.showOpenDialog(window, { title: "Open a biology research project", properties: ["openDirectory", "createDirectory"] });
-      if (!result.canceled && result.filePaths[0]) { terminal.close(); await store.addProject(result.filePaths[0]); changed(); } return { opened: !result.canceled };
+      if (!result.canceled && result.filePaths[0]) { controller.idle(); terminal.close(); await store.addProject(result.filePaths[0]); changed(); } return { opened: !result.canceled };
     }
     case "project.sample": {
       controller.idle(); const folder = path.join(app.getPath("userData"), "sample-project"); await fs.mkdir(folder, { recursive: true, mode: 0o700 });
@@ -52,6 +58,20 @@ async function invoke(action, value) {
     case "project.select": controller.idle(); terminal.close(); await store.selectProject(args.id); changed(); return { selected: true };
     case "session.new": controller.idle(); store.newSession(); await store.persist(); changed(); return { created: true };
     case "session.select": controller.idle(); await store.selectSession(args.id); changed(); return { selected: true };
+    case "project.rename": case "session.rename": controller.idle(); await store.rename(action.split(".")[0], args.id, args.name); changed(); return { saved: true };
+    case "project.archive": case "session.archive": case "project.restore": case "session.restore": {
+      controller.idle(); const [kind, operation] = action.split(".");
+      await store.archive(kind, args.id, operation === "restore"); if (kind === "project") terminal.close(); changed(); return { saved: true };
+    }
+    case "project.remove": case "session.remove": {
+      controller.idle(); const kind = action.split(".")[0];
+      const item = kind === "project" ? store.state.projects.find((p) => p.id === args.id) : store.project()?.sessions.find((s) => s.id === args.id);
+      if (!item?.archivedAt) throw new Error("Only archived work can be removed.");
+      const result = await dialog.showMessageBox(window, { type: "warning", title: "Remove archived work?", message: `Remove “${item.name ?? item.title}” from NutritiScan?`, detail: kind === "project" ? "This removes this project's saved chats and handoff from this app. Research files and saved reports in the folder stay on your Mac. The original Codex history is separate. Export any chats you need before removing them." : "This removes the saved conversation, sources and checks from this app. Project files, saved reports and the original Codex history stay separate. Restore and export this conversation first if you need a copy.", buttons: ["Keep archived", "Remove saved history"], defaultId: 0, cancelId: 0 });
+      if (result.response !== 1) return { removed: false };
+      controller.idle(); await store.removeArchived(kind, args.id); changed(); return { removed: true };
+    }
+    case "files.refresh": controller.inventory = null; changed(); return { refreshed: true };
     case "run": return controller.run(args.text, args.model);
     case "stop": await controller.stop(); changed(); return { stopped: true };
     case "file.read": return store.read(args.path);
@@ -109,6 +129,6 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   controller?.finish("interrupted"); clearTimeout(controller?.saveTimer);
   terminal?.close(); controller?.bridge.close(); clearTimeout(notificationTimer);
-  void (controller?.persist() ?? Promise.resolve()).finally(() => { quitting = true; app.quit(); });
+  void Promise.resolve(store?.pendingChange).catch(() => {}).then(() => controller?.persist()).finally(() => { quitting = true; app.quit(); });
 });
 app.on("window-all-closed", () => app.quit());

@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "tag": "desktop-v0.2.0",
+  "channel": "preview",
+  "architecture": "arm64",
+  "minimumMacOS": "13.0",
+  "fileName": "NutritiScan-0.2.0-mac-arm64.zip",
+  "sizeBytes": 130829332,
+  "sha256": "8205fa97b84d885fdd26c7c126cc8ae7e004cf105551d98609ce64e6cdca9f22",
+  "url": "https://github.com/Adarsh-9182/nutritiscan-ai/releases/download/desktop-v0.2.0/NutritiScan-0.2.0-mac-arm64.zip"
+}

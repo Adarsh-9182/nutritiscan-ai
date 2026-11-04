@@ -47,6 +47,13 @@ Native Claude Code tools differ from the custom tools in the Codex chat.
    original files are preserved. Mixed text/numeric columns receive no numeric mean.
 5. Save new artifacts and a concise handoff, continue or reopen a saved session,
    and export the transcript with sources. New artifacts never overwrite earlier work.
+6. Use the control beside a project or investigation to rename or archive it.
+   **Archived work** restores it. Removal is limited to archived work and requires
+   native confirmation; it only removes app history, never project files or reports.
+   Archived items still count toward the storage limits. Restore and export first
+   if you want a copy. Codex maintains its original thread history separately.
+7. **Files → Saved reports** lists artifacts in the bounded project inventory.
+   Markdown reports render in the inspector; **Refresh files** rescans changes.
 
 Useful first task with the included fictional dataset:
 
@@ -113,17 +120,22 @@ patient-record workflow or a claim of healthcare compliance.
 
 ## Subscription integration and distribution
 
-The tested path is personal local use of the installed Codex runtime. This is not
-a registered third-party Sign in with ChatGPT client. For an open-source distribution,
-implement the documented registration/authorization flow; private/commercial plan
-usage needs the relevant provider eligibility. Do not treat this prototype's successful
-local login as commercial partner approval. See the [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
+This free local preview uses the installed Codex runtime. OpenAI's current
+app-server documentation permits existing local/open-source clients to continue
+using app-server authentication and recommends moving to Sign in with ChatGPT.
+This is not a registered third-party Sign in with ChatGPT client or commercial
+partner approval. Commercial/hosted integration needs the relevant provider
+eligibility; the website distributes a local app, not hosted subscription inference.
+See the [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
 and [Sign in with ChatGPT guide](https://developers.openai.com/siwc/quickstart).
 
 Claude Code is launched unchanged. Subscription sign-in remains in Anthropic's
 client; custom product/API access has separate rules. See [Anthropic's integration conditions](https://code.claude.com/docs/en/legal-and-compliance).
 
-The `.app` is ad-hoc signed for local testing, not notarized for public distribution.
+The `.app` is ad-hoc signed, not notarized by Apple. The website labels this as
+a preview and links Apple's installation guidance. `npm run archive` produces
+a versioned ZIP, SHA-256 file and the website's `lib/desktop-release.json` manifest.
+Publish those exact assets before publishing a website that points to the version.
 Existing web releases and unfinished pilot/pricing work are separate and preserved.
 
 ## Verification
@@ -136,6 +148,10 @@ node scripts/smoke-desktop.mjs
 node scripts/smoke-agent.mjs
 node scripts/smoke-agent.mjs --literature
 npm run package
+npm run archive
+# With the web server running, or after deployment:
+node scripts/smoke-download.mjs
+node scripts/smoke-download.mjs --url=https://www.nutritiscan.com --verify-download
 ```
 
 The initial build passed 28 unit tests and native UI checks at 800, 1000 and 1400

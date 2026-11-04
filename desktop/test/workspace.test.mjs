@@ -32,3 +32,55 @@ test("dataset profiles preserve source identity and original data", async (t) =>
   const { store, root } = await fixture(t); const text = "well_id,signal_au\nA1,1\nA2,3\n"; await fs.writeFile(path.join(root, "plate.csv"), text);
   const p = await store.profile("plate.csv"); assert.equal(p.columns[1].statistics.mean, 2); assert.equal(p.sha256, (await store.read("plate.csv")).sha256); assert.equal(await fs.readFile(path.join(root, "plate.csv"), "utf8"), text);
 });
+
+test("older workspaces gain archive defaults while keeping their transcript and selected investigation", async (t) => {
+  const { store } = await fixture(t), id = store.session().id;
+  store.session().messages.push({ id: crypto.randomUUID(), role: "user", text: "Synthetic retained question", status: "completed", createdAt: new Date().toISOString() });
+  const old = structuredClone(store.state);
+  for (const p of old.projects) { delete p.archivedAt; for (const s of p.sessions) delete s.archivedAt; }
+  await fs.writeFile(store.file, JSON.stringify(old));
+  const restored = new WorkspaceStore(store.directory); await restored.load();
+  assert.equal(restored.session().id, id); assert.equal(restored.session().messages[0].text, "Synthetic retained question"); assert.equal(restored.project().archivedAt, null); assert.equal(restored.session().archivedAt, null);
+});
+
+test("archiving selects available work; the last investigation can be restored after restart", async (t) => {
+  const { store } = await fixture(t), first = store.session().id;
+  const second = store.newSession().id; await store.rename("session", second, "  Replication question  ");
+  await store.archive("session", second); assert.equal(store.session().id, first);
+  await assert.rejects(store.selectSession(second), /Restore archived/);
+  await store.archive("session", first); assert.equal(store.session(), null);
+  const restored = new WorkspaceStore(store.directory); await restored.load(); assert.equal(restored.session(), null);
+  await restored.archive("session", second, true); assert.equal(restored.session().title, "Replication question");
+  assert.equal(restored.project().sessions.length, 2);
+});
+
+test("project archive and removal retain all project files; reopening a folder restores its history", async (t) => {
+  const { store, root } = await fixture(t), id = store.project().id, session = store.session().id;
+  await store.artifact("retained-report.md", "Synthetic retained report");
+  await store.rename("project", id, "Synthetic study"); await store.archive("project", id);
+  assert.equal(store.project(), null); await assert.rejects(store.selectProject(id), /Restore archived/);
+  await store.addProject(root); assert.equal(store.project().name, "Synthetic study"); assert.equal(store.session().id, session);
+  await assert.rejects(store.removeArchived("project", id), /Only archived/);
+  await store.archive("project", id); await store.removeArchived("project", id);
+  assert.equal(store.state.projects.length, 0); assert.equal(await fs.readFile(path.join(root, "artifacts/retained-report.md"), "utf8"), "Synthetic retained report");
+});
+
+test("removing only an archived investigation frees its slot and cannot erase another project's work", async (t) => {
+  const { store, base, root } = await fixture(t), first = store.session().id;
+  while (store.project().sessions.length < 20) store.newSession();
+  await store.archive("session", first); assert.throws(() => store.newSession(), /including archived/);
+  const other = path.join(base, "other-project"); await fs.mkdir(other); await store.addProject(other);
+  await assert.rejects(store.removeArchived("session", first), /Only archived/);
+  await store.addProject(root); await store.removeArchived("session", first);
+  store.newSession(); await store.persist(); assert.equal(store.project().sessions.length, 20);
+});
+
+test("a failed durable change leaves the visible and stored history intact", async (t) => {
+  const { store } = await fixture(t), original = store.project().name, id = store.project().id;
+  const persist = store.persist.bind(store); store.persist = async () => { throw new Error("Synthetic disk failure"); };
+  await assert.rejects(store.rename("project", id, "Should not appear"), /disk failure/);
+  assert.equal(store.project().name, original); assert.equal(store.pendingChange, null);
+  store.persist = persist;
+  await assert.rejects(store.rename("project", id, " \n "), /./); await assert.rejects(store.rename("project", id, "Two\nlines"), /one line/);
+  const restored = new WorkspaceStore(store.directory); await restored.load(); assert.equal(restored.project().name, original);
+});

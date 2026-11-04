@@ -5,6 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${base}/` },
     { url: `${base}/about` },
+    { url: `${base}/download` },
     { url: `${base}/agents` },
     { url: `${base}/guides/doctor-appointment-checklist` },
     { url: `${base}/privacy` },

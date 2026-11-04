@@ -21,14 +21,16 @@ export class ResearchController extends EventEmitter {
     bridge.on("request", (message) => void this.serverRequest(message));
   }
   changed() { this.emit("change"); }
-  idle() { if (this.current) throw new Error("Stop or finish the current investigation before changing projects or sessions."); }
-  async persist() { try { await this.store.persist(); } catch { this.issue = "Work remains open, but local saving failed. Export your session before closing the app."; this.changed(); } }
+  idle() { if (this.current) throw new Error("Stop or finish the current investigation before changing projects or sessions."); if (this.store.pendingChange) throw new Error("Workspace changes are being saved. Try again in a moment."); }
+  async persist() { try { await this.store.pendingChange; await this.store.persist(); } catch { this.issue = "Work remains open, but local saving failed. Export your session before closing the app."; this.changed(); } }
   saveSoon() { clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => void this.persist(), 350); this.saveTimer.unref?.(); }
   async snapshot() {
     const p = this.store.project(), session = this.store.session();
     let files = {};
     if (p) { if (!this.inventory || this.inventory.id !== p.id || Date.now() - this.inventory.time > 1000) this.inventory = { id: p.id, time: Date.now(), value: await this.store.context().then(({ files, limited }) => ({ files, limited })).catch(() => ({ files: [], limited: false, unavailable: true })) }; files = this.inventory.value; }
-    return { projects: this.store.state.projects.map(({ id, name, path, sample }) => ({ id, name, path, sample })), project: p ? { id: p.id, name: p.name, path: p.path, memory: p.memory, sample: p.sample, sessions: p.sessions.map(({ id, title, status }) => ({ id, title, status })), session, ...files } : null, running: Boolean(this.current), agent: this.bridge.status(), issue: this.issue };
+    const projectSummary = ({ id, name, path, sample, archivedAt, sessions }) => ({ id, name, path, sample, archivedAt, sessionCount: sessions.length });
+    const sessionSummary = ({ id, title, status, archivedAt }) => ({ id, title, status, archivedAt });
+    return { projects: this.store.state.projects.filter((p) => !p.archivedAt).map(projectSummary), archivedProjects: this.store.state.projects.filter((p) => p.archivedAt).map(projectSummary), project: p ? { id: p.id, name: p.name, path: p.path, memory: p.memory, sample: p.sample, sessions: p.sessions.filter((s) => !s.archivedAt).map(sessionSummary), archivedSessions: p.sessions.filter((s) => s.archivedAt).map(sessionSummary), session, ...files } : null, running: Boolean(this.current), agent: this.bridge.status(), issue: this.issue };
   }
   async run(text, model) {
     this.idle(); text = z.string().trim().min(3).max(6000).parse(text);

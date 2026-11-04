@@ -188,6 +188,7 @@ export default function ResearchWorkspace() {
       <div role="group" aria-label="Research colour theme" className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
         {([{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }] as const).map(({ value, label, icon: Icon }) => <button key={value} type="button" aria-pressed={theme === value} onClick={() => changeTheme(value)} className={`flex min-h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors ${theme === value ? "bg-[var(--said)] text-[var(--text)]" : "text-[var(--text-dim)] hover:text-[var(--text)]"}`}><Icon size={12} aria-hidden />{label}</button>)}
       </div>
+      <Link href="/download" aria-label="Download for Mac" className="btn-ghost flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs sm:px-3"><Download size={15} /><span className="hidden sm:inline">Download for Mac</span></Link>
       <Link href="/chat" aria-label="Health chat" className="btn-ghost flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs sm:px-3"><HeartPulse size={15} className="sm:hidden" /><span className="hidden sm:inline">Health chat</span></Link>
       <button type="button" aria-label="New research conversation" onClick={newConversation} disabled={busy} className="btn-ghost grid h-9 w-9 shrink-0 place-items-center rounded-lg disabled:opacity-40"><Plus size={18} /></button>
       <AccountControls returnTo="/research" />

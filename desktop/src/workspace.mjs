@@ -9,9 +9,16 @@ const Message = z.object({ id: z.string().uuid(), role: z.enum(["user", "assista
 const Activity = z.object({ id: z.string(), name: z.string(), status: z.enum(["running", "completed", "failed"]), summary: z.string().max(1000) });
 const Source = z.object({ id: z.string(), title: z.string().max(2000), url: z.url(), detail: z.string().max(14000), kind: z.enum(["paper", "trial"]), notice: z.string().optional(), metadata: z.object({ hasAbstract: z.boolean().optional(), publicationTypes: z.array(z.string()).optional(), year: z.number().nullable().optional(), studyType: z.string().optional(), status: z.string().optional() }).optional() });
 const PassageCheck = z.object({ claim: z.string().max(1200), sourceId: z.string().max(80), quote: z.string().max(1000), status: z.enum(["quote-found", "withheld"]), reason: z.string().max(500) });
-const Session = z.object({ id: z.string().uuid(), title: z.string().max(160), threadId: z.string().nullable(), messages: z.array(Message).max(100), activities: z.array(Activity).max(200), sources: z.array(Source).max(100), checks: z.array(PassageCheck).max(30).default([]), status: z.enum(["ready", "working", "completed", "failed", "interrupted"]) });
-const Project = z.object({ id: z.string().uuid(), name: z.string().min(1).max(160), path: z.string().min(1), memory: z.string().max(6000), sample: z.boolean(), activeSessionId: z.string().uuid().nullable(), sessions: z.array(Session).max(20) });
+const archivedAt = z.string().datetime().nullable().default(null);
+const Session = z.object({ id: z.string().uuid(), title: z.string().max(160), threadId: z.string().nullable(), messages: z.array(Message).max(100), activities: z.array(Activity).max(200), sources: z.array(Source).max(100), checks: z.array(PassageCheck).max(30).default([]), status: z.enum(["ready", "working", "completed", "failed", "interrupted"]), archivedAt });
+const Project = z.object({ id: z.string().uuid(), name: z.string().min(1).max(160), path: z.string().min(1), memory: z.string().max(6000), sample: z.boolean(), activeSessionId: z.string().uuid().nullable(), sessions: z.array(Session).max(20), archivedAt });
 const State = z.object({ version: z.literal(1), activeProjectId: z.string().uuid().nullable(), projects: z.array(Project).max(12) });
+const Label = z.string().trim().min(1).max(160).refine((value) => [...value].every((character) => character.charCodeAt(0) > 31 && character.charCodeAt(0) !== 127), "Use a name on one line.");
+function selectAvailable(state) {
+  const projects = state.projects.filter((p) => !p.archivedAt);
+  if (!projects.some((p) => p.id === state.activeProjectId)) state.activeProjectId = projects[0]?.id ?? null;
+  for (const p of state.projects) if (!p.sessions.some((s) => s.id === p.activeSessionId && !s.archivedAt)) p.activeSessionId = p.sessions.find((s) => !s.archivedAt)?.id ?? null;
+}
 const allowed = new Set([".md", ".txt", ".csv", ".tsv", ".json", ".fasta", ".fa", ".log", ".py", ".r"]);
 const blocked = (name) => name.startsWith(".") || /^(node_modules|dist|build|venv|__pycache__)$/i.test(name) || /(?:^|[._-])(credentials?|secrets?|tokens?|passwords?)(?:[._-]|$)/i.test(name) || /\.(pem|key|p12|pfx)$/i.test(name);
 
@@ -52,22 +59,52 @@ export class WorkspaceStore {
     try { const raw = await fs.readFile(this.file, "utf8"); if (Buffer.byteLength(raw) > 20_000_000) throw new Error("Workspace storage exceeds its limit."); this.state = State.parse(JSON.parse(raw)); }
     catch (e) { if (e.code !== "ENOENT") throw new Error("Saved workspace could not be loaded. Its file was preserved; choose a separate data directory or restore a backup."); }
     for (const p of this.state.projects) for (const s of p.sessions) { if (s.status === "working") s.status = "interrupted"; for (const m of s.messages) if (m.status === "working") m.status = "interrupted"; for (const a of s.activities) if (a.status === "running") a.status = "failed"; }
+    selectAvailable(this.state);
   }
-  persist() {
-    const content = JSON.stringify(State.parse(this.state)); if (Buffer.byteLength(content) > 20_000_000) throw new Error("Workspace storage is full. Export research before adding more.");
+  persist(state = this.state) {
+    const content = JSON.stringify(State.parse(state)); if (Buffer.byteLength(content) > 20_000_000) throw new Error("Workspace storage is full. Export research before adding more.");
     const task = this.queue.catch(() => {}).then(async () => { const temp = `${this.file}.${randomUUID()}.tmp`; try { await fs.writeFile(temp, content, { mode: 0o600, flag: "wx" }); await fs.rename(temp, this.file); } finally { await fs.unlink(temp).catch(() => {}); } }); this.queue = task; return task;
   }
-  project() { return this.state.projects.find((p) => p.id === this.state.activeProjectId) ?? null; }
-  session() { const p = this.project(); return p?.sessions.find((s) => s.id === p.activeSessionId) ?? null; }
+  project() { return this.state.projects.find((p) => p.id === this.state.activeProjectId && !p.archivedAt) ?? null; }
+  session() { const p = this.project(); return p?.sessions.find((s) => s.id === p.activeSessionId && !s.archivedAt) ?? null; }
+  async manage(change) {
+    if (this.pendingChange) throw new Error("Workspace changes are still being saved. Try again in a moment.");
+    const next = structuredClone(this.state); change(next); selectAvailable(next);
+    const pending = this.persist(next); this.pendingChange = pending;
+    try { await pending; this.state = next; } finally { this.pendingChange = null; }
+  }
+  async rename(kind, id, name) {
+    const label = Label.parse(name);
+    await this.manage((state) => { const item = kind === "project" ? state.projects.find((p) => p.id === id) : state.projects.find((p) => p.id === state.activeProjectId && !p.archivedAt)?.sessions.find((s) => s.id === id); if (!item) throw new Error("This saved work could not be found."); item[kind === "project" ? "name" : "title"] = label; });
+  }
+  async archive(kind, id, restore = false) {
+    await this.manage((state) => {
+      const p = kind === "project" ? state.projects.find((p) => p.id === id) : state.projects.find((p) => p.id === state.activeProjectId && !p.archivedAt);
+      const item = kind === "project" ? p : p?.sessions.find((s) => s.id === id);
+      if (!item) throw new Error("This saved work could not be found.");
+      if ((kind === "project" ? p.sessions : [item]).some((s) => s.status === "working")) throw new Error("Finish or stop the active investigation first.");
+      item.archivedAt = restore ? null : new Date().toISOString();
+      if (restore) { state.activeProjectId = p.id; if (kind === "session") p.activeSessionId = id; }
+    });
+  }
+  async removeArchived(kind, id) {
+    await this.manage((state) => {
+      const p = kind === "project" ? state.projects.find((p) => p.id === id) : state.projects.find((p) => p.id === state.activeProjectId && !p.archivedAt);
+      const item = kind === "project" ? p : p?.sessions.find((s) => s.id === id);
+      if (!item?.archivedAt) throw new Error("Only archived work can be removed.");
+      if (kind === "project") state.projects = state.projects.filter((project) => project.id !== id);
+      else p.sessions = p.sessions.filter((s) => s.id !== id);
+    });
+  }
   async addProject(directory, sample = false) {
     const real = await fs.realpath(directory); if (!(await fs.stat(real)).isDirectory() || real === path.parse(real).root || real === process.env.HOME) throw new Error("Choose a dedicated research folder, not your home or disk root.");
     let p = this.state.projects.find((p) => p.path === real);
     if (!p) { if (this.state.projects.length >= 12) throw new Error("This app supports twelve project folders."); p = { id: randomUUID(), name: path.basename(real).slice(0, 160), path: real, memory: "", sample, sessions: [], activeSessionId: null }; this.state.projects.push(p); }
-    this.state.activeProjectId = p.id; if (!p.sessions.length) this.newSession(); await this.persist(); return p;
+    p.archivedAt = null; this.state.activeProjectId = p.id; selectAvailable(this.state); if (!p.sessions.length) this.newSession(); await this.persist(); return p;
   }
-  newSession() { const p = this.project(); if (!p) throw new Error("Open a research project first."); if (p.sessions.length >= 20) throw new Error("This project has twenty research sessions. Export before starting another."); const s = { id: randomUUID(), title: "New investigation", threadId: null, messages: [], activities: [], sources: [], checks: [], status: "ready" }; p.sessions.push(s); p.activeSessionId = s.id; return s; }
-  async selectProject(id) { if (!this.state.projects.some((p) => p.id === id)) throw new Error("Unknown project."); this.state.activeProjectId = id; await this.persist(); }
-  async selectSession(id) { const p = this.project(); if (!p?.sessions.some((s) => s.id === id)) throw new Error("Unknown research session."); p.activeSessionId = id; await this.persist(); }
+  newSession() { const p = this.project(); if (!p) throw new Error("Open a research project first."); if (p.sessions.length >= 20) throw new Error("This project has twenty saved investigations, including archived work. Restore and export any work you need, then remove an archived investigation to make room."); const s = { id: randomUUID(), title: "New investigation", threadId: null, messages: [], activities: [], sources: [], checks: [], status: "ready" }; p.sessions.push(s); p.activeSessionId = s.id; return s; }
+  async selectProject(id) { if (!this.state.projects.some((p) => p.id === id && !p.archivedAt)) throw new Error("Unknown active project. Restore archived work from the library."); this.state.activeProjectId = id; await this.persist(); }
+  async selectSession(id) { const p = this.project(); if (!p?.sessions.some((s) => s.id === id && !s.archivedAt)) throw new Error("Unknown active investigation. Restore archived work from the library."); p.activeSessionId = id; await this.persist(); }
   async context() { const p = this.project(); if (!p) throw new Error("Open a project first."); return { name: p.name, memory: p.memory, sample: p.sample, ...(await projectFiles(p.path)) }; }
   async read(relative) { const p = this.project(); if (!p) throw new Error("Open a project first."); const file = await safeProjectFile(p.path, relative); return { path: relative, sha256: file.sha256, modifiedAt: file.modifiedAt, bytes: file.size, text: file.text.slice(0, 60000), truncated: file.text.length > 60000 }; }
   async profile(relative) { const p = this.project(); if (!p) throw new Error("Open a project first."); const file = await safeProjectFile(p.path, relative); const ext = path.extname(relative).toLowerCase(); if (![".csv", ".tsv", ".json"].includes(ext)) throw new Error("Choose a CSV, TSV or FHIR Observation JSON file."); return { path: relative, sha256: file.sha256, modifiedAt: file.modifiedAt, bytes: file.size, ...(ext === ".json" ? extractObservations(file.text) : profileDelimited(file.text, ext === ".tsv" ? "\t" : ",")) }; }

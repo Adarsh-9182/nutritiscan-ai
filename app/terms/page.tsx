@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">EARLY ACCESS · 9 OCTOBER 2026</span>
+      <span className="ns-eyebrow">EARLY ACCESS · 4 NOVEMBER 2026</span>
       <h1>A clearer picture. An honest scope.</h1>
 
       <h2>What NutritiScan does</h2>
@@ -31,6 +31,23 @@ export default function Page() {
         records and simulated roles. It does not connect to a hospital,
         identify a clinician, send a patient message or provide a real clinical
         audit record.
+      </p>
+
+      <h2>Mac research preview</h2>
+      <p>
+        The downloadable Mac app is a free local research preview. It adds
+        project files, literature retrieval, descriptive dataset inspection,
+        saved reports and a user-operated terminal. It does not operate lab
+        instruments or validate diagnoses, treatments or disease cures. It has
+        not been notarized by Apple; compatibility and installation details are
+        shown on the <Link href="/download">download page</Link>.
+      </p>
+      <p>
+        Model access requires your own supported account, installed client and
+        available usage. Provider terms and limits apply. Downloading the app
+        does not include a ChatGPT or Claude subscription, guarantee access to
+        every model, or enable a paid API fallback. The local preview does not
+        sell or host access to either provider’s subscription.
       </p>
 
       <h2>Medical decisions stay with qualified professionals</h2>

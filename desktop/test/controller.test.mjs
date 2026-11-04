@@ -76,3 +76,13 @@ test("a changed retrieved record invalidates old passage-check labels", async (t
   await controller.serverRequest({ id: "updated", method: "item/tool/call", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", callId: "search-updated", tool: "search_literature", arguments: { query: "synthetic research", source: "pubmed" } } });
   assert.equal(store.session().checks[0].status, "withheld"); assert.match(store.session().checks[0].reason, /changed/);
 });
+test("a background save waits for durable workspace changes instead of restoring an older project name", async (t) => {
+  const { controller, store } = await setup(t);
+  let release; store.queue = new Promise((resolve) => { release = resolve; });
+  const change = store.rename("project", store.project().id, "Retained synthetic project");
+  const backgroundSave = controller.persist();
+  assert.throws(() => controller.idle(), /being saved/);
+  release(); await Promise.all([change, backgroundSave]);
+  const restored = new WorkspaceStore(store.directory); await restored.load();
+  assert.equal(restored.project().name, "Retained synthetic project");
+});
