@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, PUT } from "@/app/api/research/backup/route";
 import { authenticatedAccount } from "@/lib/account/session";
+import { createStudyProtocol } from "./protocol";
+import { reply, request as researchRequest, source } from "./test-fixtures";
 vi.mock("@/lib/account/session", () => ({ authenticatedAccount: vi.fn(), cookieValue: () => "synthetic-test-session", SESSION_COOKIE: "nutritiscan-session" }));
 vi.mock("@/lib/http/guard", async (original) => ({ ...await original<typeof import("@/lib/http/guard")>(), checkRateShared: async () => ({ ok: true }) }));
 const owner = "11111111-1111-4111-8111-111111111111";
@@ -15,6 +17,17 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ revision, updatedAt: "2026-11-02T10:00:00Z", backup })));
 });
 describe("account research boundary", () => {
+  it("roundtrips protocol drafts through the authenticated account snapshot contract", async () => {
+    const protocol = createStudyProtocol(researchRequest.message, [source.id], reply);
+    const snapshot = { ...backup, threads: [{ id: "project", title: "Synthetic protocol project", query: "", updatedAt: 1, turns: [{ id: "turn", request: { message: researchRequest.message, query: "", mode: "evidence", sources: ["pubmed"] }, phase: "done", reply, protocol }] }] };
+    const response = await PUT(request("PUT", { accountId: owner, revision: null, consent: true, backup: snapshot }));
+    expect(response.status).toBe(200);
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).backup.threads[0].turns[0].protocol).toEqual(protocol);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ revision, updatedAt: backup.exportedAt, backup: snapshot })));
+    const restored = await GET(request());
+    expect(restored.status).toBe(200);
+    expect((await restored.json()).backup.threads[0].turns[0].protocol).toEqual(protocol);
+  });
   it("requires sign-in and same-origin writes before upstream storage access", async () => {
     expect((await PUT(request("PUT", {}, "https://untrusted.invalid"))).status).toBe(403);
     vi.mocked(authenticatedAccount).mockResolvedValue(null);

@@ -9,10 +9,14 @@ import { ResearchController } from "./controller.mjs";
 import { LocalTerminal } from "./terminal.mjs";
 import { searchLiterature } from "./literature.mjs";
 import { CLAUDE_BIOLOGY_CONTEXT } from "./policy.mjs";
+import { AnalysisSpec } from "./analysis.mjs";
+import { PaperClaims } from "./paper-schema.mjs";
+import { PmcId } from "./pmc.mjs";
+import { readPickedPdf } from "./papers.mjs";
 
 app.setName("NutritiScan");
 if (process.env.NUTRITISCAN_DATA_DIR) app.setPath("userData", path.resolve(process.env.NUTRITISCAN_DATA_DIR));
-let window, controller, terminal, notificationTimer, store;
+let window, controller, terminal, notificationTimer, store, previewAbort;
 let loadFailed = false;
 function send(channel, ...data) { if (window && !window.isDestroyed()) window.webContents.send(channel, ...data); }
 function changed() { if (notificationTimer) return; notificationTimer = setTimeout(() => { notificationTimer = null; send("biology:change"); }, 50); }
@@ -30,12 +34,22 @@ const requests = {
   run: z.object({ text: z.string().trim().min(3).max(6000), model: z.string().max(160).optional() }).strict(), stop: object,
   "file.read": z.object({ path: z.string().min(1).max(500) }).strict(), "file.profile": z.object({ path: z.string().min(1).max(500) }).strict(),
   "memory.save": z.object({ memory: z.string().max(6000) }).strict(), "session.export": object,
+  "analysis.propose": z.object({ spec: AnalysisSpec }).strict(),
+  "analysis.run": z.object({ id: z.string().uuid(), sha256: z.string().regex(/^[a-f\d]{64}$/) }).strict(),
+  "analysis.reject": savedItem,
+  "paper.pick": object, "paper.import": z.object({ path: z.string().min(1).max(500) }).strict(),
+  "paper.pmc": z.object({ pmcid: PmcId }).strict(),
+  "paper.inspect": savedItem,
+  "paper.section": savedItem.extend({ sectionId: z.string().regex(/^[ps]\d{1,4}$/) }),
+  "paper.search": savedItem.extend({ query: z.string().trim().min(3).max(200) }),
+  "paper.preview": savedItem.extend({ page: z.number().int().min(1).max(80) }), "paper.preview.cancel": object,
+  "paper.verify": z.object({ claims: PaperClaims }).strict(),
   "terminal.start": z.object({ claude: z.boolean().optional() }).strict(), "terminal.close": object,
   external: z.object({ url: z.string().max(2500) }).strict(),
 };
 async function openExternal(value, authentication = false) {
   const url = new URL(value);
-  const hosts = authentication ? ["auth.openai.com", "chatgpt.com"] : ["pubmed.ncbi.nlm.nih.gov", "clinicaltrials.gov", "www.ncbi.nlm.nih.gov", "pmc.ncbi.nlm.nih.gov", "doi.org", "nature.com", "www.nature.com", "learn.chatgpt.com", "developers.openai.com", "code.claude.com"];
+  const hosts = authentication ? ["auth.openai.com", "chatgpt.com"] : ["pubmed.ncbi.nlm.nih.gov", "clinicaltrials.gov", "www.ncbi.nlm.nih.gov", "pmc.ncbi.nlm.nih.gov", "doi.org", "nature.com", "www.nature.com", "learn.chatgpt.com", "developers.openai.com", "code.claude.com", "gdc.cancer.gov", "platform-docs.opentargets.org"];
   if (url.protocol !== "https:" || !hosts.includes(url.hostname) || url.username || url.password || url.port) throw new Error("This external address is not a supported research or sign-in destination.");
   await shell.openExternal(url.href);
 }
@@ -52,7 +66,7 @@ async function invoke(action, value) {
     }
     case "project.sample": {
       controller.idle(); const folder = path.join(app.getPath("userData"), "sample-project"); await fs.mkdir(folder, { recursive: true, mode: 0o700 });
-      for (const filename of ["instrument-readings.csv", "README.md"]) { try { await fs.copyFile(fileURLToPath(new URL(`../resources/${filename}`, import.meta.url)), path.join(folder, filename), fs.constants.COPYFILE_EXCL); } catch (e) { if (e.code !== "EEXIST") throw e; } }
+      for (const filename of ["instrument-readings.csv", "synthetic-cohort.csv", "sample-paper.pdf", "README.md"]) { try { await fs.copyFile(fileURLToPath(new URL(`../resources/${filename}`, import.meta.url)), path.join(folder, filename), fs.constants.COPYFILE_EXCL); } catch (e) { if (e.code !== "EEXIST") throw e; } }
       terminal.close(); await store.addProject(folder, true); changed(); return { opened: true };
     }
     case "project.select": controller.idle(); terminal.close(); await store.selectProject(args.id); changed(); return { selected: true };
@@ -76,12 +90,38 @@ async function invoke(action, value) {
     case "stop": await controller.stop(); changed(); return { stopped: true };
     case "file.read": return store.read(args.path);
     case "file.profile": return store.profile(args.path);
+    case "analysis.propose": controller.idle(); try { return await store.proposeAnalysis(args.spec); } finally { changed(); }
+    case "analysis.run": return controller.runAnalysis(args.id, args.sha256);
+    case "analysis.reject": controller.idle(); { const result = await store.rejectAnalysis(args.id); changed(); return result; }
+    case "paper.pick": {
+      controller.idle(); const projectId = store.project()?.id; if (!projectId) throw new Error("Open a research project first.");
+      const picked = await dialog.showOpenDialog(window, { title: "Import a research PDF", filters: [{ name: "PDF paper", extensions: ["pdf"] }], properties: ["openFile"] });
+      if (picked.canceled || !picked.filePaths[0]) return { cancelled: true };
+      if (store.project()?.id !== projectId) throw new Error("The active project changed. Choose the PDF again.");
+      return controller.paperTask(async (signal) => { const data = await readPickedPdf(picked.filePaths[0]); signal.throwIfAborted(); return controller.papers.importPdf({ data, name: path.basename(picked.filePaths[0]) }, signal); });
+    }
+    case "paper.import": return controller.paperTask((signal) => controller.papers.importPdf({ path: args.path }, signal));
+    case "paper.pmc": return controller.paperTask((signal) => controller.papers.importPmc(args.pmcid, signal));
+    case "paper.inspect": return controller.papers.inspect(args.id);
+    case "paper.section": return controller.papers.read(args.id, args.sectionId);
+    case "paper.search": return controller.papers.search(args.id, args.query);
+    case "paper.preview": {
+      previewAbort?.abort(); const active = new AbortController(); previewAbort = active;
+      try { return await controller.papers.preview(args.id, args.page, active.signal); } finally { if (previewAbort === active) previewAbort = null; }
+    }
+    case "paper.preview.cancel": previewAbort?.abort(); return { cancelled: true };
+    case "paper.verify": {
+      const session = store.session(); if (!session) throw new Error("Open an investigation first.");
+      const result = await controller.papers.verify(args.claims);
+      if (store.session() !== session) throw new Error("The active investigation changed. Verify the passages again.");
+      session.paperChecks = [...(session.paperChecks ?? []), ...result.checks].slice(-30); await store.persist(); changed(); return result;
+    }
     case "memory.save": controller.idle(); if (!store.project()) throw new Error("Open a project first."); store.project().memory = args.memory; await store.persist(); changed(); return { saved: true };
     case "session.export": {
       const session = store.session(); if (!session) throw new Error("Open a research session first.");
       const result = await dialog.showSaveDialog(window, { title: "Export research session", defaultPath: "nutritiscan-research.md", filters: [{ name: "Markdown", extensions: ["md"] }], properties: ["showOverwriteConfirmation"] });
       if (result.canceled || !result.filePath) return { saved: false };
-      const text = [`# ${session.title}`, "Research draft — researcher review required", ...session.messages.map((m) => `## ${m.role === "user" ? "Researcher" : "NutritiScan"} (${m.status})\n\n${m.text}`), "## Retrieved sources", ...session.sources.map((s) => `### ${s.id}: ${s.title}\n${s.url}\n\n${s.detail}\n\n${s.notice ?? ""}`), "## Completed tool activity", ...session.activities.map((a) => `${a.name}: ${a.status} — ${a.summary}`)].join("\n\n");
+      const text = [`# ${session.title}`, "Research draft — researcher review required", ...session.messages.map((m) => `## ${m.role === "user" ? "Researcher" : "NutritiScan"} (${m.status})\n\n${m.text}`), "## Retrieved sources", ...session.sources.map((s) => `### ${s.id}: ${s.title}\n${s.url}\n\n${s.detail}\n\n${s.notice ?? ""}`), "## Recorded tool activity", ...session.activities.map((a) => `${a.name}: ${a.status} — ${a.summary}`), "## Analysis records", ...(session.analyses ?? []).map((record) => JSON.stringify(record, null, 2)), "## Project paper snapshots", ...(store.project()?.papers ?? []).map((paper) => JSON.stringify(paper, null, 2)), "## Paper passage membership checks (not scientific validation)", ...(session.paperChecks ?? []).map((check) => JSON.stringify(check, null, 2))].join("\n\n");
       await fs.writeFile(result.filePath, text, { mode: 0o600 }); return { saved: true };
     }
     case "terminal.start": {
@@ -128,7 +168,9 @@ app.on("before-quit", (event) => {
   if (quitting || loadFailed) return;
   event.preventDefault();
   controller?.finish("interrupted"); clearTimeout(controller?.saveTimer);
+  controller?.analysisActive?.abort.abort();
+  controller?.paperActive?.abort.abort(); previewAbort?.abort();
   terminal?.close(); controller?.bridge.close(); clearTimeout(notificationTimer);
-  void Promise.resolve(store?.pendingChange).catch(() => {}).then(() => controller?.persist()).finally(() => { quitting = true; app.quit(); });
+  void Promise.allSettled([controller?.analysisActive?.promise, controller?.paperActive?.promise]).then(() => store?.pendingChange).catch(() => {}).then(() => controller?.persist()).finally(() => { quitting = true; app.quit(); });
 });
 app.on("window-all-closed", () => app.quit());

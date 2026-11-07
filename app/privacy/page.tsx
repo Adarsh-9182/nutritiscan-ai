@@ -73,6 +73,14 @@ export default function Page() {
         chats or account research backups.
       </p>
       <p>
+        Importing a paper saves an original copy and an extracted text snapshot
+        inside the chosen project. PDF extraction, previews and manual passage
+        checks run locally. Passages requested during agent chat are sent to
+        the connected model provider; importing alone does not send the PDF to
+        that provider. Fetching open full text sends the article identifier to
+        the official PMC service and retains the returned licence and attribution.
+      </p>
+      <p>
         The desktop agent sends messages, requested file content, retrieved
         evidence and project context to the model through your installed Codex
         runtime. Public literature queries go to PubMed and ClinicalTrials.gov.

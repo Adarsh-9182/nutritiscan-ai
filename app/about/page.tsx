@@ -2,72 +2,55 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "About the NutritiScan health journal",
-  description:
-    "Learn what NutritiScan does today, what is still in development, and how the early-access health journal fits alongside care from a qualified clinician.",
+  title: "About",
+  description: "NutritiScan is building a research agent for human biology, with a Mac project workspace and a web evidence-to-protocol workflow.",
   alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {
-  return (
-    <main className="ns-policy">
-      <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">ABOUT THE PRODUCT</span>
-      <h1>What is NutritiScan?</h1>
-      <p>
-        NutritiScan is an early-access educational health companion for people
-        and families of all ages. Younger users should involve a parent or
-        guardian when sharing personal health information.
-        The website offers general health chat, and the Android beta includes a
-        local journal for meals, health notes and saved conversations. It is
-        designed to help people organize questions for a doctor visit—not to
-        replace medical care.
-      </p>
+  return <main className="ns-policy">
+    <Link href="/">← NutritiScan</Link>
+    <span className="ns-eyebrow">ABOUT THE PRODUCT</span>
+    <h1>A research agent for human biology.</h1>
+    <p>NutritiScan is building a working environment for researchers to investigate
+      evidence, understand datasets, develop analyses and preserve their work.
+      The Mac application is the primary research workspace. Cancer biology and
+      treatment resistance are the first specialist direction.</p>
 
-      <h2>What can I use today?</h2>
-      <p>
-        You can ask general health questions in the web chat and keep personal
-        journal entries in the Android beta. Android journal entries are stored
-        on your device and are not encrypted by NutritiScan. Web chat messages
-        are sent to the server when you submit them and may be processed by a
-        configured AI provider.
-      </p>
+    <h2>What can I use today?</h2>
+    <p>The Mac preview brings local project files, PDF/PMC paper reading with exact passage citations, CSV/FHIR
+      inspection, reviewed descriptive analyses, public literature search, saved reports,
+      a project handoff and a terminal
+      together. Agent chat uses your installed Codex client and existing managed
+      ChatGPT sign-in. The web workspace supports source review and an editable
+      study protocol with bibliography and export.</p>
 
-      <h2>Are lab reports and shared health records available?</h2>
-      <p>
-        No. The private cloud health-record service, shared report storage,
-        automatic lab extraction and shared health trends are not active in the
-        current release. Do not rely on NutritiScan to interpret a test result.
-        Check the health dashboard for the current service status.
-      </p>
+    <h2>What comes next?</h2>
+    <p>Broader evidence retrieval, reproducible scientific computation, public
+      cancer cohort connectors and structured hypothesis validation are roadmap
+      work. Each needs known-answer checks and evaluation with researchers.
+      Database reference links do not mean their data has been ingested.</p>
 
-      <h2>Does NutritiScan provide medical advice?</h2>
-      <p>
-        No. NutritiScan is not clinically validated and does not diagnose,
-        prescribe, recommend treatment or check medicine interactions. A
-        qualified clinician should interpret symptoms, test results and
-        treatment options. In an emergency, contact local emergency services.
-      </p>
+    <h2>Can it discover or validate a cure?</h2>
+    <p>No disease cure has been developed or validated by this product.
+      NutritiScan aims to help researchers develop better treatments.
+      A computational finding needs independent replication, experimental
+      validation and the appropriate clinical studies before it can support a
+      treatment claim. Scientific and clinical decisions remain with qualified people.</p>
 
-      <h2>How does NutritiScan handle health information?</h2>
-      <p>
-        NutritiScan does not use patient records for model training. Chat
-        messages may be sent to a configured AI provider, whose handling is
-        governed by its own terms. Review the <Link href="/privacy">privacy
-        notice</Link> before sending health-related information.
-      </p>
+    <h2>Where does research data go?</h2>
+    <p>Desktop project files and history remain on your Mac. Requested content,
+      messages and project context go to the connected model provider during a run;
+      public search terms go to the enabled databases. Local app history is not
+      application-level encrypted. Use public or appropriately de-identified
+      material and review the <Link href="/privacy">privacy notice</Link>.</p>
 
-      <p>
-        <Link href="/chat">Try the educational web chat</Link> or{" "}
-        <Link href="https://github.com/Adarsh-9182/nutritiscan/releases">
-          get the Android beta
-        </Link>.
-      </p>
-      <p>
-        <Link href="/guides/doctor-appointment-checklist">
-          Read the doctor appointment preparation checklist.
-        </Link>
-      </p>
-    </main>
-  );
+    <h2>What happened to the health chat?</h2>
+    <p>The earlier <Link href="/chat">educational health chat</Link> and Android
+      beta remain separate. NutritiScan does not diagnose, prescribe or replace
+      medical care. The separate health dashboard shows its own service status.</p>
+
+    <p><Link href="/download">Download the Mac preview</Link> or{" "}
+      <Link href="/research">open the web research workspace</Link>.</p>
+  </main>;
 }

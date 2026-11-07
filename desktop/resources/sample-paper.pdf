@@ -1,0 +1,58 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 3 /Kids [5 0 R 7 0 R 9 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Title (NutritiScan fictional software-test paper) /Author (NutritiScan software test) >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 485 >>
+stream
+BT /F1 12 Tf 50 740 Td 22 TL (NUTRITISCAN - FICTIONAL RESEARCH NOTE) Tj T* (Software demonstration only. This is not a published study.) Tj T* () Tj T* (Question) Tj T* (How can an agent preserve the source and page of a quotation?) Tj T* () Tj T* (Methods) Tj T* (Eight invented measurements are stored in synthetic-cohort.csv.) Tj T* (The values were constructed for deterministic software checks.) Tj T* (No participants, specimens or biological experiments were involved.) Tj T* ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 537 >>
+stream
+BT /F1 12 Tf 50 740 Td 22 TL (RESULTS - SYNTHETIC SOFTWARE DATA ONLY) Tj T* () Tj T* (The mean signal was 5 in model_A and 12 in model_B.) Tj T* (Seven complete pairs had a Pearson correlation of 1.) Tj T* (One signal value was missing and no values were imputed.) Tj T* () Tj T* (Limitations) Tj T* (These fictional values provide no evidence about cancer or treatment.) Tj T* (A quotation match establishes text membership, not scientific validity.) Tj T* (The third page is intentionally blank to test missing text handling.) Tj T* ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000305 00000 n 
+0000000431 00000 n 
+0000000967 00000 n 
+0000001093 00000 n 
+0000001681 00000 n 
+0000001808 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R /Info 4 0 R >>
+startxref
+1858
+%%EOF

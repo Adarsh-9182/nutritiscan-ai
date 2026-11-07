@@ -18,7 +18,8 @@
     "predev": "node scripts/pdf-worker.mjs",
     "prebuild": "node scripts/pdf-worker.mjs",
     "migrate:workspace": "node scripts/workspace-migrate.mjs",
-    "test:e2e": "node scripts/smoke-workspace.mjs"
+    "test:e2e": "node scripts/smoke-workspace.mjs",
+    "test:study-browser": "node scripts/smoke-study-planning.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.54",

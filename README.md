@@ -1,14 +1,31 @@
 # NutritiScan
 
-The separate [local biology desktop prototype](desktop/README.md) adds an Electron
-research workspace with project files, literature tools, CSV/FHIR inspection,
-memory, a terminal and the user's existing Codex/ChatGPT sign-in. Its local Mac
-build, current limits and verification are documented there; it is separate from
-the web workspace below. The website's [Mac download page](https://www.nutritiscan.com/download)
+NutritiScan is a supervised research agent for human biology. The Mac application
+is the primary workspace: open a project, inspect evidence and data, propose an
+analysis, review and run it, then preserve results and a reproducible record.
+The active [product roadmap](docs/RESEARCH_PRODUCT_ROADMAP.md) focuses first on
+cancer biology and treatment-resistance research, with measurable delivery gates.
+
+The web workspace now adds an investigator-editable study protocol alongside
+each question's selected evidence: question, methods, eligibility, outcomes,
+sample-size rationale, analysis and ethics/data management. Missing choices stay
+blank; drafts preview/export with their bibliography and survive conversation
+reload and backups. This is a working draft editor, not automatic protocol
+generation, scientific validation or institutional sign-off.
+
+The [Mac biology workspace](desktop/README.md) adds project files, literature,
+CSV/FHIR inspection, persistent context, a terminal and the user's existing
+Codex/ChatGPT sign-in. Version 0.4.0 adds a PDF/PMC paper library, original-page previews, exact passage
+citations and source verification alongside the 0.3.0 analysis proposals, local
+profiles/grouped summaries/correlations, result charts and source-hashed receipts. It does not yet execute arbitrary Python/R or ingest public cancer
+cohorts. The web and Mac project formats remain separate.
+The website's [Mac download page](https://www.nutritiscan.com/download)
 links a versioned GitHub Release ZIP, shows install requirements and the archive's
 SHA-256, and labels the build as an Apple Silicon preview that is not notarized.
 
-An educational personal health companion for web and Android. The public health chat is live at [nutritiscan.com](https://nutritiscan.com); [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases) use the same midnight/lime/mint design.
+The earlier educational personal-health chat and Android app remain separate
+surfaces. [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases)
+use the same midnight/lime/mint design. They are not the active research roadmap.
 
 The `/health` workspace adds account-scoped reports, confirmed lab trends, health history, record questions, doctor summaries and privacy controls. It requires a separately deployed [FastAPI health service](backend/README.md); until `HEALTH_API_URL` is configured, the dashboard and Android shared-record screens clearly show that the service is not connected. Public chat and the app's local journal remain independent.
 
@@ -19,7 +36,10 @@ npm ci
 npm run dev
 ```
 
-`/` is the personal-health landing page, `/chat` the public educational chat, `/health` the shared health workspace, and `/research` the existing research surface. `/discharge-demo` retains fictional demonstration workflows.
+`/` is the research product landing page, `/download` the Mac preview download,
+`/research` the web research workspace, `/chat` the earlier educational chat and
+`/health` the separate shared health workspace. `/discharge-demo` retains fictional
+demonstration workflows.
 
 Public AI chat uses the configured provider credentials described in `.env.example`. Without a working provider it has limited demonstration behavior. The Android transport at `/api/mobile/chat` labels that fallback. A single supervisor handles the normal public-chat path; `HEALTH_MULTI_AGENT_ENABLED=true` retains separate LLM delegation only as an evaluation experiment.
 
@@ -66,7 +86,7 @@ credentials, failed checks and exhausted quotas produce a labelled source
 collection rather than an invented AI answer. Local tests use synthetic sources;
 a live provider call is not verified by those tests.
 
-This release supports literature-based research, hypothesis drafting and study
+The web release supports literature-based research, hypothesis drafting and study
 planning. It does not execute code, analyze uploaded datasets, conduct lab
 experiments, validate disease cures or establish human age reversal. Research
 history is device-local (eight conversations, twelve turns each, 1 MB total), not

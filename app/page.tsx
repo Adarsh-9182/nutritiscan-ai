@@ -40,11 +40,11 @@ const STRUCTURED_DATA = {
       applicationCategory: "HealthApplication",
       url: SITE_URL,
       description:
-        "An AI assistant for medical schools and hospitals, in early access. A research workspace searches PubMed and ClinicalTrials.gov and returns a source-linked evidence index; synthesis, protocol drafting, participant screening and hospital workflows are planned and not yet available.",
+        "A research agent for human biology, in early access. The Mac preview provides a local project workspace, dataset inspection, literature tools and saved reports. The web workspace searches PubMed and ClinicalTrials.gov and supports an investigator-editable study protocol. Broader scientific execution and cancer cohort connectors remain roadmap work.",
       isAccessibleForFree: true,
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
       publisher: { "@id": `${SITE_URL}/#org` },
-      operatingSystem: "Web",
+      operatingSystem: "Web, macOS",
       disclaimer:
         "Research support only. Search coverage is incomplete and abstracts can omit important details. Not a diagnosis, not a prescription, not emergency care and not a substitute for ethics review or a qualified clinician.",
     },

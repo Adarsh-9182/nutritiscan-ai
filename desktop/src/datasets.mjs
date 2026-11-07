@@ -23,13 +23,13 @@ export function parseDelimited(text, delimiter = ",") {
   return { headers, rows };
 }
 
-export function profileDelimited(text, delimiter = ",") {
+export function profileDelimited(text, delimiter = ",", missingValues = []) {
   const { headers, rows } = parseDelimited(text, delimiter);
   const numeric = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
   const columns = headers.map((name, i) => {
     let missing = 0, count = 0, mean = 0, m2 = 0, min = Infinity, max = -Infinity, nonNumeric = 0;
     for (const row of rows) {
-      const raw = row[i].trim(); if (!raw) { missing++; continue; }
+      const raw = row[i].trim(); if (!raw || missingValues.includes(raw)) { missing++; continue; }
       if (!numeric.test(raw) || !Number.isFinite(Number(raw))) { nonNumeric++; continue; }
       const value = Number(raw); count++; const delta = value - mean; mean += delta / count; m2 += delta * (value - mean); min = Math.min(min, value); max = Math.max(max, value);
     }
@@ -37,7 +37,7 @@ export function profileDelimited(text, delimiter = ",") {
     if (stats && Object.values(stats).some((v) => v !== null && !Number.isFinite(v))) throw new Error("Numeric range exceeds reliable descriptive calculations. No summary was returned.");
     return { name, missing, numericCount: count, textCount: nonNumeric, statistics: stats, ...(nonNumeric && count ? { notice: "Mixed numeric/text column; no numeric summary computed." } : {}) };
   });
-  return { type: "delimited", rowCount: rows.length, columns, preview: rows.slice(0, 5), limitations: ["Only blank cells count as missing. Codes such as NA remain text.", "Column names and values are preserved; units are not inferred.", "Descriptive statistics do not establish efficacy, causation or a diagnosis."] };
+  return { type: "delimited", rowCount: rows.length, columns, preview: rows.slice(0, 5), limitations: [missingValues.length ? `Blank cells and the explicit, case-sensitive codes ${JSON.stringify(missingValues)} count as missing. Original values are preserved.` : "Only blank cells count as missing. Codes such as NA remain text.", "Column names and values are preserved; units are not inferred.", "Descriptive statistics do not establish efficacy, causation or a diagnosis."] };
 }
 
 export function extractObservations(text) {

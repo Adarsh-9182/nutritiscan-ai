@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import ResearchWorkspace from "@/components/research-workspace";
 
 export const metadata: Metadata = {
-  title: "Research chat | NutritiScan",
-  description: "Investigate human biology, disease mechanisms and aging research with source-linked findings, testable hypothesis drafts and proposed study plans.",
+  title: "Research workspace | NutritiScan",
+  description: "Investigate human biology, disease mechanisms and aging research with source-linked findings, hypothesis drafts and an editable study protocol with bibliography and export.",
 };
 
 export default function ResearchPage() {

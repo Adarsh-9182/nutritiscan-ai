@@ -11,6 +11,8 @@ import { includedSourcesRis } from "@/lib/research/references";
 import { ResearchProjects, ResearchProjectTitle } from "./research-projects";
 import { ResearchCloud } from "./research-cloud";
 import { ResearchBrief } from "./research-evidence-brief";
+import { ResearchProtocol } from "./research-protocol";
+import { createStudyProtocol, StudyProtocolSchema, type StudyProtocol } from "@/lib/research/protocol";
 import { EvidenceBriefSchema, type EvidenceBrief } from "@/lib/research/brief";
 import { ResearchEvidence } from "./research-evidence";
 import { ResearchSourceReview } from "./research-source-review";
@@ -79,11 +81,14 @@ export default function ResearchWorkspace() {
     if (locked.current) return;
     setActiveId(null); setQuery(""); setInput(""); setInspected(null); setRail(false); setSteps([]); persist(snapshot.current, null); composer.current?.focus();
   }
-  async function send(text: string, retry?: ResearchTurn) {
+  async function send(text: string, retry?: ResearchTurn, repeatRequest?: ResearchTurn["request"]): Promise<void> {
     if (locked.current || text.trim().length < 3) return;
-    if (!retry && !enabled.length) { setNotice("Choose at least one public source in Research settings."); return; }
+    if (!retry && !repeatRequest && !enabled.length) { setNotice("Choose at least one public source in Research settings."); return; }
     let current = snapshot.current.find((t) => t.id === activeId);
     if (retry && current?.turns.at(-1)?.id !== retry.id) return;
+    // Investigator-authored work stays attached to its original source snapshot.
+    // A fresh search is a new turn rather than a replacement for that work.
+    if (retry?.protocol) return send(text, undefined, retry.request);
     if (!current && snapshot.current.length >= 8) { setNotice("You have eight saved research conversations. Export and delete an older one before starting another."); return; }
     if (current && !retry && current.turns.length >= 12) { setNotice("This conversation has reached twelve questions. Start a new research conversation to keep context focused."); return; }
     locked.current = true; setBusy(true); setNotice(""); setSteps([]); setInput(""); setInspected(null);
@@ -91,7 +96,7 @@ export default function ResearchWorkspace() {
     const requestedAt = researchTimestamp();
     if (!current) current = { id: crypto.randomUUID(), title: text.slice(0, 160), query: query.trim(), updatedAt: requestedAt, turns: [] };
     const id = current.id;
-    const request = retry?.request ?? { message: text.trim(), query: query.trim(), searchMode: query.trim() ? "manual" as const : "auto" as const, mode, sources: enabled };
+    const request = repeatRequest ?? retry?.request ?? { message: text.trim(), query: query.trim(), searchMode: query.trim() ? "manual" as const : "auto" as const, mode, sources: enabled };
     const turn: ResearchTurn = { id: retry?.id ?? crypto.randomUUID(), request, phase: "working", reply: null };
     const previous = retry ? current.turns.slice(0, -1) : current.turns;
     const history: ResearchRequest["history"] = previous.flatMap((t) => [
@@ -129,7 +134,7 @@ export default function ResearchWorkspace() {
     if (current?.phase !== "done" || !current.reply?.sources.some((s) => s.id === sourceId)) return;
     const updatedAt = new Date(researchTimestamp()).toISOString();
     const review = value ? SourceReviewSchema.parse({ ...value, sourceId, updatedAt }) : null;
-    update(activeId, (t) => ({ ...t, turns: t.turns.map((v) => v.id === turnId ? { ...v, sourceReviews: [...(v.sourceReviews ?? []).filter((r) => r.sourceId !== sourceId), ...(review ? [review] : [])] } : v) }));
+    update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, sourceReviews: [...(v.sourceReviews ?? []).filter((r) => r.sourceId !== sourceId), ...(review ? [review] : [])], ...(v.protocol ? { protocol: { ...v.protocol, reviewedAt: null } } : {}) } : v) }));
   }
   async function buildBrief(turnId: string) {
     if (locked.current || !activeId) return;
@@ -155,6 +160,26 @@ export default function ResearchWorkspace() {
     if (locked.current || !activeId) return;
     update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: v.briefs?.map((b) => b.id === briefId ? EvidenceBriefSchema.parse({ ...b, ...patch }) : b) } : v) }));
   }
+  function createProtocol(turnId: string) {
+    if (locked.current || !activeId) return;
+    const turn = snapshot.current.find((t) => t.id === activeId)?.turns.find((t) => t.id === turnId);
+    if (!turn?.reply || turn.phase !== "done" || turn.protocol) return;
+    const ids = turn.reply.sources.filter((source) => turn.sourceReviews?.some((review) => review.sourceId === source.id && review.decision === "include")).map((source) => source.id);
+    try {
+      const protocol = createStudyProtocol(turn.request.message, ids, turn.reply);
+      update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, protocol } : v) }));
+    } catch { setNotice("Choose valid included sources from this question before creating a protocol."); }
+  }
+  function editProtocol(turnId: string, patch: Partial<Pick<StudyProtocol, "title" | "fields" | "sourceIds" | "reviewedAt">>) {
+    if (locked.current || !activeId) return;
+    const turn = snapshot.current.find((t) => t.id === activeId)?.turns.find((t) => t.id === turnId);
+    if (!turn?.protocol || !turn.reply || turn.phase !== "done") return;
+    if (patch.sourceIds?.some((id) => !turn.sourceReviews?.some((review) => review.sourceId === id && review.decision === "include"))) return;
+    try {
+      const protocol = StudyProtocolSchema.parse({ ...turn.protocol, ...patch, updatedAt: new Date().toISOString() });
+      update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, protocol } : v) }));
+    } catch { setNotice("The protocol change could not be saved. Keep each section under 2,000 characters and retain at least one source."); }
+  }
   function deleteBrief(turnId: string, briefId: string) {
     if (locked.current || !activeId) return;
     update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: v.briefs?.filter((b) => b.id !== briefId) } : v) }));
@@ -171,7 +196,7 @@ export default function ResearchWorkspace() {
     try { download(researchBackup(snapshot.current), "nutritiscan-research-backup.json", "application/json;charset=utf-8"); }
     catch (e) { setNotice(messageOf(e)); }
   }
-  async function copy(request: ResearchTurn["request"], reply: ResearchReply, reviews?: SourceReview[], importedAt?: string) { try { await navigator.clipboard.writeText(researchExport(request, reply, reviews, importedAt)); setNotice("Research draft copied with sources, limitations and researcher decisions."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
+  async function copy(request: ResearchTurn["request"], reply: ResearchReply, reviews?: SourceReview[], importedAt?: string, protocol?: StudyProtocol) { try { await navigator.clipboard.writeText(researchExport(request, reply, reviews, importedAt, protocol)); setNotice("Research draft copied with sources, limitations and researcher decisions."); } catch { setNotice("Copy is unavailable in this browser. Use Export research instead."); } }
   function download(content: string, filename: string, type: string) {
     try {
       const url = URL.createObjectURL(new Blob([content], { type }));
@@ -212,17 +237,18 @@ export default function ResearchWorkspace() {
               <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--emerald)]"><FlaskConical size={25} strokeWidth={1.5} /></div>
               <p className="t-label mb-3 text-[var(--emerald)]">YOUR HUMAN-BIOLOGY RESEARCH PARTNER</p>
               <h1 className="ns-hero-title max-w-lg text-3xl font-medium leading-tight tracking-tight sm:text-5xl">What should we<br /> investigate together?</h1>
-              <p className="mt-5 max-w-lg text-sm leading-7 text-[var(--text-muted)]">Explore disease mechanisms, examine aging research, and develop testable hypotheses—with the evidence beside every finding.</p>
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">{EXAMPLES.map((ex) => <button key={ex.title} type="button" onClick={() => { setInput(ex.text); setMode(ex.mode); composer.current?.focus(); }} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition-colors hover:border-[var(--border-strong)]"><span className="mb-3 flex items-start justify-between gap-2 text-xs font-medium">{ex.title}<ChevronRight size={14} className="shrink-0 text-[var(--emerald)]" /></span><span className="block text-xs leading-6 text-[var(--text-dim)]">{ex.text}</span></button>)}</div>
+              <p className="mt-5 max-w-lg text-sm leading-7 text-[var(--text-muted)]">Investigate a research question, review the sources, and turn your selected evidence into an editable working study protocol.</p>
+              <ol aria-label="Research workflow" className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-[var(--text-dim)]"><li>01 · Ask a question</li><li>02 · Review and include sources</li><li>03 · Draft and export your protocol</li></ol><div className="mt-8 grid gap-3 sm:grid-cols-3">{EXAMPLES.map((ex) => <button key={ex.title} type="button" onClick={() => { setInput(ex.text); setMode(ex.mode); composer.current?.focus(); }} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition-colors hover:border-[var(--border-strong)]"><span className="mb-3 flex items-start justify-between gap-2 text-xs font-medium">{ex.title}<ChevronRight size={14} className="shrink-0 text-[var(--emerald)]" /></span><span className="block text-xs leading-6 text-[var(--text-dim)]">{ex.text}</span></button>)}</div>
               <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-[var(--text-dim)]"><span className="flex items-center gap-1.5"><Search size={12} /> PubMed + ClinicalTrials.gov</span><span className="flex items-center gap-1.5"><History size={12} /> Research context stays together</span></div>
             </section> : <div className="space-y-9" aria-label="Research conversation">{thread.turns.map((turn, index) => <section key={turn.id} className="space-y-5">
               <div className="ml-8 rounded-2xl rounded-br-md border border-[var(--border)] bg-[var(--said)] px-5 py-4"><p className="mb-2 text-[10px] font-medium uppercase tracking-widest text-[var(--text-dim)]">You · {MODES.find((m) => m.id === turn.request.mode)?.label}</p><p className="whitespace-pre-wrap break-words text-sm leading-7">{turn.request.message}</p></div>
               <div><div className="mb-4 flex items-center gap-2.5 text-xs font-medium"><span className="grid h-7 w-7 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--emerald)]"><FlaskConical size={14} /></span>NutritiScan Research<span className="ml-auto text-[10px] font-normal text-[var(--text-dim)]">{turn.reply?.model ?? (turn.phase === "working" ? "Researching" : "Public evidence")}</span></div>
                 {turn.phase === "working" && <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="flex items-center gap-2 text-xs text-[var(--emerald)]"><LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" />{steps.at(-1) ?? "Preparing your research question…"}</p>{steps.length > 1 && <details className="mt-3 text-xs text-[var(--text-dim)]"><summary className="cursor-pointer">View tool activity</summary><ol className="mt-2 space-y-2">{steps.slice(0, -1).map((s, i) => <li key={i}>{s}</li>)}</ol></details>}</div>}
                 {turn.error && <div role="alert" className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-sm leading-6"><p>{turn.error}</p>{index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-3 text-xs font-medium text-[var(--emerald)]">Retry question</button>}</div>}
-                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExportReferences={() => download(includedSourcesRis(turn.reply!, turn.sourceReviews), "nutritiscan-included-sources.ris", "application/x-research-info-systems;charset=utf-8")} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
+                {turn.reply && <ResearchAnswer reply={turn.reply} onInspect={(source, quote) => setInspected({ source, quote })} onCopy={() => void copy(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt, turn.protocol)} onExport={() => download(researchExport(turn.request, turn.reply!, turn.sourceReviews, thread.importedAt, turn.protocol), "nutritiscan-research.txt", "text/plain;charset=utf-8")} sourceReview={<ResearchSourceReview reply={turn.reply} reviews={turn.sourceReviews} disabled={busy} onReview={(sourceId, value) => reviewSource(turn.id, sourceId, value)} onInspect={(source) => setInspected({ source })} onExportReferences={() => download(includedSourcesRis(turn.reply!, turn.sourceReviews), "nutritiscan-included-sources.ris", "application/x-research-info-systems;charset=utf-8")} onExport={() => download(sourceReviewCsv(turn.request.message, turn.reply!, turn.sourceReviews), "nutritiscan-source-review.csv", "text/csv;charset=utf-8")} />} />}
                 {turn.reply && <ResearchBrief turn={turn} disabled={busy} generating={briefTurn === turn.id} imported={Boolean(thread.importedAt)} onBuild={() => buildBrief(turn.id)} onEdit={(id, patch) => editBrief(turn.id, id, patch)} onDelete={(id) => deleteBrief(turn.id, id)} onInspect={(source, quote) => setInspected({ source, quote })} onDownload={download} onNotice={setNotice} />}
-                {turn.reply?.status === "sources-only" && index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--emerald)] disabled:opacity-40">Retry research</button>}
+                {turn.reply && <ResearchProtocol turn={turn} disabled={busy} imported={Boolean(thread.importedAt)} onCreate={() => createProtocol(turn.id)} onEdit={(patch) => editProtocol(turn.id, patch)} onDownload={download} onNotice={setNotice} />}
+                {turn.reply?.status === "sources-only" && index === thread.turns.length - 1 && <button type="button" disabled={busy} onClick={() => void send(turn.request.message, turn)} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--emerald)] disabled:opacity-40">{turn.protocol ? "Repeat search, keep protocol" : "Retry research"}</button>}
                 {turn.reply && index === thread.turns.length - 1 && <div className="mt-5 flex flex-wrap gap-2">{[{ label: "Challenge the hypothesis", mode: "hypotheses" as const, text: "Challenge the current explanation. Propose competing hypotheses and what evidence would falsify them." }, { label: "Plan an independent test", mode: "study-plan" as const, text: "Plan an independent replication test for the findings above, including confounders, controls and appropriate endpoints." }].map((f) => <button key={f.label} disabled={busy} type="button" onClick={() => { setMode(f.mode); setInput(f.text); composer.current?.focus(); }} className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">{f.label} →</button>)}</div>}
               </div>
             </section>)}</div>}

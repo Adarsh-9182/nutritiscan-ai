@@ -1,0 +1,9 @@
+sample_id,cohort,signal_au,readout_au
+S01,model_A,2,5
+S02,model_A,4,9
+S03,model_A,6,13
+S04,model_A,8,17
+S05,model_B,10,21
+S06,model_B,12,25
+S07,model_B,14,29
+S08,model_B,,33

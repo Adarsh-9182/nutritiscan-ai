@@ -6,6 +6,7 @@ import path from "node:path";
 import os from "node:os";
 import { WorkspaceStore } from "../src/workspace.mjs";
 import { ResearchController } from "../src/controller.mjs";
+import { textPdf, samplePaperPages } from "../scripts/pdf-fixtures.mjs";
 
 class Bridge extends EventEmitter {
   constructor(auth = true) { super(); this.auth = { connected: auth, plan: "synthetic" }; this.models = [{ model: "synthetic-model", isDefault: true }]; this.calls = []; this.replies = []; }
@@ -13,7 +14,7 @@ class Bridge extends EventEmitter {
   async connect() {} async refreshAuth() {} reply(id, result) { this.replies.push({ id, result }); this.emit("replied"); }
   async rpc(method, params) { this.calls.push({ method, params }); if (method === "thread/start" || method === "thread/resume") return { modelProvider: "openai", thread: { id: "synthetic-thread" } }; if (method === "turn/start") { this.emit("started"); return { turn: { id: "synthetic-turn" } }; } return {}; }
 }
-async function setup(t, authenticated = true) { const base = await fs.mkdtemp(path.join(os.tmpdir(), "nutritiscan-controller-")); const root = path.join(base, "project"); await fs.mkdir(root); const store = new WorkspaceStore(path.join(base, "storage")); await store.load(); await store.addProject(root); const bridge = new Bridge(authenticated); const controller = new ResearchController(store, bridge, async () => ({ sources: [] })); t.after(async () => { controller.finish("interrupted"); clearTimeout(controller.saveTimer); await store.queue.catch(() => {}); await fs.rm(base, { recursive: true, force: true }); }); return { store, bridge, controller, root }; }
+async function setup(t, authenticated = true) { const base = await fs.mkdtemp(path.join(os.tmpdir(), "nutritiscan-controller-")); const root = path.join(base, "project"); await fs.mkdir(root); const store = new WorkspaceStore(path.join(base, "storage")); await store.load(); await store.addProject(root); const bridge = new Bridge(authenticated); const controller = new ResearchController(store, bridge, async () => ({ sources: [] })); t.after(async () => { controller.finish("interrupted"); clearTimeout(controller.saveTimer); await controller.persist(); await store.queue.catch(() => {}); await fs.rm(base, { recursive: true, force: true }); }); return { store, bridge, controller, root }; }
 async function start(controller, bridge) { const ready = once(bridge, "started"); await controller.run("Inspect the synthetic project", "synthetic-model"); await ready; await new Promise((resolve) => setImmediate(resolve)); }
 test("biology context and dynamic tools use managed ChatGPT auth with a read-only native sandbox", async (t) => {
   const { controller, bridge } = await setup(t); await start(controller, bridge);
@@ -85,4 +86,32 @@ test("a background save waits for durable workspace changes instead of restoring
   release(); await Promise.all([change, backgroundSave]);
   const restored = new WorkspaceStore(store.directory); await restored.load();
   assert.equal(restored.project().name, "Retained synthetic project");
+});
+test("agent tools can propose and inspect an analysis but cannot approve or execute it", async (t) => {
+  const { controller, bridge, store, root } = await setup(t); await fs.writeFile(path.join(root, "data.csv"), "g,x\nA,1\nA,2\nB,3"); await start(controller, bridge);
+  const params = { threadId: "synthetic-thread", turnId: "synthetic-turn", callId: "analysis-plan", tool: "propose_analysis", arguments: { title: "Synthetic grouped analysis", question: "Inspect synthetic group differences.", path: "data.csv", missingValues: [], operations: [{ type: "group-summary", value: "x", group: "g" }] } };
+  await controller.serverRequest({ id: "plan", method: "item/tool/call", params });
+  assert.equal(bridge.replies.at(-1).result.success, true); assert.equal(store.session().analyses[0].status, "pending");
+  assert.equal(store.session().analyses[0].result, null);
+  await controller.serverRequest({ id: "forged-run", method: "item/tool/call", params: { ...params, tool: "analysis.run", arguments: { id: store.session().analyses[0].id, sha256: store.session().analyses[0].source.sha256 } } });
+  assert.equal(bridge.replies.at(-1).result.success, false); assert.equal(store.session().analyses[0].status, "pending");
+  await controller.serverRequest({ id: "inspect", method: "item/tool/call", params: { ...params, tool: "inspect_analysis", arguments: { id: store.session().analyses[0].id } } });
+  assert.equal(bridge.replies.at(-1).result.success, true);
+  assert.match(bridge.replies.at(-1).result.contentItems[0].text, /"status":"pending"/);
+});
+test("agent paper tools import only project PDFs and retain exact section checks without exposing a native file picker", { skip: process.platform !== "darwin" }, async (t) => {
+  const { controller, bridge, store, root } = await setup(t); await fs.writeFile(path.join(root, "paper.pdf"), textPdf(samplePaperPages)); await start(controller, bridge);
+  const invoke = async (tool, args) => { await controller.serverRequest({ id: tool, method: "item/tool/call", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", callId: tool, tool, arguments: args } }); const result = bridge.replies.at(-1).result; assert.equal(result.success, true, result.contentItems[0].text); return JSON.parse(result.contentItems[0].text); };
+  const { paper } = await invoke("import_project_pdf", { path: "paper.pdf" });
+  const passage = await invoke("read_paper_section", { paperId: paper.id, sectionId: "p2" });
+  const result = await invoke("verify_paper_passages", { claims: [{ paperId: paper.id, sectionId: "p2", contentSha256: passage.contentSha256, quote: "The mean signal was 5 in model_A and 12 in model_B.", claim: "The fictional note states the group means." }] });
+  assert.equal(result.checks[0].status, "quote-found"); assert.equal(store.session().paperChecks.length, 1);
+  await controller.serverRequest({ id: "native-picker", method: "item/tool/call", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", callId: "native-picker", tool: "paper.pick", arguments: {} } });
+  assert.equal(bridge.replies.at(-1).result.success, false);
+});
+test("a manual paper task reports running and cancellation waits for its worker", async (t) => {
+  const { controller } = await setup(t);
+  const pending = controller.paperTask((signal) => new Promise((resolve) => signal.addEventListener("abort", () => resolve("cancelled"), { once: true })));
+  assert.equal((await controller.snapshot()).running, true); assert.throws(() => controller.idle(), /Stop or finish/);
+  await controller.stop(); assert.equal(await pending, "cancelled"); assert.equal((await controller.snapshot()).running, false);
 });

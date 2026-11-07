@@ -3,9 +3,11 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { parseArgs } from "node:util";
 const require = createRequire(import.meta.url);
 if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("This local package target is Apple Silicon macOS.");
-const electron = require("electron"), base = path.resolve("release"), destination = path.join(base, "NutritiScan.app");
+const { values } = parseArgs({ options: { "output-dir": { type: "string", default: "release" } } });
+const electron = require("electron"), base = path.resolve(values["output-dir"]), destination = path.join(base, "NutritiScan.app");
 const { version } = JSON.parse(await fs.readFile("package.json", "utf8"));
 await fs.mkdir(base, { recursive: true });
 try { await fs.access(destination); throw new Error("The app bundle already exists. Preserve or move it before packaging a new version."); } catch (e) { if (e.code !== "ENOENT") throw e; }
@@ -20,6 +22,7 @@ await fs.rename(path.join(contents, "MacOS/Electron"), path.join(contents, "MacO
 const appRoot = path.join(contents, "Resources/app"); await fs.mkdir(appRoot, { recursive: true });
 await fs.cp("dist", path.join(appRoot, "dist"), { recursive: true }); await fs.cp("resources", path.join(appRoot, "resources"), { recursive: true });
 await fs.writeFile(path.join(appRoot, "package.json"), JSON.stringify({ name: "nutritiscan-desktop", productName: "NutritiScan", version, type: "module", main: "dist/main.mjs" }));
+execFileSync("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", path.join(appRoot, "dist/paper-reader")], { stdio: "pipe" });
 execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", temporary], { stdio: "pipe" });
 await fs.rename(temporary, destination);
 console.log(destination);

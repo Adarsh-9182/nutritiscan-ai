@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ResearchChatRequest, ResearchEvent, ResearchResult, type ResearchReply, type ResearchStreamEvent } from "./contracts";
 import { SourceReviewsSchema, sourceReviewText, type SourceReview } from "./source-review";
 import { EvidenceBriefSchema } from "./brief";
+import { StudyProtocolSchema, protocolText, type StudyProtocol } from "./protocol";
 
 export const ResearchTurnSchema = z.object({
   id: z.string().max(80), request: ResearchChatRequest.omit({ history: true }),
@@ -9,6 +10,7 @@ export const ResearchTurnSchema = z.object({
   reply: ResearchResult.nullable(), error: z.string().max(1000).optional(),
   sourceReviews: SourceReviewsSchema.optional(),
   briefs: z.array(EvidenceBriefSchema).max(2).optional(),
+  protocol: StudyProtocolSchema.optional(),
 }).strict().superRefine((turn, context) => {
   for (const review of turn.sourceReviews ?? []) {
     if (turn.phase !== "done" || !turn.reply?.sources.some((source) => source.id === review.sourceId)) {
@@ -18,6 +20,9 @@ export const ResearchTurnSchema = z.object({
   if (new Set(turn.briefs?.map((b) => b.id)).size !== (turn.briefs?.length ?? 0)) context.addIssue({ code: "custom", path: ["briefs"], message: "Brief versions must have distinct IDs." });
   for (const brief of turn.briefs ?? []) {
     if (turn.phase !== "done" || brief.question !== turn.request.message || brief.selectedIds.some((id) => !turn.reply?.sources.some((s) => s.id === id))) context.addIssue({ code: "custom", path: ["briefs"], message: "Briefs must belong to this question and its retrieved sources." });
+  }
+  if (turn.protocol && (turn.phase !== "done" || turn.protocol.originQuestion !== turn.request.message || turn.protocol.sourceIds.some((id) => !turn.reply?.sources.some((source) => source.id === id)))) {
+    context.addIssue({ code: "custom", path: ["protocol"], message: "A study protocol must belong to this question and its retrieved sources." });
   }
 });
 export type ResearchTurn = z.infer<typeof ResearchTurnSchema>;
@@ -64,8 +69,9 @@ export function replyText(reply: ResearchReply): string {
   return lines.join("\n\n");
 }
 
-export function researchExport(request: ResearchTurn["request"], reply: ResearchReply, reviews: SourceReview[] = [], importedAt?: string) {
-  return `NutritiScan research draft${importedAt ? " — imported backup; sources and AI checks have not been revalidated" : ""}\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}\n\n${sourceReviewText(reply, reviews)}`;
+export function researchExport(request: ResearchTurn["request"], reply: ResearchReply, reviews: SourceReview[] = [], importedAt?: string, protocol?: StudyProtocol) {
+  const included = reviews.filter((review) => review.decision === "include").map((review) => review.sourceId);
+  return `NutritiScan research draft${importedAt ? " — imported backup; sources and AI checks have not been revalidated" : ""}\n\nQuestion: ${request.message}\nMode: ${request.mode}\nSearch: ${request.searchMode === "manual" ? request.query : "Automatic, adapted to this question"}\n\n${replyText(reply)}\n\n${sourceReviewText(reply, reviews)}${protocol ? `\n\n${protocolText(protocol, reply, included, Boolean(importedAt))}` : ""}`;
 }
 
 /** Bounded NDJSON consumer: an interrupted stream never becomes a completed turn. */

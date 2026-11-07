@@ -4,7 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import assert from "node:assert/strict";
-const require = createRequire(import.meta.url), packaged = process.argv.includes("--packaged"), live = process.argv.includes("--live"), binary = packaged ? path.resolve("release/NutritiScan.app/Contents/MacOS/NutritiScan") : require("electron");
+const appArgument = process.argv.find((arg) => arg.startsWith("--app="))?.slice("--app=".length);
+const require = createRequire(import.meta.url), packaged = process.argv.includes("--packaged") || Boolean(appArgument), live = process.argv.includes("--live"), binary = packaged ? path.join(path.resolve(appArgument || "release/NutritiScan.app"), "Contents/MacOS/NutritiScan") : require("electron");
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), "nutritiscan-desktop-qa-"));
 const output = path.resolve("test-results"); await fs.mkdir(output, { recursive: true });
 let app, stage = "launch";
@@ -23,6 +24,27 @@ try {
   await page.getByRole("button", { name: "Profile dataset", exact: true }).click();
   await page.getByText("6 rows · 3 columns", { exact: true }).waitFor();
   assert.ok((await page.locator(".dataset-profile").innerText()).includes("107.8333"));
+  stage = "analysis-proposal-and-approval";
+  await page.getByRole("tab", { name: "Analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Propose dataset profile", exact: true }).click();
+  await page.getByRole("button", { name: "Reject proposal", exact: true }).click();
+  const rejected = await page.evaluate(async () => (await window.biology.call("state")).value.project.session.analyses);
+  assert.equal(rejected[0].status, "rejected"); assert.equal(rejected[0].result, null);
+  const proposed = await page.evaluate(async () => window.biology.call("analysis.propose", { spec: { title: "Synthetic cohort comparison", question: "Verify a fictional research workflow, not a biological effect.", path: "synthetic-cohort.csv", missingValues: [], operations: [{ type: "group-summary", value: "signal_au", group: "cohort" }, { type: "correlation", x: "signal_au", y: "readout_au" }] } }));
+  assert.equal(proposed.ok, true);
+  await page.getByRole("button", { name: "Approve & run analysis", exact: true }).click();
+  await page.getByRole("button", { name: "Open analysis receipt ↗", exact: true }).waitFor();
+  const analysis = await page.evaluate(async () => (await window.biology.call("state")).value.project.session.analyses.at(-1));
+  assert.equal(analysis.status, "completed"); assert.equal(analysis.result.results[0].groups[0].mean, 5); assert.equal(analysis.result.results[0].groups[1].mean, 12);
+  assert.ok(Math.abs(analysis.result.results[1].correlation - 1) < 1e-12); assert.equal(analysis.result.results[1].count, 7);
+  const receipt = JSON.parse(await fs.readFile(path.join(directory, "sample-project", analysis.artifact), "utf8"));
+  assert.equal(receipt.source.sha256, proposed.value.source.sha256);
+  await page.screenshot({ path: path.join(output, "analysis-workspace.png") });
+  // Give the retained investigation a distinct name before exercising deletion
+  // on another one; the sidebar orders investigations newest first.
+  await page.getByRole("button", { name: "Manage investigation New investigation", exact: true }).click();
+  await page.getByRole("textbox", { name: "Investigation name", exact: true }).fill("Retained analysis investigation");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
   stage = "memory";
   await page.getByRole("tab", { name: "Memory", exact: true }).click();
   await page.getByRole("textbox", { name: "Project memory" }).fill("Synthetic QA handoff: inspect data quality before interpretation.");
@@ -113,6 +135,7 @@ try {
   assert.equal(finalState.projects.length, 1);
   assert.equal(finalState.projects[0].name, "Synthetic biology workspace");
   assert.equal(finalState.projects[0].sessions.length, 1);
-  console.log(JSON.stringify({ passed: true, checks: ["native-electron", "isolated-renderer", "sample-workspace", "CSV-statistics", "memory-save-and-restart", "rename-archive-restore", "confirmed-history-removal", "saved-report-preview", "interactive-PTY", "light-dark-800-1000-1400", "existing-chatgpt-login", "model-catalog"], models: state.agent.models.length, packaged, liveAgent: live }));
+  assert.equal(finalState.projects[0].sessions[0].analyses.at(-1).status, "completed");
+  console.log(JSON.stringify({ passed: true, checks: ["native-electron", "isolated-renderer", "sample-workspace", "CSV-statistics", "analysis-proposal/rejection/approval", "grouped-summary-and-correlation", "hash-bound-receipt", "analysis-restart", "memory-save-and-restart", "rename-archive-restore", "confirmed-history-removal", "saved-report-preview", "interactive-PTY", "light-dark-800-1000-1400", "existing-chatgpt-login", "model-catalog"], models: state.agent.models.length, packaged, liveAgent: live }));
 } catch (error) { console.error(JSON.stringify({ passed: false, stage, error: error.message })); process.exitCode = 1; }
 finally { await app?.close().catch(() => {}); await fs.rm(directory, { recursive: true, force: true }); }

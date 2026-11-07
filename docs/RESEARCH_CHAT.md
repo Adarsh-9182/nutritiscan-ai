@@ -1,5 +1,41 @@
 # Research chat
 
+The active product sequence and release gates are in the
+[research product roadmap](RESEARCH_PRODUCT_ROADMAP.md).
+
+## Working study protocols
+
+Mark one or more sources Include, then choose **Create protocol draft** after
+the evidence brief tools. This works with a sources-only response and makes no
+additional model request. The originating question and selected bibliography
+are retained; methodology and statistics are investigator input. Eleven bounded
+sections cover question, rationale, population, eligibility, exposure, comparator,
+outcomes/timing, methods, sample-size rationale, analysis and ethics/data management.
+
+An existing model response's proposed steps can be copied explicitly into an
+empty methods section with an unvalidated-proposal label. Existing methods are
+never overwritten; proposals over the field limit are not silently truncated.
+Protocol fields are not added to follow-up model history.
+
+Section completeness is distinct from methodological quality. The personal
+review checkbox requires nonblank sections and the original source selection;
+edits and source decisions clear it. Source changes preserve the original
+bibliography until an explicit update. A personal mark is not supervisor sign-off
+or ethics approval. Imported drafts keep their unvalidated provenance and cannot
+display a current personal-review claim.
+
+Drafts persist with their conversation and roundtrip through the existing
+versioned file/account backup schema. Failed device writes leave the in-memory
+draft available for export. TXT and browser print/PDF include timestamps, sources,
+missing fields, draft/review state and import/selection warnings. The print view
+escapes all content and loads no remote assets. General copy/export also includes
+the protocol. Repeating a sources-only search appends a new question if a protocol
+already exists, preserving the original draft and sources. The eight-conversation,
+twelve-turn and one-megabyte history/backup limits remain enforced.
+
+This is an editable planning artifact, not automatic methodology generation,
+an executed study, participant screening or scientific/ethical approval.
+
 The `/research` entry is a conversation-first research assistant using the same
 dark/mint theme, full-height transcript and bottom composer as Health chat.
 Research conversations have their own storage key and do not read health

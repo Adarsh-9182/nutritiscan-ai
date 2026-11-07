@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
 import { safeChildEnvironment } from "./policy.mjs";
+import packageInfo from "../package.json" with { type: "json" };
 
 const exec = promisify(execFile);
 export async function executable(name) {
@@ -39,7 +40,7 @@ export class CodexBridge extends EventEmitter {
     child.stdin.on("error", () => { if (this.process === child) this.closed(); });
     child.on("error", () => { if (this.process === child) this.closed(); }); child.on("exit", () => { if (this.process === child) this.closed(); });
     try {
-      await this.rpc("initialize", { clientInfo: { name: "nutritiscan_desktop", title: "NutritiScan", version: "0.1.0" }, capabilities: { experimentalApi: true } });
+      await this.rpc("initialize", { clientInfo: { name: "nutritiscan_desktop", title: "NutritiScan", version: packageInfo.version }, capabilities: { experimentalApi: true } });
       this.notify("initialized"); this.connected = true;
       await this.refreshAuth();
       const models = await this.rpc("model/list", { limit: 30, includeHidden: false });

@@ -3,15 +3,17 @@ import { createReadStream } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { parseArgs } from "node:util";
 
 if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("Archive the tested Apple Silicon app on macOS.");
 const { version } = JSON.parse(await fs.readFile("package.json", "utf8"));
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Use a numeric release version.");
-const app = path.resolve("release/NutritiScan.app"), plist = path.join(app, "Contents/Info.plist");
+const { values } = parseArgs({ options: { app: { type: "string", default: "release/NutritiScan.app" }, local: { type: "boolean", default: false } } });
+const app = path.resolve(values.app), plist = path.join(app, "Contents/Info.plist");
 const readPlist = (key) => execFileSync("/usr/libexec/PlistBuddy", ["-c", `Print :${key}`, plist], { encoding: "utf8" }).trim();
 if (readPlist("CFBundleShortVersionString") !== version) throw new Error("Repackage the app before creating this version's download.");
 execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", app], { stdio: "pipe" });
-const fileName = `NutritiScan-${version}-mac-arm64.zip`, destination = path.resolve("release", fileName);
+const fileName = `NutritiScan-${version}-mac-arm64.zip`, destination = path.join(path.dirname(app), fileName);
 try { await fs.access(destination); throw new Error("This download already exists. Preserve it and choose a new release version."); } catch (error) { if (error.code !== "ENOENT") throw error; }
 const temporary = `${destination}.${randomUUID()}.tmp.zip`;
 try {
@@ -22,7 +24,7 @@ const hash = createHash("sha256");
 for await (const chunk of createReadStream(destination)) hash.update(chunk);
 const sha256 = hash.digest("hex"), tag = `desktop-v${version}`;
 await fs.writeFile(`${destination}.sha256`, `${sha256}  ${fileName}\n`, { flag: "wx" });
-const manifest = { version, tag, channel: "preview", architecture: "arm64", minimumMacOS: readPlist("LSMinimumSystemVersion"), fileName, sizeBytes: (await fs.stat(destination)).size, sha256, url: `https://github.com/Adarsh-9182/nutritiscan-ai/releases/download/${tag}/${fileName}` };
-const manifestFile = path.resolve("../lib/desktop-release.json"), manifestTemp = `${manifestFile}.${randomUUID()}.tmp`;
+const manifest = { version, tag, channel: "preview", architecture: "arm64", minimumMacOS: readPlist("LSMinimumSystemVersion"), fileName, sizeBytes: (await fs.stat(destination)).size, sha256, url: values.local ? null : `https://github.com/Adarsh-9182/nutritiscan-ai/releases/download/${tag}/${fileName}`, ...(values.local ? { publication: "local-unpublished" } : {}) };
+const manifestFile = values.local ? path.join(path.dirname(app), "desktop-release.local.json") : path.resolve("../lib/desktop-release.json"), manifestTemp = `${manifestFile}.${randomUUID()}.tmp`;
 try { await fs.writeFile(manifestTemp, JSON.stringify(manifest, null, 2) + "\n", { flag: "wx" }); await fs.rename(manifestTemp, manifestFile); } finally { await fs.unlink(manifestTemp).catch(() => {}); }
 console.log(JSON.stringify(manifest));
