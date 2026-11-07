@@ -13,6 +13,8 @@ import { AnalysisSpec } from "./analysis.mjs";
 import { PaperClaims } from "./paper-schema.mjs";
 import { PmcId } from "./pmc.mjs";
 import { readPickedPdf } from "./papers.mjs";
+import { StudyPlans, StudyPlanEdit, readPickedStudyDraft } from "./study-plans.mjs";
+import { BriefSourceId, BiologyContextSchema, studyPlanText } from "../../shared/study-plan.ts";
 
 app.setName("NutritiScan");
 if (process.env.NUTRITISCAN_DATA_DIR) app.setPath("userData", path.resolve(process.env.NUTRITISCAN_DATA_DIR));
@@ -34,9 +36,14 @@ const requests = {
   run: z.object({ text: z.string().trim().min(3).max(6000), model: z.string().max(160).optional() }).strict(), stop: object,
   "file.read": z.object({ path: z.string().min(1).max(500) }).strict(), "file.profile": z.object({ path: z.string().min(1).max(500) }).strict(),
   "memory.save": z.object({ memory: z.string().max(6000) }).strict(), "session.export": object,
+  "biology.save": BiologyContextSchema,
   "analysis.propose": z.object({ spec: AnalysisSpec }).strict(),
   "analysis.run": z.object({ id: z.string().uuid(), sha256: z.string().regex(/^[a-f\d]{64}$/) }).strict(),
   "analysis.reject": savedItem,
+  "study.pick": object,
+  "study.create": z.object({ question: z.string().trim().min(3).max(2000), sourceIds: z.array(BriefSourceId).min(1).max(10) }).strict(),
+  "study.save": savedItem.extend({ revision: z.number().int().min(1), edit: StudyPlanEdit }),
+  "study.export": savedItem.extend({ type: z.enum(["json", "txt"]) }),
   "paper.pick": object, "paper.import": z.object({ path: z.string().min(1).max(500) }).strict(),
   "paper.pmc": z.object({ pmcid: PmcId }).strict(),
   "paper.inspect": savedItem,
@@ -93,6 +100,26 @@ async function invoke(action, value) {
     case "analysis.propose": controller.idle(); try { return await store.proposeAnalysis(args.spec); } finally { changed(); }
     case "analysis.run": return controller.runAnalysis(args.id, args.sha256);
     case "analysis.reject": controller.idle(); { const result = await store.rejectAnalysis(args.id); changed(); return result; }
+    case "study.pick": {
+      controller.idle(); const projectId = store.project()?.id; if (!projectId) throw new Error("Open a research project first.");
+      const result = await dialog.showOpenDialog(window, { title: "Import a NutritiScan study draft", filters: [{ name: "NutritiScan study draft", extensions: ["json"] }], properties: ["openFile"] });
+      if (result.canceled || !result.filePaths[0]) return { cancelled: true };
+      const raw = await readPickedStudyDraft(result.filePaths[0]); controller.idle();
+      if (store.project()?.id !== projectId) throw new Error("The active project changed. Choose the draft again.");
+      const imported = await new StudyPlans(store).import(raw); changed(); return imported;
+    }
+    case "study.create": { controller.idle(); const result = await new StudyPlans(store).create(args.question, args.sourceIds); changed(); return result; }
+    case "study.save": { controller.idle(); const result = await new StudyPlans(store).save(args.id, args.revision, args.edit); changed(); return result; }
+    case "study.export": {
+      controller.idle(); const plans = new StudyPlans(store), projectId = store.project()?.id;
+      const record = plans.read(args.id), revision = record.revision;
+      const raw = args.type === "json" ? plans.export(args.id) : studyPlanText(record.document);
+      const result = await dialog.showSaveDialog(window, { title: "Export study draft", defaultPath: `nutritiscan-study-plan.${args.type}`, filters: [{ name: "Study draft", extensions: [args.type] }], properties: ["showOverwriteConfirmation"] });
+      if (result.canceled || !result.filePath) return { saved: false };
+      controller.idle();
+      if (store.project()?.id !== projectId || plans.read(args.id).revision !== revision) throw new Error("The draft changed. Export the current revision again.");
+      await fs.writeFile(result.filePath, raw, { mode: 0o600 }); return { saved: true };
+    }
     case "paper.pick": {
       controller.idle(); const projectId = store.project()?.id; if (!projectId) throw new Error("Open a research project first.");
       const picked = await dialog.showOpenDialog(window, { title: "Import a research PDF", filters: [{ name: "PDF paper", extensions: ["pdf"] }], properties: ["openFile"] });
@@ -117,6 +144,11 @@ async function invoke(action, value) {
       session.paperChecks = [...(session.paperChecks ?? []), ...result.checks].slice(-30); await store.persist(); changed(); return result;
     }
     case "memory.save": controller.idle(); if (!store.project()) throw new Error("Open a project first."); store.project().memory = args.memory; await store.persist(); changed(); return { saved: true };
+    case "biology.save": {
+      controller.idle(); const id = store.project()?.id; if (!id) throw new Error("Open a project first.");
+      await store.manage((state) => { const project = state.projects.find((item) => item.id === id && !item.archivedAt); if (!project) throw new Error("The active project changed."); project.biology = args; });
+      changed(); return { saved: true };
+    }
     case "session.export": {
       const session = store.session(); if (!session) throw new Error("Open a research session first.");
       const result = await dialog.showSaveDialog(window, { title: "Export research session", defaultPath: "nutritiscan-research.md", filters: [{ name: "Markdown", extensions: ["md"] }], properties: ["showOverwriteConfirmation"] });
@@ -146,6 +178,7 @@ try { await store.load(); }
 catch { loadFailed = true; dialog.showErrorBox("Saved research was preserved", "NutritiScan could not load its saved workspace. The existing file was preserved. Restore a backup or use a separate data directory before trying again."); app.quit(); }
 if (!loadFailed) {
   const bridge = new CodexBridge(); terminal = new LocalTerminal(); controller = new ResearchController(store, bridge, searchLiterature);
+  if (store.migrationBackup) controller.issue = `Workspace upgraded. The exact previous file is preserved as ${store.migrationBackup} in Application Support/NutritiScan. Earlier app versions cannot read this upgraded workspace.`;
   controller.on("change", changed); terminal.on("data", (data) => send("biology:terminal", { type: "data", data })); terminal.on("exit", () => send("biology:terminal", { type: "exit" }));
   window = new BrowserWindow({ width: 1400, height: 940, minWidth: 760, minHeight: 600, title: "NutritiScan — Biology Workspace", backgroundColor: "#111812", titleBarStyle: "hiddenInset", trafficLightPosition: { x: 18, y: 18 }, webPreferences: { preload: fileURLToPath(new URL("../dist/preload.cjs", import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false } });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

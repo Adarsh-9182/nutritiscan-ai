@@ -1,0 +1,36 @@
+import { createRequire } from "node:module";
+import fs from "node:fs/promises";
+import path from "node:path";
+import assert from "node:assert/strict";
+const require = createRequire(new URL("../desktop/package.json", import.meta.url));
+const { chromium } = require("playwright-core");
+const origin = new URL(process.argv.find((arg) => arg.startsWith("--url="))?.slice(6) ?? "http://127.0.0.1:3014").origin;
+if (!["127.0.0.1", "localhost", "www.nutritiscan.com"].includes(new URL(origin).hostname)) throw new Error("Choose the local preview or the authorized production domain.");
+const output = path.resolve(".local/live-release-checks"); await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 } }), page = await context.newPage(), errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  assert.equal((await page.goto(`${origin}/chat`)).status(), 200);
+  const composer = page.getByRole("textbox", { name: /describe how you feel/i });
+  await composer.fill("Hello");
+  const reply = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/chat" && response.request().method() === "POST", { timeout: 90000 });
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  const response = await reply; assert.equal(response.status(), 200);
+  const raw = await response.text(), chunks = raw.split("\n").filter((line) => line.startsWith("data: ") && !line.includes("[DONE]")).map((line) => JSON.parse(line.slice(6)));
+  assert.equal(chunks[0].type, "start"); assert.equal(chunks.filter((chunk) => chunk.type === "start").length, 1);
+  assert.ok(chunks.some((chunk) => chunk.type === "text-delta" && chunk.delta.trim()));
+  const log = page.getByRole("log");
+  await page.waitForFunction(() => document.querySelector('[role="log"]')?.getAttribute("aria-busy") === "false", { timeout: 90000 });
+  assert.equal(await log.getByText("Safety guidance", { exact: true }).count(), 0);
+  assert.equal(await log.locator(".typing-caret").count(), 0);
+  await page.screenshot({ path: path.join(output, "health-chat-fixed-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await composer.count(), 1);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+  await page.screenshot({ path: path.join(output, "health-chat-fixed-mobile.png") });
+  assert.deepEqual(errors, []);
+  const result = { passed: true, origin, message: "Synthetic greeting only", assistantStarts: 1, emptySafetyGuidance: 0, mode: chunks.filter((chunk) => chunk.type === "data-mode").at(-1)?.data.mode, widths: [1400, 390], errors };
+  await fs.writeFile(path.join(output, "health-chat-fixed.json"), JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
+} finally { await browser.close(); }

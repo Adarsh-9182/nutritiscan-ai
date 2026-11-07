@@ -9,6 +9,7 @@ import { consumeResearch, readResearch, replyText, researchExport, researchTimes
 import { researchBackup, mergeResearchBackup, type ResearchBackup } from "@/lib/research/backup";
 import { includedSourcesRis } from "@/lib/research/references";
 import { ResearchProjects, ResearchProjectTitle } from "./research-projects";
+import { ResearchStudyTransfer } from "./research-study-transfer";
 import { ResearchCloud } from "./research-cloud";
 import { ResearchBrief } from "./research-evidence-brief";
 import { ResearchProtocol } from "./research-protocol";
@@ -184,12 +185,14 @@ export default function ResearchWorkspace() {
     if (locked.current || !activeId) return;
     update(activeId, (t) => ({ ...t, updatedAt: researchTimestamp(), turns: t.turns.map((v) => v.id === turnId ? { ...v, briefs: v.briefs?.filter((b) => b.id !== briefId) } : v) }));
   }
-  function restoreBackup(backup: ResearchBackup) {
+  function restoreBackup(backup: ResearchBackup, openImported = false) {
     if (locked.current) throw new Error("Wait for research to finish before importing.");
     const merged = mergeResearchBackup(snapshot.current, backup);
     // Commit device storage before changing UI, so quota failures leave current work intact.
-    saveResearch(merged.threads, activeId);
+    const selected = openImported && merged.added ? merged.threads.at(-1)!.id : activeId;
+    saveResearch(merged.threads, selected);
     snapshot.current = merged.threads; setThreads(merged.threads);
+    if (openImported && merged.added) { setActiveId(selected); setRail(false); setInput(""); setQuery(""); setInspected(null); setMode("study-plan"); }
     setNotice(`${merged.added} conversations imported. Existing work was preserved. Imported source content has not been revalidated.`);
   }
   function exportBackup() {
@@ -224,6 +227,7 @@ export default function ResearchWorkspace() {
         <button type="button" onClick={newConversation} disabled={busy} className="mb-5 flex items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-xs font-medium disabled:opacity-40"><Plus size={14} /> New research</button>
         <div className="max-h-[35svh] shrink-0 space-y-2 overflow-y-auto">{threads.map((t) => <div key={t.id} className={`group flex items-center rounded-xl border ${t.id === activeId ? "border-[var(--border-strong)] bg-[var(--surface)]" : "border-transparent"}`}><button type="button" disabled={busy} onClick={() => open(t)} className="min-w-0 flex-1 px-3 py-3 text-left"><span className="block truncate text-xs">{t.title}</span><span className="mt-1 block text-[10px] text-[var(--text-dim)]">{t.turns.length} questions · on this device</span></button><button type="button" disabled={busy} onClick={() => remove(t.id)} aria-label={`Delete research conversation: ${t.title}`} className="btn-ghost mr-1 rounded-lg p-2"><Trash2 size={13} /></button></div>)}{!threads.length && <p className="text-xs leading-6 text-[var(--text-dim)]">Your research conversations appear here. Health chats are kept separately.</p>}</div>
         <ResearchProjects threads={threads} disabled={busy} onExport={exportBackup} onImport={restoreBackup} />
+        <ResearchStudyTransfer disabled={busy} onImport={(backup) => restoreBackup(backup, true)} />
         <ResearchCloud threads={threads} disabled={busy} onRestore={restoreBackup} />
         <div role="group" aria-label="Research colour theme" className="my-4 flex items-center justify-between gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 sm:hidden">{([{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }] as const).map(({ value, label, icon: Icon }) => <button key={value} type="button" aria-pressed={theme === value} onClick={() => changeTheme(value)} className={`flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium ${theme === value ? "bg-[var(--said)] text-[var(--text)]" : "text-[var(--text-dim)]"}`}><Icon size={12} aria-hidden />{label}</button>)}</div>
         <PlanUpsell />

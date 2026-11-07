@@ -7,6 +7,9 @@ import os from "node:os";
 import { WorkspaceStore } from "../src/workspace.mjs";
 import { ResearchController } from "../src/controller.mjs";
 import { textPdf, samplePaperPages } from "../scripts/pdf-fixtures.mjs";
+import { StudyPlans } from "../src/study-plans.mjs";
+import { serializeStudyTransfer } from "../../shared/study-plan.ts";
+import { syntheticStudyTransfer } from "../../shared/test-fixtures/study-plan.mjs";
 
 class Bridge extends EventEmitter {
   constructor(auth = true) { super(); this.auth = { connected: auth, plan: "synthetic" }; this.models = [{ model: "synthetic-model", isDefault: true }]; this.calls = []; this.replies = []; }
@@ -27,6 +30,23 @@ test("project memory is refreshed as lower-priority data, never interpolated int
   const { controller, bridge, store } = await setup(t); store.project().memory = "Synthetic untrusted memory marker"; await start(controller, bridge);
   assert.ok(!bridge.calls.find((c) => c.method === "thread/start").params.developerInstructions.includes("Synthetic untrusted memory marker"));
   assert.equal(JSON.parse(bridge.calls.find((c) => c.method === "turn/start").params.input[0].text).project.memory, "Synthetic untrusted memory marker");
+});
+test("the existing model receives biological scope as data and can inspect study drafts without editing or approving them", async (t) => {
+  const { controller, bridge, store } = await setup(t), plans = new StudyPlans(store);
+  const { id } = await plans.import(serializeStudyTransfer(syntheticStudyTransfer()));
+  store.project().biology = { disease: "Synthetic context marker", organism: "Mouse model, not human evidence" };
+  await start(controller, bridge);
+  const initial = bridge.calls.find((call) => call.method === "thread/start").params;
+  assert.ok(!initial.developerInstructions.includes("Synthetic context marker"));
+  assert.equal(JSON.parse(bridge.calls.find((call) => call.method === "turn/start").params.input[0].text).project.biology.organism, "Mouse model, not human evidence");
+  assert.ok(initial.dynamicTools.some((tool) => tool.name === "read_study_plan"));
+  assert.ok(!initial.dynamicTools.some((tool) => /^(save|approve|run)_study/.test(tool.name)));
+  for (const [tool, args] of [["list_study_plans", {}], ["read_study_plan", { id }]]) {
+    await controller.serverRequest({ id: tool, method: "item/tool/call", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", callId: tool, tool, arguments: args } });
+    assert.equal(bridge.replies.at(-1).result.success, true);
+    assert.match(bridge.replies.at(-1).result.contentItems[0].text, /Fictional transfer study/);
+  }
+  assert.equal(plans.read(id).revision, 1);
 });
 test("an API-key or missing subscription session never starts an inference turn", async (t) => {
   const { controller, bridge, store } = await setup(t, false); await controller.run("Inspect this synthetic dataset");

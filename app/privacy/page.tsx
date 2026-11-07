@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <main className="ns-policy">
       <Link href="/">← NutritiScan</Link>
-      <span className="ns-eyebrow">PRIVACY NOTICE · 4 NOVEMBER 2026</span>
+      <span className="ns-eyebrow">PRIVACY NOTICE · 7 NOVEMBER 2026</span>
       <h1>Private health questions deserve care.</h1>
       <p>
         NutritiScan offers a public health conversation, a local Android journal,
@@ -155,6 +155,17 @@ export default function Page() {
         follow the host’s retention policy. Android local entries are deleted
         separately in the app. Revoking storage consent stops routine access and
         new storage but keeps export and deletion available.
+      </p>
+
+      <h2>Public-page visitor counts</h2>
+      <p>
+        We use Vercel Web Analytics for aggregate visitor and page-view counts on
+        the homepage, download, about, privacy, terms and pricing pages. Query
+        strings and URL fragments are removed before sending page views. Health
+        chat, research, health workspace, account and sign-in routes are excluded.
+        No chat messages, profiles, research drafts, report contents or custom
+        content events are sent to analytics. Counts use Vercel&apos;s cookie-free
+        analytics; they are estimates of visitors, not verified individual people.
       </p>
 
       <h2>Safety and limits</h2>

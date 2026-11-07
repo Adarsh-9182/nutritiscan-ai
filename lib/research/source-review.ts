@@ -28,7 +28,7 @@ function csvCell(value: string) {
 }
 
 export function sourceReviewCsv(question: string, reply: ResearchReply, reviews: SourceReview[] = []) {
-  const rows = [["Question", "Source ID", "Title", "Source", "Year", "URL", "Retrieved at", "Researcher decision", "Reason / note", "Reviewed at"]];
+  const rows = [["Question", "Source ID", "Title", "Source", "Year", "URL", reply.sourceTimestampKind === "saved" ? "Snapshot saved at (original retrieval time unavailable)" : "Retrieved at", "Researcher decision", "Reason / note", "Reviewed at"]];
   for (const source of reply.sources) {
     const review = reviews.find((r) => r.sourceId === source.id);
     rows.push([question, source.id, source.title, source.kind === "trial" ? "ClinicalTrials.gov" : "PubMed",

@@ -52,6 +52,7 @@ export const ResearchResult = z.object({
   notice: z.string().max(1000),
   coverage: z.array(z.object({ source: z.enum(["pubmed", "trials"]), status: z.enum(["done", "empty", "failed"]), count: z.number().int().min(0).max(10) }).strict()).max(2),
   retrievedAt: z.string().datetime(),
+  sourceTimestampKind: z.enum(["retrieved", "saved"]).optional(),
   // Optional for backwards compatibility with device-local version 1 history.
   searches: z.array(ResearchSearch).max(8).optional(),
   diagnostics: z.array(ResearchDiagnostic).max(12).optional(),

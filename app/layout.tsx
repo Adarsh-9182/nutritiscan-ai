@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import Providers from "@/components/providers";
+import { PublicAnalytics } from "@/components/public-analytics";
 import "./globals.css";
 
 // Geist_Mono was loaded here and referenced by `--font-mono`, which nothing in
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={"antialiased"}>
         <Providers>{children}</Providers>
+        <PublicAnalytics />
       </body>
     </html>
   );

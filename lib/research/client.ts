@@ -65,7 +65,7 @@ export function replyText(reply: ResearchReply): string {
   if (reply.searches?.length) lines.push("Executed searches", ...reply.searches.map((s) => `${s.source}: ${s.query}\nStrategy: ${s.strategy}; status: ${s.status}; records: ${s.count}${s.error ? `; issue: ${s.error}` : ""}`));
   if (reply.diagnostics?.length) lines.push("Run issues", ...reply.diagnostics.map((d) => `${d.stage}: ${d.code}${d.model ? ` (${d.model})` : ""}`));
   if (reply.metrics) lines.push(`Model requests: ${reply.metrics.modelCalls}; reported input tokens: ${reply.metrics.inputTokens}; reported output tokens: ${reply.metrics.outputTokens}; duration: ${reply.metrics.durationMs} ms. Token counts exclude failed responses without usage data.`);
-  lines.push(`Retrieved: ${reply.retrievedAt}`, ...reply.sources.map((s) => `${s.id}: ${s.title}\n${s.url}`));
+  lines.push(`${reply.sourceTimestampKind === "saved" ? "Snapshot saved (original retrieval time unavailable)" : "Retrieved"}: ${reply.retrievedAt}`, ...reply.sources.map((s) => `${s.id}: ${s.title}\n${s.url}`));
   return lines.join("\n\n");
 }
 

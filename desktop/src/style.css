@@ -122,3 +122,23 @@
 .paper-reader-footer summary{cursor:pointer;color:var(--accent)}
 .paper-reader-footer p{margin:7px 0;font-size:10px;overflow-wrap:anywhere}
 @media(max-width:930px){.paper-toolbar{gap:8px;padding:10px}.paper-pagination{max-width:50%}.paper-text-column{padding:16px}.paper-backdrop{padding:16px}.paper-reader-header{padding:15px}.paper-original{padding:10px}}
+/* Source-linked study drafts use the existing inspector and form controls. */
+.workspace .inspector-tabs { display:flex; flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:thin }
+.workspace .inspector-tabs button { flex:1 0 auto; padding-inline:4px }
+.study-panel { display:grid; gap:14px; min-width:0 }
+.biology-context { display:grid; gap:14px; padding-bottom:20px; margin-bottom:20px; border-bottom:1px solid var(--line) }
+.study-editor,.study-new form { display:grid; gap:18px; min-width:0 }
+.study-field { display:grid; gap:7px; font-size:11px; font-weight:600; min-width:0 }
+.study-field input,.study-field textarea,.study-field select { box-sizing:border-box; width:100%; min-width:0; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:inherit; padding:10px; font:inherit; font-weight:400; line-height:1.65 }
+.study-field textarea { resize:vertical }
+.study-field small { font-weight:400; line-height:1.65; opacity:.7 }
+.study-status { border:1px solid var(--line); border-radius:8px; padding:10px; font-size:11px; line-height:1.7 }
+.study-status span,.study-sources small { display:block; font-size:10px; opacity:.7 }
+.study-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.study-bibliography article { padding:12px 0; border-bottom:1px solid var(--line); font-size:11px; line-height:1.7 }
+.study-bibliography code,.study-digest { display:block; overflow-wrap:anywhere; font-size:10px; font-weight:400 }
+.study-source-text { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px }
+.study-new { border-top:1px solid var(--line); padding-top:14px }
+.study-new summary,.study-bibliography summary { cursor:pointer; font-size:11px; margin-bottom:12px }
+.study-sources { display:grid; gap:12px; max-height:240px; overflow:auto }
+.study-sources label { display:flex; gap:8px; align-items:flex-start; font-size:11px; line-height:1.65 }

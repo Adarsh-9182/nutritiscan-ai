@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SourceSchema } from "@/shared/study-plan";
 
 export const PluginId = z.enum(["library", "pubmed", "trials", "artifact"]);
 export type PluginId = z.infer<typeof PluginId>;
@@ -28,27 +29,8 @@ export const PLUGINS: { id: PluginId; name: string; description: string; scope: 
   { id: "artifact", name: "Brief export", description: "Prepare a Markdown file for your review and download.", scope: "Download to this device", approval: true, version: "1.0.0" },
 ];
 
-export const SourceSchema = z.object({
-  id: z.string().max(80),
-  title: z.string().max(2000),
-  url: z.string().url().max(2000).refine((value) => {
-    try {
-      const url = new URL(value);
-      return url.protocol === "https:" && !url.username && !url.password && !url.port &&
-        ["medlineplus.gov", "ods.od.nih.gov", "pubmed.ncbi.nlm.nih.gov", "clinicaltrials.gov"].includes(url.hostname);
-    } catch { return false; }
-  }, "Only approved public source URLs are supported."),
-  kind: z.enum(["reference", "paper", "trial"]),
-  detail: z.string().max(12000),
-  metadata: z.object({
-    year: z.number().int().min(1000).max(9999).nullable().optional(),
-    publicationTypes: z.array(z.string().max(200)).max(30).optional(),
-    hasAbstract: z.boolean().optional(),
-    studyType: z.string().max(200).optional(),
-    status: z.string().max(200).optional(),
-  }).strict().optional(),
-}).strict();
-export type AgentSource = z.infer<typeof SourceSchema>;
+export { SourceSchema } from "@/shared/study-plan";
+export type { AgentSource } from "@/shared/study-plan";
 
 /** quote: a passage copied from a cited source. check: "quote" = found verbatim, "supported" = also judged to back the claim. Both optional so saved older briefs still load. */
 const PointSchema = z.object({

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { extractObservations, profileDelimited } from "./datasets.mjs";
 import { ANALYSIS_ENGINE, AnalysisRecord, AnalysisSpec, executeAnalysis, validateAnalysis } from "./analysis.mjs";
 import { PaperReference, PaperCheck } from "./paper-schema.mjs";
+import { StudyPlanRecord } from "./study-plans.mjs";
+import { BiologyContextSchema } from "../../shared/study-plan.ts";
 
 const Message = z.object({ id: z.string().uuid(), role: z.enum(["user", "assistant"]), text: z.string().max(80000), status: z.enum(["working", "completed", "failed", "interrupted"]), createdAt: z.string() });
 const Activity = z.object({ id: z.string(), name: z.string(), status: z.enum(["running", "completed", "failed"]), summary: z.string().max(1000) });
@@ -13,8 +15,8 @@ const Source = z.object({ id: z.string(), title: z.string().max(2000), url: z.ur
 const PassageCheck = z.object({ claim: z.string().max(1200), sourceId: z.string().max(80), quote: z.string().max(1000), status: z.enum(["quote-found", "withheld"]), reason: z.string().max(500) });
 const archivedAt = z.string().datetime().nullable().default(null);
 const Session = z.object({ id: z.string().uuid(), title: z.string().max(160), threadId: z.string().nullable(), messages: z.array(Message).max(100), activities: z.array(Activity).max(200), sources: z.array(Source).max(100), checks: z.array(PassageCheck).max(30).default([]), paperChecks: z.array(PaperCheck).max(30).default([]), analyses: z.array(AnalysisRecord).max(12).default([]), status: z.enum(["ready", "working", "completed", "failed", "interrupted"]), archivedAt });
-const Project = z.object({ id: z.string().uuid(), name: z.string().min(1).max(160), path: z.string().min(1), memory: z.string().max(6000), sample: z.boolean(), papers: z.array(PaperReference).max(30).default([]), activeSessionId: z.string().uuid().nullable(), sessions: z.array(Session).max(20), archivedAt });
-const State = z.object({ version: z.literal(1), activeProjectId: z.string().uuid().nullable(), projects: z.array(Project).max(12) });
+const Project = z.object({ id: z.string().uuid(), name: z.string().min(1).max(160), path: z.string().min(1), memory: z.string().max(6000), sample: z.boolean(), papers: z.array(PaperReference).max(30).default([]), plans: z.array(StudyPlanRecord).max(12).default([]), biology: BiologyContextSchema.default(() => BiologyContextSchema.parse({})), activeSessionId: z.string().uuid().nullable(), sessions: z.array(Session).max(20), archivedAt });
+const State = z.object({ version: z.literal(2), activeProjectId: z.string().uuid().nullable(), projects: z.array(Project).max(12) });
 const Label = z.string().trim().min(1).max(160).refine((value) => [...value].every((character) => character.charCodeAt(0) > 31 && character.charCodeAt(0) !== 127), "Use a name on one line.");
 function selectAvailable(state) {
   const projects = state.projects.filter((p) => !p.archivedAt);
@@ -67,11 +69,27 @@ export async function projectFiles(root) {
 }
 
 export class WorkspaceStore {
-  constructor(directory) { this.directory = directory; this.file = path.join(directory, "workspace.json"); this.state = { version: 1, activeProjectId: null, projects: [] }; this.queue = Promise.resolve(); }
+  constructor(directory) { this.directory = directory; this.file = path.join(directory, "workspace.json"); this.state = { version: 2, activeProjectId: null, projects: [] }; this.queue = Promise.resolve(); }
   async load() {
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
-    try { const raw = await fs.readFile(this.file, "utf8"); if (Buffer.byteLength(raw) > 20_000_000) throw new Error("Workspace storage exceeds its limit."); this.state = State.parse(JSON.parse(raw)); }
+    let raw;
+    try { raw = await fs.readFile(this.file, "utf8"); }
     catch (e) { if (e.code !== "ENOENT") throw new Error("Saved workspace could not be loaded. Its file was preserved; choose a separate data directory or restore a backup."); }
+    if (raw !== undefined) {
+      try {
+        if (Buffer.byteLength(raw) > 20_000_000) throw new Error("Workspace storage exceeds its limit.");
+        const previous = JSON.parse(raw), migrated = previous.version === 1;
+        const next = State.parse(migrated ? { ...previous, version: 2 } : previous);
+        if (migrated) {
+          // Older apps must fail to read v2 instead of silently dropping drafts
+          // and context. Preserve the exact pre-upgrade file before any v2 save.
+          const backup = `workspace-v1-before-0.5-${randomUUID()}.json`;
+          await fs.writeFile(path.join(this.directory, backup), raw, { mode: 0o600, flag: "wx" });
+          this.migrationBackup = backup;
+        }
+        this.state = next;
+      } catch { throw new Error("Saved workspace could not be loaded or backed up for upgrade. Its file was preserved; choose a separate data directory or restore a backup."); }
+    }
     for (const p of this.state.projects) for (const s of p.sessions) { if (s.status === "working") s.status = "interrupted"; for (const m of s.messages) if (m.status === "working") m.status = "interrupted"; for (const a of s.activities) if (a.status === "running") a.status = "failed"; for (const analysis of s.analyses) if (analysis.status === "running") { analysis.status = "interrupted"; analysis.error = "The application closed during analysis. No completed result is established; propose a fresh run."; } }
     selectAvailable(this.state);
   }
@@ -119,7 +137,7 @@ export class WorkspaceStore {
   newSession() { const p = this.project(); if (!p) throw new Error("Open a research project first."); if (p.sessions.length >= 20) throw new Error("This project has twenty saved investigations, including archived work. Restore and export any work you need, then remove an archived investigation to make room."); const s = { id: randomUUID(), title: "New investigation", threadId: null, messages: [], activities: [], sources: [], checks: [], status: "ready" }; p.sessions.push(s); p.activeSessionId = s.id; return s; }
   async selectProject(id) { if (!this.state.projects.some((p) => p.id === id && !p.archivedAt)) throw new Error("Unknown active project. Restore archived work from the library."); this.state.activeProjectId = id; await this.persist(); }
   async selectSession(id) { const p = this.project(); if (!p?.sessions.some((s) => s.id === id && !s.archivedAt)) throw new Error("Unknown active investigation. Restore archived work from the library."); p.activeSessionId = id; await this.persist(); }
-  async context() { const p = this.project(); if (!p) throw new Error("Open a project first."); return { name: p.name, memory: p.memory, sample: p.sample, papers: p.papers ?? [], ...(await projectFiles(p.path)) }; }
+  async context() { const p = this.project(); if (!p) throw new Error("Open a project first."); return { name: p.name, memory: p.memory, biology: p.biology ?? {}, plans: (p.plans ?? []).map(({id,revision,document}) => ({id,revision,title:document.protocol.title})), sample: p.sample, papers: p.papers ?? [], ...(await projectFiles(p.path)) }; }
   async read(relative) { const p = this.project(); if (!p) throw new Error("Open a project first."); const file = await safeProjectFile(p.path, relative); return { path: relative, sha256: file.sha256, modifiedAt: file.modifiedAt, bytes: file.size, text: file.text.slice(0, 60000), truncated: file.text.length > 60000 }; }
   async profile(relative) { const p = this.project(); if (!p) throw new Error("Open a project first."); const file = await safeProjectFile(p.path, relative); const ext = path.extname(relative).toLowerCase(); if (![".csv", ".tsv", ".json"].includes(ext)) throw new Error("Choose a CSV, TSV or FHIR Observation JSON file."); return { path: relative, sha256: file.sha256, modifiedAt: file.modifiedAt, bytes: file.size, ...(ext === ".json" ? extractObservations(file.text) : profileDelimited(file.text, ext === ".tsv" ? "\t" : ",")) }; }
   async proposeAnalysis(input, signal = new AbortController().signal) {

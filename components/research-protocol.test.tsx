@@ -5,6 +5,8 @@ import { ResearchProtocol } from "./research-protocol";
 import { createStudyProtocol, PROTOCOL_SECTIONS } from "@/lib/research/protocol";
 import { RESEARCH_STORAGE, readResearch, type ResearchTurn } from "@/lib/research/client";
 import { reply, source, streamReply } from "@/lib/research/test-fixtures";
+import { parseStudyTransfer, serializeStudyTransfer } from "@/shared/study-plan";
+import { syntheticStudyTransfer } from "@/shared/test-fixtures/study-plan.mjs";
 
 const question = "Synthetic study question for protocol planning";
 function turn(): ResearchTurn { return { id: "turn", request: { message: question, query: "synthetic public query", mode: "study-plan", sources: ["pubmed"], searchMode: "manual" }, phase: "done", reply, sourceReviews: [{ sourceId: source.id, decision: "include", note: "", updatedAt: reply.retrievedAt }] }; }
@@ -13,6 +15,29 @@ beforeEach(() => { vi.stubGlobal("fetch", vi.fn(async (url: string) => url === "
 const saved = () => readResearch().threads[0].turns[0].protocol!;
 
 describe("study planning workflow", () => {
+  it("exports exactly this draft and its selected source snapshots for the Mac app", async () => {
+    const onDownload = vi.fn(), protocol = createStudyProtocol(question, [source.id], reply);
+    render(<ResearchProtocol turn={{ ...turn(), protocol }} disabled={false} imported={false} onCreate={vi.fn()} onEdit={vi.fn()} onDownload={onDownload} onNotice={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Export draft for Mac" }));
+    const exported = parseStudyTransfer(onDownload.mock.calls[0][0]);
+    expect(exported.protocol).toEqual(protocol); expect(exported.bibliography).toEqual([source]);
+    expect(exported.origin).toBe("web");
+  });
+  it("imports a Mac draft as separate editable work without searching or sending it to a model", async () => {
+    seed(); const original = readResearch().threads[0]; render(<ResearchWorkspace />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show or hide research conversations" }));
+    const document = syntheticStudyTransfer(), file = new File(["fixture"], "study.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => serializeStudyTransfer(document) });
+    fireEvent.change(screen.getByLabelText("Mac study draft file"), { target: { files: [file] } });
+    expect(await screen.findByRole("region", { name: "Study draft import preview" })).toHaveTextContent("Previous review marks will be reset");
+    fireEvent.click(screen.getByRole("button", { name: "Open imported study draft" }));
+    expect(await screen.findByLabelText("Protocol title")).toHaveValue(document.protocol.title);
+    const saved = readResearch(); expect(saved.threads).toHaveLength(2); expect(saved.threads[0]).toEqual(original);
+    expect(saved.activeId).toBe(saved.threads[1].id); expect(saved.threads[1].turns[0].protocol?.reviewedAt).toBeNull();
+    fireEvent.change(screen.getByLabelText("Comparator"), { target: { value: "Edited after native transfer" } });
+    expect(readResearch().threads[1].turns[0].protocol?.fields.comparator).toBe("Edited after native transfer");
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
   it("creates from included sources without another model call, persists edits and restores them after reload", async () => {
     seed(); const view = render(<ResearchWorkspace />);
     fireEvent.click(await screen.findByRole("button", { name: "Create protocol draft" }));
