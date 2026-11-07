@@ -6,7 +6,9 @@ NutritiScan's ambition is to give a biology researcher the kind of working
 environment Cursor gives a developer: an agent that understands the project,
 inspects evidence and data, proposes work, uses tools, checks results and retains
 a reproducible record. The Mac application is the primary research workspace.
-The website supports discovery, downloads and an evidence-to-protocol workflow.
+The website supports discovery, downloads, health chat and an evidence-to-protocol workflow.
+Health chat remains a core product area. Preserve the existing homepage layout and
+tagline; this roadmap adds product capabilities without replacing those interfaces.
 
 The scientific objective is to help researchers understand disease and develop
 better treatments. A generated answer, target score or computational association

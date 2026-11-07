@@ -1,7 +1,7 @@
 # NutritiScan
 
-NutritiScan is a supervised research agent for human biology. The Mac application
-is the primary workspace: open a project, inspect evidence and data, propose an
+NutritiScan is an AI assistant for medical schools and hospitals. Health chat is
+a core product area. The Mac research workspace lets investigators open a project, inspect evidence and data, propose an
 analysis, review and run it, then preserve results and a reproducible record.
 The active [product roadmap](docs/RESEARCH_PRODUCT_ROADMAP.md) focuses first on
 cancer biology and treatment-resistance research, with measurable delivery gates.
@@ -23,8 +23,8 @@ The website's [Mac download page](https://www.nutritiscan.com/download)
 links a versioned GitHub Release ZIP, shows install requirements and the archive's
 SHA-256, and labels the build as an Apple Silicon preview that is not notarized.
 
-The earlier educational personal-health chat and Android app remain separate
-surfaces. [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases)
+Health chat remains a core part of NutritiScan. Its educational conversations
+and the Android app remain separate from research project data. [Android APK releases](https://github.com/Adarsh-9182/nutritiscan/releases)
 use the same midnight/lime/mint design. They are not the active research roadmap.
 
 The `/health` workspace adds account-scoped reports, confirmed lab trends, health history, record questions, doctor summaries and privacy controls. It requires a separately deployed [FastAPI health service](backend/README.md); until `HEALTH_API_URL` is configured, the dashboard and Android shared-record screens clearly show that the service is not connected. Public chat and the app's local journal remain independent.
