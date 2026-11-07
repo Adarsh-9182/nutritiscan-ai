@@ -191,6 +191,19 @@ describe("conversations", () => {
 
 
 describe("agent provenance in saved answers", () => {
+  it("hides an old empty safety placeholder while keeping the actual safety answer", async () => {
+    seed([
+      msg("user", "Synthetic saved question"),
+      { id: "empty-safety", role: "assistant", parts: [{ type: "data-mode", data: { mode: "safety" } }] } as UIMessage,
+      { id: "safety-answer", role: "assistant", parts: [{ type: "data-mode", data: { mode: "safety" } }, { type: "text", text: "Synthetic safety response." }] } as UIMessage,
+    ]);
+    render(<Chat profile={demoProfile} />);
+    expect(await transcript().findByText("Synthetic safety response.")).toBeInTheDocument();
+    expect(transcript().getAllByText("Safety guidance")).toHaveLength(1);
+    // Rendering must not erase the saved conversation.
+    expect(readActiveThread().messages).toHaveLength(3);
+  });
+
   it("labels reference content and hides simulated consultation activity", async () => {
     const existing = readActiveThread();
     const assistant = { id: "reference", role: "assistant", parts: [{ type: "data-mode", data: { mode: "demo" } }, { type: "data-trace", data: { agents: ["nutrition"], done: true } }, { type: "text", text: "Synthetic reference answer." }] } as UIMessage;

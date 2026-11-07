@@ -222,8 +222,8 @@ async function streamRealSupervisor(
     // A soloist makes no ask* tool call, so without this the UI could not
     // say which specialist answered. Same part id as the keyless path, so a
     // retry down the model ladder updates the trace rather than adding one.
-    // Written only after the stream's own "start": a data part ahead of it
-    // opens a message of its own, and the answer then arrives as a second.
+    // The outer response owns the message id. Provider attempts must not
+    // replace it: metadata or a failed attempt may already be on screen.
     let traced = !solo;
 
     for await (const chunk of stream) {
@@ -259,7 +259,7 @@ async function streamRealSupervisor(
       if (solo && traced && type === "finish") {
         writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: true } } as never);
       }
-      writer.write(chunk as never);
+      if (type !== "start" && type !== "finish") writer.write(chunk as never);
       if (!traced && type === "start") {
         writer.write({ type: "data-trace", id: "trace", data: { agents: [route], done: false } } as never);
         traced = true;
@@ -496,6 +496,9 @@ export async function POST(req: Request) {
 
   const stream = createUIMessageStream({
     async execute({ writer }) {
+      // Start one reply before any safety metadata. Model retries keep this
+      // identity instead of leaving empty "Safety guidance" replies behind.
+      writer.write({ type: "start" });
       writeTriage(writer, state);
       writer.write({ type: "data-mode", id: "mode", data: { mode: "safety" } } as never);
 

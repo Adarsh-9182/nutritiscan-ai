@@ -775,6 +775,10 @@ function Conversation({ thread, profile }: { thread: Thread; profile: HealthProf
                 const mode = answerMode(m);
                 const trace = tracesFor(m);
                 const note = noteFor(m);
+                // Older streams saved empty safety placeholders before the
+                // actual reply. Keep the transcript intact, but do not render
+                // those as extra guidance. The live reply still shows progress.
+                if (mode === "safety" && !text.trim() && !note && !actionPartsOf(m).length && !(busy && idx === messages.length - 1)) return null;
                 const route = badgeFor(trace);
                 const color = agentColor(route);
                 return (
